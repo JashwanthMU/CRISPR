@@ -1,0 +1,4 @@
+[
+  {"finding_id":"TI001","source_type":"THREAT_INTEL","source_name":"MISP","asset_id":"A003","finding_type":"ACTIVE_EXPLOITATION","title":"CVE-2024-21887 being actively exploited by APT groups targeting Indian fintech","cve":"CVE-2024-21887","severity":"CRITICAL","confidence":0.88,"first_seen":"2026-08-08","status":"OPEN"},
+  {"finding_id":"TI002","source_type":"THREAT_INTEL","source_name":"MISP","asset_id":"A002","finding_type":"THREAT_ACTOR","title":"Ransomware group targeting payment databases in APAC region","cve":null,"severity":"HIGH","confidence":0.70,"first_seen":"2026-08-14","status":"OPEN"}
+]

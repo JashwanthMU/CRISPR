@@ -1,10 +1,8 @@
 """Compliance mapping API. Member 5."""
-
 from fastapi import APIRouter
 from backend.compliance.mapper import get_compliance_summary, get_gaps, COMPLIANCE_SCORES
 
 router = APIRouter()
-
 
 @router.get("")
 def compliance_summary():
@@ -17,7 +15,6 @@ def compliance_summary():
         "highest": max(summary, key=lambda x: x["score"]) if summary else None,
     }
 
-
 @router.get("/gaps")
 def compliance_gaps():
     gaps = get_gaps()
@@ -28,7 +25,6 @@ def compliance_gaps():
         "total_impact_inr": total_impact,
         "total_impact_lakh": round(total_impact / 100_000, 2),
     }
-
 
 @router.get("/scores")
 def raw_scores():

@@ -1,0 +1,5 @@
+[
+  {"finding_id":"VS001","source_type":"VULNERABILITY_SCANNER","source_name":"Nessus","asset_id":"A003","finding_type":"CVE","title":"CVE-2024-21887 Remote Code Execution","cve":"CVE-2024-21887","cvss":9.8,"severity":"CRITICAL","patch_available":true,"patch_age_days":21,"exploited_in_wild":true,"confidence":0.90,"first_seen":"2026-08-01","status":"OPEN"},
+  {"finding_id":"VS002","source_type":"VULNERABILITY_SCANNER","source_name":"Nessus","asset_id":"A002","finding_type":"CVE","title":"CVE-2024-3400 SQL Injection","cve":"CVE-2024-3400","cvss":10.0,"severity":"CRITICAL","patch_available":true,"patch_age_days":14,"exploited_in_wild":true,"confidence":0.95,"first_seen":"2026-08-05","status":"OPEN"},
+  {"finding_id":"VS003","source_type":"VULNERABILITY_SCANNER","source_name":"Nessus","asset_id":"A006","finding_type":"CVE","title":"CVE-2023-44487 HTTP/2 Rapid Reset (Isolated test env)","cve":"CVE-2023-44487","cvss":9.8,"severity":"CRITICAL","patch_available":true,"patch_age_days":90,"exploited_in_wild":true,"confidence":0.95,"first_seen":"2026-05-01","status":"OPEN"}
+]
