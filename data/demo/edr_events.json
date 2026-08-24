@@ -1,0 +1,4 @@
+[
+  {"finding_id":"EDR001","source_type":"EDR","source_name":"Microsoft Defender for Endpoint","asset_id":"A004","finding_type":"MALICIOUS_PROCESS","title":"Encoded PowerShell process launched by the customer portal service account","cve":null,"severity":"HIGH","confidence":0.86,"first_seen":"2026-08-20","status":"OPEN"},
+  {"finding_id":"EDR002","source_type":"EDR","source_name":"Microsoft Defender for Endpoint","asset_id":"A005","finding_type":"CREDENTIAL_DUMPING","title":"Credential dumping behavior blocked on HR portal host","cve":null,"severity":"CRITICAL","confidence":0.91,"first_seen":"2026-08-21","status":"OPEN"}
+]

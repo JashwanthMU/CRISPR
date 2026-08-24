@@ -3,30 +3,23 @@
 Run with: python backend/ingestion/seed.py
 """
 
-import json
+import sys
 from pathlib import Path
 
 
-DATA_DIR = Path(__file__).resolve().parents[2] / "data/demo"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-
-def load_json(filename: str) -> list[dict]:
-    with (DATA_DIR / filename).open(encoding="utf-8") as file:
-        return json.load(file)
+from backend.database.connection import init_database
+from backend.ingestion.store import refresh_demo_sources
 
 
 def seed_all() -> None:
-    assets = load_json("assets.json")
-    datasets = {
-        "bug bounty findings": load_json("bug_bounty.json"),
-        "vulnerabilities": load_json("vulnerabilities.json"),
-        "XDR events": load_json("xdr_events.json"),
-        "SIEM events": load_json("siem_events.json"),
-        "IAM findings": load_json("iam.json"),
-        "threat intel findings": load_json("threat_intel.json"),
-    }
-    summary = ", ".join(f"{len(items)} {name}" for name, items in datasets.items())
-    print(f"Seeded: {len(assets)} assets, {summary}")
+    init_database()
+    counts = refresh_demo_sources()
+    summary = ", ".join(f"{count} {source}" for source, count in counts.items())
+    print(f"Seeded PostgreSQL: {summary}")
 
 
 if __name__ == "__main__":
