@@ -1,30 +1,33 @@
 """Finding APIs backed by the demo connector datasets."""
-import json
+
 from collections import Counter, defaultdict
-from pathlib import Path
+
 from fastapi import APIRouter
 
-router = APIRouter()
+from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
+from backend.connectors.edr.connector import fetch_findings as fetch_edr
+from backend.connectors.iam.connector import fetch_findings as fetch_iam
+from backend.connectors.siem.connector import fetch_findings as fetch_siem
+from backend.connectors.threat_intel.connector import fetch_findings as fetch_threat_intel
+from backend.connectors.vulnerability_scanner.connector import fetch_findings as fetch_vulns
+from backend.connectors.xdr.connector import fetch_findings as fetch_xdr
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data/demo"
-FINDING_FILES = (
-    "bug_bounty.json",
-    "vulnerabilities.json",
-    "edr_events.json",
-    "xdr_events.json",
-    "siem_events.json",
-    "iam.json",
-    "cspm.json",
-    "threat_intel.json",
+
+router = APIRouter()
+CONNECTORS = (
+    fetch_bug_bounty,
+    fetch_vulns,
+    fetch_edr,
+    fetch_xdr,
+    fetch_siem,
+    fetch_iam,
+    fetch_threat_intel,
 )
 
 def load_all_findings() -> list[dict]:
     findings: list[dict] = []
-    for filename in FINDING_FILES:
-        path = DATA_DIR / filename
-        if path.exists():
-            with path.open(encoding="utf-8") as file:
-                findings.extend(json.load(file))
+    for fetch in CONNECTORS:
+        findings.extend(fetch())
     return findings
 
 @router.get("")
