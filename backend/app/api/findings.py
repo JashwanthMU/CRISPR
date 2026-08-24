@@ -41,7 +41,7 @@ def get_sources() -> list[dict]:
     ]
 
 @router.get("/correlate")
-def correlate_findings() -> dict:
+def group_findings_by_asset() -> dict:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for finding in load_all_findings():
         grouped[finding["asset_id"]].append(finding)
