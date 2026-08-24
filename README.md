@@ -2,12 +2,12 @@
 
 ## Core Workflow
 
-- Member 1: Harish Kumar
-- Member 2: Ishwarya
-- Member 3: Jashwanth
-- Member 4: Michael
-- Member 5: Kadhiravan
-- Member 6: Karan
+- Member 1: Harish Kumar N
+- Member 2: Ishwarya S
+- Member 3: Jashwanth MU
+- Member 4: Michael S
+- Member 5: Kadhiravan EG
+- Member 6: Karan RJ
 
 ```text
 SECURITY SOURCES
