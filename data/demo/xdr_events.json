@@ -1,0 +1,4 @@
+[
+  {"finding_id":"XDR001","source_type":"XDR","source_name":"CrowdStrike Falcon","asset_id":"A003","finding_type":"SUSPICIOUS_AUTH","title":"347 failed auth attempts followed by successful login from new IP","cve":null,"severity":"HIGH","confidence":0.82,"first_seen":"2026-08-18","status":"OPEN"},
+  {"finding_id":"XDR002","source_type":"XDR","source_name":"CrowdStrike Falcon","asset_id":"A002","finding_type":"LATERAL_MOVEMENT","title":"Unusual internal traffic pattern from payment DB to HR server","cve":null,"severity":"HIGH","confidence":0.75,"first_seen":"2026-08-19","status":"OPEN"}
+]
