@@ -1,11 +1,18 @@
-version: "3.9"
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports: ["8000:8000"]
     volumes: ["./data:/app/data"]
     environment:
       - DATABASE_URL=postgresql://crispr:crispr@db:5432/crispr
+      - AUTH_SECRET=${AUTH_SECRET:-local-development-secret-change-me}
+      - SECURITY_ADMIN_EMAIL=${SECURITY_ADMIN_EMAIL:-security@novapay.com}
+      - SECURITY_ADMIN_PASSWORD=${SECURITY_ADMIN_PASSWORD:-NovaPay-Security-2026}
+    depends_on:
+      db:
+        condition: service_healthy
   db:
     image: postgres:15
     environment:
@@ -13,7 +20,19 @@ services:
       POSTGRES_PASSWORD: crispr
       POSTGRES_DB: crispr
     ports: ["5432:5432"]
-  frontend:
-    build: ./frontend
-    ports: ["3000:3000"]
-    depends_on: [backend]
+    volumes:
+      - crispr_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crispr -d crispr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  bug-bounty:
+    build:
+      context: ./bug-bounty
+    ports: ["3000:80"]
+    depends_on:
+      - backend
+
+volumes:
+  crispr_postgres_data:
