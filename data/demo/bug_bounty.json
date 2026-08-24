@@ -1,0 +1,5 @@
+[
+  {"finding_id":"BB001","source_type":"BUG_BOUNTY","source_name":"HackerOne","asset_id":"A003","finding_type":"AUTH_BYPASS","title":"Authentication bypass on Payment API allows unauthorized access","cve":null,"severity":"CRITICAL","confidence":0.95,"first_seen":"2026-08-10","status":"VALIDATED"},
+  {"finding_id":"BB002","source_type":"BUG_BOUNTY","source_name":"HackerOne","asset_id":"A004","finding_type":"IDOR","title":"IDOR allows accessing other users account data","cve":null,"severity":"HIGH","confidence":0.88,"first_seen":"2026-08-12","status":"VALIDATED"},
+  {"finding_id":"BB003","source_type":"BUG_BOUNTY","source_name":"Bugcrowd","asset_id":"A001","finding_type":"API_ABUSE","title":"Payment API rate limiting bypassable — allows brute force","cve":null,"severity":"HIGH","confidence":0.80,"first_seen":"2026-08-15","status":"TRIAGED"}
+]

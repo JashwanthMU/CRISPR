@@ -1,0 +1,4 @@
+[
+  {"finding_id":"SIEM001","source_type":"SIEM","source_name":"Splunk Enterprise Security","asset_id":"A003","finding_type":"AUTH_ANOMALY","title":"Correlated authentication failures and privileged login from a new IP","cve":null,"severity":"HIGH","confidence":0.84,"first_seen":"2026-08-18","status":"OPEN"},
+  {"finding_id":"SIEM002","source_type":"SIEM","source_name":"Splunk Enterprise Security","asset_id":"A001","finding_type":"API_TRAFFIC_SPIKE","title":"Abnormal payment API request volume detected outside business hours","cve":null,"severity":"MEDIUM","confidence":0.72,"first_seen":"2026-08-20","status":"OPEN"}
+]
