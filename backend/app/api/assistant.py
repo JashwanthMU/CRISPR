@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 router = APIRouter()
 
 class QueryRequest(BaseModel):
@@ -7,4 +8,7 @@ class QueryRequest(BaseModel):
 
 @router.post("/query")
 def query(req: QueryRequest):
-    return {"answer": f"AI Advisor coming soon — Member 4 is building this. You asked: {req.question}", "intent": "stub"}
+    return {
+        "answer": f"AI Advisor coming soon — Member 4 is building this. You asked: {req.question}",
+        "intent": "stub"
+    }
