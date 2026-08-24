@@ -5,6 +5,12 @@ This React application provides two prototype views:
 - **Report a vulnerability** — researchers submit GitHub Advisory-style reports.
 - **Security team** — reviewers inspect reports and accept or reject them.
 
+Security-team users can also create internal advisories from penetration tests,
+red-team exercises, and security reviews using the same private Markdown
+template. The Overview and Policy tabs contain program guidance, scope, safe
+harbor, testing rules, and disclosure expectations. Light and dark themes follow
+the system initially and persist the user's selection in the browser.
+
 The advisory composer follows a GitHub Security Advisory-style workflow. Its
 Write/Preview editor supports GitHub Flavored Markdown, including headings,
 tables, task lists, links, block quotes, inline code, and fenced code blocks.
