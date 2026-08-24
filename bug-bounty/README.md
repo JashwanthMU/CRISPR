@@ -5,6 +5,11 @@ This React application provides two prototype views:
 - **Report a vulnerability** — researchers submit GitHub Advisory-style reports.
 - **Security team** — reviewers inspect reports and accept or reject them.
 
+The advisory composer follows a GitHub Security Advisory-style workflow. Its
+Write/Preview editor supports GitHub Flavored Markdown, including headings,
+tables, task lists, links, block quotes, inline code, and fenced code blocks.
+Markdown is rendered consistently in submitted advisories and triage notes.
+
 Accepted reports are converted to normalized `BUG_BOUNTY` findings and appear in
 `GET /api/findings`, `/api/findings/correlate`, and the relevant asset endpoint.
 
