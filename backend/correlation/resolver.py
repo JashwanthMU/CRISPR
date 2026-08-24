@@ -9,29 +9,22 @@ from typing import Optional
 
 def resolve_asset(raw: dict, known_assets: dict) -> Optional[str]:
     """
-    known_assets: dict keyed by asset_id -> asset record dict (expects
-    'ip' and/or 'hostname' fields on each asset record).
+    known_assets: dict keyed by asset_id -> asset record (expects a 'name' field).
     Returns a resolved asset_id, or None if it truly can't be matched.
     """
     asset_id = raw.get("asset_id")
     if asset_id and asset_id in known_assets:
         return asset_id
 
-    ip = raw.get("ip") or raw.get("host_ip")
-    if ip:
+    # Fallback: match by asset name (case-insensitive)
+    name = raw.get("asset_name") or raw.get("name")
+    if name:
+        name_lower = name.lower()
         for aid, asset in known_assets.items():
-            if asset.get("ip") == ip:
-                return aid
-
-    hostname = raw.get("hostname")
-    if hostname:
-        hostname_lower = hostname.lower()
-        for aid, asset in known_assets.items():
-            if asset.get("hostname", "").lower() == hostname_lower:
+            if asset.get("name", "").lower() == name_lower:
                 return aid
 
     return None
-
 
 def resolve_all(raw_findings: list[dict], known_assets: dict) -> list[dict]:
     """
