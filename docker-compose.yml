@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    volumes: ["./data:/app/data"]
+    environment:
+      - DATABASE_URL=postgresql://crispr:crispr@db:5432/crispr
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: crispr
+      POSTGRES_PASSWORD: crispr
+      POSTGRES_DB: crispr
+    ports: ["5432:5432"]
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    depends_on: [backend]
