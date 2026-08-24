@@ -6,11 +6,12 @@ from pathlib import Path
 
 from fastapi import APIRouter
 
+from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
+
 
 router = APIRouter()
 DATA_DIR = Path(__file__).resolve().parents[3] / "data/demo"
 FINDING_FILES = (
-    "bug_bounty.json",
     "vulnerabilities.json",
     "edr_events.json",
     "xdr_events.json",
@@ -22,7 +23,7 @@ FINDING_FILES = (
 
 
 def load_all_findings() -> list[dict]:
-    findings: list[dict] = []
+    findings: list[dict] = fetch_bug_bounty()
     for filename in FINDING_FILES:
         path = DATA_DIR / filename
         if path.exists():
@@ -76,4 +77,3 @@ def get_findings_by_asset(asset_id: str) -> list[dict]:
         for finding in load_all_findings()
         if finding.get("asset_id") == asset_id
     ]
-
