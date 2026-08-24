@@ -1,8 +1,7 @@
-
 from fastapi import APIRouter
 import json
 from pathlib import Path
-from backend.asset_intelligence.criticality import enrich_asset
+from backend.asset_intelligence.criticality import enrich_asset, calculate_business_criticality
 from backend.controls.effectiveness import calculate_control_effectiveness, DEMO_CONTROLS
 from backend.correlation.correlator import correlate_findings
 from backend.normalization.normalizer import normalize_all
@@ -37,12 +36,22 @@ def get_asset(asset_id: str):
 @router.get("/{asset_id}/risk-cases")
 def get_asset_risk_cases(asset_id: str):
     assets = load_assets()
-    if not any(a["asset_id"] == asset_id for a in assets):
+    asset_record = next((a for a in assets if a["asset_id"] == asset_id), None)
+    if not asset_record:
         return {"error": "not found"}
 
     raw_findings = get_findings_by_asset(asset_id)
     normalized = normalize_all(raw_findings)
-    lookup = _asset_name_lookup(assets)
-    risk_cases = correlate_findings(normalized, assets_lookup=lookup)
+    asset_names = _asset_name_lookup(assets)
 
-    return {"asset_id": asset_id, "risk_case_count": len(risk_cases), "risk_cases": risk_cases}
+    risk_cases = correlate_findings(
+        normalized,
+        asset_names,
+        criticality_lookup=lambda aid: calculate_business_criticality(asset_record),
+    )
+
+    return {
+        "asset_id": asset_id,
+        "risk_case_count": len(risk_cases),
+        "risk_cases": [rc.model_dump() for rc in risk_cases],
+    }
