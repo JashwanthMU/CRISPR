@@ -59,7 +59,7 @@
 ---
 
 ### How to test this PR
-<!-- Exact steps for the reviewer to verify your work -->
+
 1. Pull this branch
 2. Run `pip install -r requirements.txt --prefer-binary`
 3. Run `python -m uvicorn backend.app.main:app --reload --port 8000`
