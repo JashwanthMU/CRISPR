@@ -76,3 +76,4 @@ def get_findings_by_asset(asset_id: str) -> list[dict]:
         for finding in load_all_findings()
         if finding.get("asset_id") == asset_id
     ]
+
