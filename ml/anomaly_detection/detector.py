@@ -1,32 +1,34 @@
-"""Login-anomaly detection over SIEM demo data.
-
-V1 (no training): builds a deterministic daily failed-login-rate series per
-asset, anchored to the real SIEM/XDR signals in data/demo, then flags assets
-whose recent-window failure rate is a statistical outlier (z-score) versus
-the fleet baseline. An optional LLM narration is appended only when the
-router is reachable — the detection itself never depends on it.
-
-V2 plan: replace the z-score layer with a fitted IsolationForest /
-XGBoost model behind the same detect_anomalies() signature.
-"""
+"""Isolation Forest login-anomaly detection over CRISPR SIEM demo data."""
 
 import json
 import random
 from pathlib import Path
+from statistics import fmean, pstdev
 from typing import Optional
+
+from sklearn.ensemble import IsolationForest
+
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "demo"
 
 HISTORY_DAYS = 30
 RECENT_WINDOW_DAYS = 7
-Z_THRESHOLD = 3.0
-RATE_THRESHOLD = 0.15
+DEFAULT_CONTAMINATION = 0.15
+RANDOM_STATE = 42
 
 _BASELINE_RATE = 0.03
 _BASELINE_STD = 0.012
+_AUTH_TERMS = ("auth", "login", "credential", "brute")
+_FEATURE_NAMES = (
+    "historical_failure_rate",
+    "recent_failure_rate",
+    "failure_rate_change",
+    "peak_daily_failure_rate",
+    "auth_signal_count",
+)
 
 
-def _load_json(name: str) -> list:
+def _load_json(name: str) -> list[dict]:
     path = DATA_DIR / name
     if not path.exists():
         return []
@@ -34,71 +36,131 @@ def _load_json(name: str) -> list:
         return json.load(file)
 
 
-def _anchor_assets_from_siem() -> dict:
-    """Derive spike anchors from real SIEM/XDR findings.
-
-    A003 carries correlated auth-failure alerts (SIEM001 + XDR001, 347 failed
-    attempts), so it gets a strong recent spike. Any other asset with an
-    auth/login-flavoured finding gets a mild elevation. Everything else sits
-    at the fleet baseline.
-    """
-    anchors: dict[str, float] = {}
-    for filename in ("siem_events.json", "xdr_events.json"):
-        for event in _load_json(filename):
-            asset_id = event.get("asset_id")
-            title = (event.get("title") or "").lower()
-            ftype = (event.get("finding_type") or "").lower()
-            auth_related = any(k in title or k in ftype for k in ("auth", "login", "brute"))
-            if asset_id and auth_related:
-                anchors[asset_id] = max(anchors.get(asset_id, 0.0), 0.28)
-    return anchors
+def _siem_auth_signals(events: list[dict]) -> dict[str, int]:
+    signals: dict[str, int] = {}
+    for event in events:
+        asset_id = event.get("asset_id")
+        searchable = " ".join(
+            str(event.get(field) or "").lower()
+            for field in ("title", "finding_type")
+        )
+        if asset_id and any(term in searchable for term in _AUTH_TERMS):
+            signals[asset_id] = signals.get(asset_id, 0) + 1
+    return signals
 
 
-def _daily_series(asset_id: str, spike_rate: Optional[float]) -> list[float]:
-    rng = random.Random(f"crispr-{asset_id}")
-    history_end = HISTORY_DAYS - RECENT_WINDOW_DAYS
-    if not spike_rate:
-        return [max(0.001, rng.gauss(_BASELINE_RATE, _BASELINE_STD)) for _ in range(HISTORY_DAYS)]
-    series = [max(0.001, rng.gauss(_BASELINE_RATE * 1.5, _BASELINE_STD)) for _ in range(history_end)]
-    series += [max(0.02, rng.gauss(spike_rate, spike_rate / 6)) for _ in range(RECENT_WINDOW_DAYS)]
-    return series
+def _daily_failure_rates(asset_id: str, auth_signal_count: int) -> list[float]:
+    rng = random.Random(f"crispr-isolation-forest-{asset_id}")
+    historical_days = HISTORY_DAYS - RECENT_WINDOW_DAYS
+    historical = [
+        max(0.001, rng.gauss(_BASELINE_RATE, _BASELINE_STD))
+        for _ in range(historical_days)
+    ]
+    if auth_signal_count:
+        spike_rate = min(0.28 + (auth_signal_count - 1) * 0.05, 0.60)
+        recent = [
+            max(0.02, min(0.99, rng.gauss(spike_rate, spike_rate / 7)))
+            for _ in range(RECENT_WINDOW_DAYS)
+        ]
+    else:
+        recent = [
+            max(0.001, rng.gauss(_BASELINE_RATE, _BASELINE_STD))
+            for _ in range(RECENT_WINDOW_DAYS)
+        ]
+    return historical + recent
+
+
+def _asset_features(asset_id: str, auth_signal_count: int) -> dict:
+    rates = _daily_failure_rates(asset_id, auth_signal_count)
+    historical = rates[:-RECENT_WINDOW_DAYS]
+    recent = rates[-RECENT_WINDOW_DAYS:]
+    historical_rate = fmean(historical)
+    recent_rate = fmean(recent)
+    return {
+        "asset_id": asset_id,
+        "historical_failure_rate": historical_rate,
+        "recent_failure_rate": recent_rate,
+        "failure_rate_change": recent_rate - historical_rate,
+        "peak_daily_failure_rate": max(rates),
+        "auth_signal_count": auth_signal_count,
+    }
+
+
+def _effective_contamination(asset_count: int) -> float:
+    if asset_count < 2:
+        return DEFAULT_CONTAMINATION
+    return min(0.25, max(DEFAULT_CONTAMINATION, 1 / asset_count))
 
 
 def detect_anomalies(include_llm_summary: bool = True) -> dict:
     siem_events = _load_json("siem_events.json")
-    anchors = _anchor_assets_from_siem()
-    asset_ids = sorted({a.get("asset_id") for a in _load_json("assets.json")} |
-                       {e.get("asset_id") for e in siem_events} | set(anchors))
+    auth_signals = _siem_auth_signals(siem_events)
+    asset_ids = sorted(
+        {
+            asset.get("asset_id")
+            for asset in _load_json("assets.json")
+            if asset.get("asset_id")
+        }
+        | set(auth_signals)
+    )
+    feature_rows = [
+        _asset_features(asset_id, auth_signals.get(asset_id, 0))
+        for asset_id in asset_ids
+    ]
 
-    series_by_asset = {aid: _daily_series(aid, anchors.get(aid)) for aid in asset_ids if aid}
+    baseline_rates = [row["historical_failure_rate"] for row in feature_rows]
+    baseline_mean = fmean(baseline_rates) if baseline_rates else 0.0
+    baseline_std = max(pstdev(baseline_rates), 1e-6) if baseline_rates else 1e-6
+    contamination = _effective_contamination(len(feature_rows))
 
-    history_rates = [rate for rates in series_by_asset.values() for rate in rates[:HISTORY_DAYS - RECENT_WINDOW_DAYS]]
-    baseline_mean = sum(history_rates) / len(history_rates)
-    variance = sum((r - baseline_mean) ** 2 for r in history_rates) / len(history_rates)
-    baseline_std = max(variance ** 0.5, 1e-6)
+    if len(feature_rows) >= 2:
+        feature_matrix = [
+            [float(row[name]) for name in _FEATURE_NAMES]
+            for row in feature_rows
+        ]
+        model = IsolationForest(
+            n_estimators=200,
+            contamination=contamination,
+            random_state=RANDOM_STATE,
+        )
+        predictions = model.fit_predict(feature_matrix)
+        anomaly_scores = -model.decision_function(feature_matrix)
+    else:
+        predictions = [1] * len(feature_rows)
+        anomaly_scores = [0.0] * len(feature_rows)
 
     assets_report = []
-    for asset_id, series in sorted(series_by_asset.items()):
-        recent = series[-RECENT_WINDOW_DAYS:]
-        recent_mean = sum(recent) / len(recent)
-        z_score = (recent_mean - baseline_mean) / baseline_std
-        is_anomaly = z_score >= Z_THRESHOLD or recent_mean >= RATE_THRESHOLD
-        assets_report.append({
-            "asset_id": asset_id,
-            "recent_failure_rate": round(recent_mean, 4),
-            "baseline_failure_rate": round(baseline_mean, 4),
-            "z_score": round(z_score, 2),
-            "peak_daily_rate": round(max(series), 4),
-            "is_anomaly": is_anomaly,
-        })
+    for row, prediction, anomaly_score in zip(
+        feature_rows, predictions, anomaly_scores
+    ):
+        recent_rate = row["recent_failure_rate"]
+        assets_report.append(
+            {
+                "asset_id": row["asset_id"],
+                "historical_failure_rate": round(row["historical_failure_rate"], 4),
+                "recent_failure_rate": round(recent_rate, 4),
+                "failure_rate_change": round(row["failure_rate_change"], 4),
+                "peak_daily_failure_rate": round(row["peak_daily_failure_rate"], 4),
+                "auth_signal_count": row["auth_signal_count"],
+                "anomaly_score": round(float(anomaly_score), 4),
+                "z_score": round((recent_rate - baseline_mean) / baseline_std, 2),
+                "is_anomaly": int(prediction) == -1,
+            }
+        )
 
-    anomalies = [a for a in assets_report if a["is_anomaly"]]
+    anomalies = sorted(
+        (row for row in assets_report if row["is_anomaly"]),
+        key=lambda row: row["anomaly_score"],
+        reverse=True,
+    )
     result = {
-        "model": "zscore_v1",
+        "model": "isolation_forest_v1",
+        "training_mode": "runtime_unsupervised_fit",
         "window_days": RECENT_WINDOW_DAYS,
         "history_days": HISTORY_DAYS,
         "baseline_failure_rate": round(baseline_mean, 4),
-        "z_threshold": Z_THRESHOLD,
+        "contamination": round(contamination, 4),
+        "feature_names": list(_FEATURE_NAMES),
         "siem_events_considered": len(siem_events),
         "anomalies": anomalies,
         "assets": assets_report,
@@ -112,20 +174,23 @@ def detect_anomalies(include_llm_summary: bool = True) -> dict:
 def _narrate(detection: dict) -> Optional[str]:
     try:
         from ai.tools.llm import chat, is_available
+
         if not is_available():
             return None
         facts = {
             "baseline_failure_rate": detection["baseline_failure_rate"],
             "anomalies": [
-                {"asset_id": a["asset_id"], "recent_failure_rate": a["recent_failure_rate"],
-                 "z_score": a["z_score"]}
-                for a in detection["anomalies"]
+                {
+                    "asset_id": anomaly["asset_id"],
+                    "recent_failure_rate": anomaly["recent_failure_rate"],
+                    "anomaly_score": anomaly["anomaly_score"],
+                }
+                for anomaly in detection["anomalies"]
             ],
         }
         return chat(
             task="explain",
-            system="You are CRISPR's anomaly analyst. Summarize the login anomalies in 2-3 "
-                   "sentences for a security manager. Use ONLY the numbers provided; do not invent any.",
+            system="You are CRISPR's anomaly analyst. Summarize the login anomalies in 2-3 sentences for a security manager. Use only the provided figures.",
             user=json.dumps(facts),
         )
     except Exception:

@@ -67,7 +67,7 @@ def _answer_top_risk(question: str = "") -> tuple[str, dict]:
     enterprise = risk_tools.get_enterprise_summary()
     top = enterprise.get("top_risk") or {}
     drivers = top.get("risk_drivers") or []
-    driver_names = ", ".join(d.get("driver", d.get("name", "")) for d in drivers[:3] if isinstance(d, dict)) \
+    driver_names = ", ".join((d.get("factor") or d.get("driver") or d.get("name", "")) for d in drivers[:3] if isinstance(d, dict)) \
         if drivers else "exposure, threat activity and control weakness"
     answer = (
         f"Our highest financial cyber risk is {top.get('asset_name', 'unknown')} "
@@ -91,7 +91,7 @@ def _answer_risk_drivers(question: str) -> tuple[str, dict]:
     likelihood_pct = likelihood * 100 if likelihood <= 1 else likelihood
     drivers = row.get("risk_drivers") or []
     driver_lines = "; ".join(
-        d.get("driver", d.get("name", "driver")) if isinstance(d, dict) else str(d)
+        (d.get("factor") or d.get("driver") or d.get("name", "driver")) if isinstance(d, dict) else str(d)
         for d in drivers[:5]
     ) or "control weakness and exposure"
     answer = (
@@ -171,7 +171,7 @@ def _answer_anomalies(question: str) -> tuple[str, dict]:
     flagged = detection["anomalies"]
     if flagged:
         parts = ", ".join(
-            f"{a['asset_id']} ({format_pct(a['recent_failure_rate'] * 100)} recent failure rate, z={a['z_score']})"
+            f"{a['asset_id']} ({format_pct(a['recent_failure_rate'] * 100)} recent failure rate, anomaly score {a['anomaly_score']:.4f})"
             for a in flagged
         )
         answer = (

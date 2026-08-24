@@ -1,11 +1,4 @@
-"""Deterministic EAL trend forecasting.
-
-Projects the do-nothing Expected Annual Loss trajectory over a horizon.
-Pure arithmetic — no model training. A fitted/V2 model can replace
-generate_trend later behind the same signature.
-"""
-
-from typing import Optional
+"""Deterministic linear EAL forecasting for the prototype."""
 
 DEFAULT_DAILY_GROWTH_RATE = 0.0077
 DEFAULT_HORIZON_DAYS = 90
@@ -25,10 +18,10 @@ def generate_trend(
 
     points = []
     for day in range(0, horizon_days + 1, step_days):
-        projected = base_eal_inr * ((1 + daily_growth_rate) ** day)
+        projected = base_eal_inr * (1 + daily_growth_rate * day)
         points.append({"day": day, "eal_inr": round(projected)})
     if points[-1]["day"] != horizon_days:
-        projected = base_eal_inr * ((1 + daily_growth_rate) ** horizon_days)
+        projected = base_eal_inr * (1 + daily_growth_rate * horizon_days)
         points.append({"day": horizon_days, "eal_inr": round(projected)})
     return points
 
@@ -55,6 +48,8 @@ def forecast_eal(
 ) -> dict:
     trend = generate_trend(base_eal_inr, horizon_days, step_days, daily_growth_rate)
     return {
+        "model": "linear_v1",
+        "model_trained": False,
         "base_eal_inr": round(base_eal_inr),
         "horizon_days": horizon_days,
         "step_days": step_days,

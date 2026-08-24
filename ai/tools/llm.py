@@ -1,6 +1,6 @@
 """LLM client for the AI Risk Advisor.
 
-Talks to an OpenAI-compatible router (Kiro-backed models). Configuration
+Talks to an OpenAI-compatible model API. Configuration
 comes from environment variables loaded from .env:
 
     LLM_BASE_URL  (default: the team router)
@@ -21,14 +21,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DEFAULT_BASE_URL = "http://98.94.73.175:20128/v1"
-REQUEST_TIMEOUT_S = 25.0
+REQUEST_TIMEOUT_S = 90.0
+AVAILABILITY_TIMEOUT_S = 25.0
 AVAILABILITY_TTL_S = 60.0
 
 MODEL_REGISTRY = {
-    "route": "kr/gpt-5.6-luna",
-    "explain": "kr/claude-opus-5",
-    "agent": "kr/claude-opus-5-agentic",
+    "route": "kr/gpt-5.6-sol",
+    "explain": "kr/claude-opus-5-thinking",
+    "agent": "kr/claude-opus-5-thinking-agentic",
     "mitigate": "kr/gpt-5.6-sol-thinking",
+}
+
+MODEL_FALLBACKS = {
+    "route": ["kr/gpt-5.6-terra", "kr/gpt-5.6-luna"],
+    "explain": ["kr/claude-opus-5", "kr/gpt-5.6-sol-thinking"],
+    "agent": ["kr/claude-opus-5-agentic", "kr/gpt-5.6-sol-thinking-agentic"],
+    "mitigate": ["kr/claude-opus-5-thinking", "kr/gpt-5.6-sol"],
 }
 
 _client: Optional[httpx.Client] = None
@@ -63,7 +71,7 @@ def is_available(force_check: bool = False) -> bool:
     if not force_check and (now - _last_availability_check) < AVAILABILITY_TTL_S:
         return _available
     try:
-        response = get_client().get("/models", timeout=5.0)
+        response = get_client().get("/models", timeout=AVAILABILITY_TIMEOUT_S)
         _available = response.status_code == 200
     except Exception:
         _available = False
@@ -86,28 +94,33 @@ def chat(
     _, api_key, enabled = _settings()
     if not enabled or not api_key:
         return None
-    model = MODEL_REGISTRY.get(task, MODEL_REGISTRY["explain"])
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "stream": False,
-    }
-    try:
-        response = get_client().post(
-            "/chat/completions",
-            json=payload,
-            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
-        )
-        response.raise_for_status()
-        body = response.json()
-        return body["choices"][0]["message"]["content"]
-    except Exception:
-        return None
+    primary = MODEL_REGISTRY.get(task, MODEL_REGISTRY["explain"])
+    models = [primary, *MODEL_FALLBACKS.get(task, MODEL_FALLBACKS["explain"])]
+    for model in dict.fromkeys(models):
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+        }
+        try:
+            response = get_client().post(
+                "/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            response.raise_for_status()
+            body = response.json()
+            content = body["choices"][0]["message"]["content"]
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        except Exception:
+            continue
+    return None
 
 
 def route_with_llm(question: str, candidates: list[str]) -> Optional[str]:

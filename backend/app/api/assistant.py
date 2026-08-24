@@ -59,6 +59,7 @@ def forecast(
     result["intent"] = "risk_forecast"
     result["baseline_eal_inr"] = round(baseline)
     result["patch_delay_applied"] = delay_applied
+    result["source"] = "risk_engine"
     return result
 
 
