@@ -24,8 +24,8 @@ def _greedy_select(budget_inr: float) -> list:
 def optimize_budget(budget_inr: float) -> dict:
     selected, solver_used = [], "greedy"
     try:
-        from pulp import LpProblem, LpVariable, LpMaximize, lpSum, value, PULP_CBC_CMD
-        prob = LpProblem("CRISPR_Optimizer", LpMaximize)
+        from pulp import LpProblem, LpVariable, LpMaximize, lpSum, COIN_CMD
+        prob.solve(COIN_CMD(msg=0))
         x = {c["id"]: LpVariable(c["id"], cat="Binary") for c in CONTROLS}
         prob += lpSum(x[c["id"]] * c["risk_reduction_inr"] for c in CONTROLS)
         prob += lpSum(x[c["id"]] * c["cost_inr"] for c in CONTROLS) <= budget_inr
