@@ -1,4 +1,4 @@
-"""Budget optimizer tool — the AI's access to Member 5's knapsack. Member 4."""
+"""Budget optimizer tool — the AI's access to the budget optimizer knapsack."""
 
 from backend.optimizer.knapsack import optimize_budget as _optimize_budget
 

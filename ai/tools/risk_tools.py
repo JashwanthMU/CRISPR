@@ -1,4 +1,4 @@
-"""Risk tools — the AI's access to Member 3's risk engine. Member 4.
+"""Risk tools — the AI's access to the risk engine.
 
 Thin wrappers around GET /api/risks, /api/risks/enterprise and
 /api/risks/{asset_id}. In-process calls keep the prototype deterministic

@@ -1,4 +1,4 @@
-"""Incident probability predictor — rule-based V1, XGBoost-ready V2. Member 4.
+"""Incident probability predictor — rule-based V1, XGBoost-ready V2.
 
 predict_incident(features) -> {"probability": float, "contributions": dict}
 
@@ -76,7 +76,7 @@ def predict_incident(
 
 
 def predict_incident_from_risk_row(risk_row: dict) -> Optional[dict]:
-    """Build features from a Member 3 risk row (asset-level risk case)."""
+    """Build features from a risk-engine row (asset-level risk case)."""
     try:
         return predict_incident(
             cvss=float(risk_row.get("cvss", risk_row.get("risk_score", 7.5))),

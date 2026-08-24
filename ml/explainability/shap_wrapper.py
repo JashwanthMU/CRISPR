@@ -1,4 +1,4 @@
-"""Explainability wrapper. Member 4.
+"""Explainability wrapper.
 
 V1: formats rule-based model contributions in a SHAP-style layout so the
 advisor and frontend can render impact bars today.

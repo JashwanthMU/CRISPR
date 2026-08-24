@@ -1,4 +1,4 @@
-"""CRISPR AI Risk Advisor — query engine. Member 4.
+"""CRISPR AI Risk Advisor — query engine.
 
 Pipeline: NL question -> deterministic keyword intent routing (LLM cascade
 for unrecognized phrasing) -> fetch real figures from backend APIs ->

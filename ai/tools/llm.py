@@ -1,4 +1,4 @@
-"""LLM client for the AI Risk Advisor. Member 4.
+"""LLM client for the AI Risk Advisor.
 
 Talks to an OpenAI-compatible router (Kiro-backed models). Configuration
 comes from environment variables loaded from .env:

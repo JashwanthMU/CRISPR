@@ -1,4 +1,4 @@
-"""Number guardrail — enforces 'AI never invents ₹ figures'. Member 4.
+"""Number guardrail — enforces 'AI never invents ₹ figures'.
 
 Every LLM-generated answer passes through validate(): money amounts are
 extracted from the text and checked against the set of figures actually

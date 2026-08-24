@@ -1,4 +1,4 @@
-"""Shared formatting helpers for advisor tools. Member 4."""
+"""Shared formatting helpers for advisor tools."""
 
 
 def format_inr(value: float) -> str:

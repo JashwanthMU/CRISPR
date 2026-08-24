@@ -1,4 +1,4 @@
-"""Deterministic EAL trend forecasting. Member 4.
+"""Deterministic EAL trend forecasting.
 
 Projects the do-nothing Expected Annual Loss trajectory over a horizon.
 Pure arithmetic — no model training. A fitted/V2 model can replace

@@ -1,4 +1,4 @@
-"""AI Risk Advisor API — Member 4.
+"""AI Risk Advisor API.
 
 POST /api/assistant/query      {question} -> {answer, data, intent, engine}
 GET  /api/assistant/forecast   90-day EAL trajectory (optional ?patch_delay=30)

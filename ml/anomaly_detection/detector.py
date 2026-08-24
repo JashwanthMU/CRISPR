@@ -1,4 +1,4 @@
-"""Login-anomaly detection over SIEM demo data. Member 4.
+"""Login-anomaly detection over SIEM demo data.
 
 V1 (no training): builds a deterministic daily failed-login-rate series per
 asset, anchored to the real SIEM/XDR signals in data/demo, then flags assets

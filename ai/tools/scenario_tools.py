@@ -1,4 +1,4 @@
-"""Scenario tools — the AI's access to Member 5's what-if simulator. Member 4.
+"""Scenario tools — the AI's access to the what-if scenario simulator.
 
 Calls the scenario ENGINE directly (backend/scenario_engine/simulator.py).
 The HTTP route function in api/scenarios.py uses FastAPI Query() defaults,
