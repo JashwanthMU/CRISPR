@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { optimize } from '../services/api';
 import { MOCK_CONTROLS, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
-import { formatRupees } from '../utils/format';
+import { formatRupees, TOKENS } from '../utils/format';
 
 export default function Investments() {
   const [budgetLakh, setBudgetLakh] = useState(100); // ₹100L default
@@ -31,11 +31,9 @@ export default function Investments() {
   const chartData = (result?.selected_controls ?? []).map((c: any) => ({ name: c.name, value: c.risk_reduction_inr }));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-          Where should your next security rupee go?
-        </h1>
+    <div className="page-container page-stack">
+      <div className="animate-in">
+        <h1 className="page-title">Where should your next security rupee go?</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           NovaPay Investment Optimizer · Maximize risk reduction per rupee spent
         </p>
@@ -73,7 +71,7 @@ export default function Investments() {
         <>
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>
                 Optimal ₹{budgetLakh}L Portfolio → {formatRupees(result.total_risk_reduction_inr)} Risk Reduction
               </div>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>
@@ -83,11 +81,12 @@ export default function Investments() {
             <span
               style={{
                 fontSize: '0.9375rem',
-                fontWeight: 800,
+                fontWeight: 600,
                 padding: '8px 18px',
                 borderRadius: 9999,
-                background: 'rgba(34,197,94,0.15)',
-                color: 'var(--sev-low)',
+                background: 'var(--color-bg)',
+                border: '1px solid var(--color-success)',
+                color: 'var(--color-success)',
               }}
             >
               ROSI {(result.rosi_pct / 100).toFixed(1)}x
@@ -112,7 +111,7 @@ export default function Investments() {
                     <tr key={c.name}>
                       <td>{c.name}</td>
                       <td>{formatRupees(c.cost_inr)}</td>
-                      <td style={{ color: 'var(--sev-low)', fontWeight: 700 }}>{formatRupees(c.risk_reduction_inr)}</td>
+                      <td style={{ color: 'var(--color-success)', fontWeight: 500 }}>{formatRupees(c.risk_reduction_inr)}</td>
                       <td>{c.complexity}</td>
                       <td>{c.weeks}w</td>
                     </tr>
@@ -125,14 +124,14 @@ export default function Investments() {
               <div className="card-title">Risk Reduction by Control</div>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: '#8b949e', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatRupees(v)} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: '#8b949e', fontSize: 10 }} axisLine={false} tickLine={false} width={120} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={TOKENS.divider} horizontal={false} />
+                  <XAxis type="number" tick={{ fill: TOKENS.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatRupees(v)} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: TOKENS.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} width={120} />
                   <Tooltip
-                    contentStyle={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, color: '#f0f6fc' }}
+                    contentStyle={{ background: TOKENS.bg, border: `1px solid ${TOKENS.border}`, borderRadius: 8, color: TOKENS.textPrimary, boxShadow: '0 2px 6px rgba(60,64,67,0.15)' }}
                     formatter={(value: number) => [formatRupees(value), 'Risk Reduction']}
                   />
-                  <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" fill={TOKENS.success} radius={[0, 4, 4, 0]} isAnimationActive animationDuration={500} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -168,7 +167,7 @@ export default function Investments() {
                       style={{
                         fontSize: '0.6875rem',
                         fontWeight: 700,
-                        color: selected ? 'var(--sev-low)' : 'var(--text-subtle)',
+                        color: selected ? 'var(--color-success)' : 'var(--color-text-muted)',
                       }}
                     >
                       {selected ? 'SELECTED' : 'Not selected'}

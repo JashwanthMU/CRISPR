@@ -17,9 +17,10 @@ export default function SourcePill({ source }: Props) {
         borderRadius: 4,
         fontSize: '0.6875rem',
         fontWeight: 700,
-        background: `${color}20`,
+        // Strict palette: white surface + colored border/text, no alpha-tinted fill.
+        background: 'var(--color-bg)',
         color,
-        border: `1px solid ${color}40`,
+        border: `1px solid ${color}`,
       }}
     >
       {sourceAbbrev(source)}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Bandage, Lock, Clock } from 'lucide-react';
+import { CheckCircle2, Wrench, Lock, Clock } from 'lucide-react';
 import { formatRupees } from '../utils/format';
 import { MOCK_RISKS } from '../utils/mock';
 
@@ -13,7 +13,7 @@ interface SimResult {
 
 const PRESETS = [
   { key: 'mfa', label: 'Enable MFA', icon: <CheckCircle2 size={16} />, savings: 4860000, cost: 1500000, rosi: 224, negative: false },
-  { key: 'patch', label: 'Patch Immediately', icon: <Bandage size={16} />, savings: 3100000, cost: 1200000, rosi: 158, negative: false },
+  { key: 'patch', label: 'Patch Immediately', icon: <Wrench size={16} />, savings: 3100000, cost: 1200000, rosi: 158, negative: false },
   { key: 'segmentation', label: 'Add Segmentation', icon: <Lock size={16} />, savings: 3870000, cost: 3000000, rosi: null, negative: false },
   { key: 'delay', label: 'Delay Patching 30d', icon: <Clock size={16} />, savings: -2100000, cost: 0, rosi: null, negative: true },
 ];
@@ -63,9 +63,9 @@ export default function Scenarios() {
   const diffGood = diff < 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>What-If Scenario Simulator</h1>
+    <div className="page-container page-stack">
+      <div className="animate-in">
+        <h1 className="page-title">What-If Scenario Simulator</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Model the financial impact of security investments before you make them
         </p>

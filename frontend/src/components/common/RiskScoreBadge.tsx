@@ -18,10 +18,11 @@ export default function RiskScoreBadge({ score, size = 48 }: Props) {
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
-        background: `${color}14`,
+        // Strict palette: no alpha-tinted semantic backgrounds — white surface only.
+        background: 'var(--color-bg)',
       }}
     >
-      <span style={{ fontWeight: 800, fontSize: size / 2.6, color }}>{score}</span>
+      <span style={{ fontWeight: 600, fontSize: size / 2.6, color }}>{score}</span>
     </div>
   );
 }

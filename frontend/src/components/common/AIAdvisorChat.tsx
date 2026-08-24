@@ -56,7 +56,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
-  const accent = theme === 'security' ? 'var(--accent-blue)' : 'var(--sev-low)';
+  const accent = theme === 'security' ? 'var(--color-primary-blue)' : 'var(--color-success)';
 
   const send = async (question: string) => {
     if (!question.trim() || loading) return;
@@ -79,7 +79,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Bot size={18} color={accent} />
-          <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
+          <span style={{ fontWeight: 500, fontSize: '0.9375rem', color: 'var(--color-text-primary)' }}>
             CRISPR {theme === 'security' ? 'Security' : 'Financial'} Advisor
           </span>
         </div>
@@ -89,11 +89,11 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
             alignItems: 'center',
             gap: 4,
             fontSize: '0.6875rem',
-            fontWeight: 700,
+            fontWeight: 600,
             padding: '3px 8px',
             borderRadius: 9999,
-            background: 'rgba(124,58,237,0.15)',
-            color: 'var(--accent-violet)',
+            background: 'var(--color-light-blue)',
+            color: 'var(--color-primary-blue)',
           }}
         >
           <Sparkles size={10} /> Powered by AI

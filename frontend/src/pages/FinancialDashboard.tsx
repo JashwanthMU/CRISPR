@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IndianRupee, TrendingUp, Wallet, Percent } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
 import FinancialBreakdownBar from '../components/charts/FinancialBreakdownBar';
@@ -6,7 +7,8 @@ import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
 import { getEnterprise, getRisks, getCompliance, optimize } from '../services/api';
 import { MOCK_ENTERPRISE, MOCK_RISKS, MOCK_COMPLIANCE, MOCK_FORECAST, MOCK_ACTIONS, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
-import { formatRupees, formatLakh } from '../utils/format';
+import { formatRupees, formatLakh, TOKENS } from '../utils/format';
+import { toast } from '../lib/toastStore';
 
 const FINANCIAL_SUGGESTIONS = [
   'What is our total financial cyber exposure?',
@@ -25,12 +27,13 @@ const LOSS_LABELS: Record<string, string> = {
 };
 
 function complianceColor(score: number) {
-  if (score < 75) return '#ef4444';
-  if (score <= 85) return '#f97316';
-  return '#22c55e';
+  if (score < 75) return TOKENS.critical;
+  if (score <= 85) return TOKENS.sevHigh;
+  return TOKENS.success;
 }
 
 export default function FinancialDashboard() {
+  const navigate = useNavigate();
   const [enterprise, setEnterprise] = useState<any>(MOCK_ENTERPRISE);
   const [risks, setRisks] = useState<any[]>(MOCK_RISKS);
   const [compliance, setCompliance] = useState<any[]>(MOCK_COMPLIANCE);
@@ -82,24 +85,20 @@ export default function FinancialDashboard() {
   const currentSpend = enterprise.current_spend_inr ?? 2800000;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-          Cyber Risk Financial Dashboard
-        </h1>
-        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          Board-level financial exposure · NovaPay Financial Services
-        </p>
+    <div className="page-container page-stack">
+      <div className="animate-in">
+        <h1 className="page-title">Cyber Risk Financial Dashboard</h1>
+        <p className="page-subtitle">Board-level financial exposure · NovaPay Financial Services</p>
       </div>
 
       {/* KPI Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard
           title="Expected Annual Loss"
           value={formatLakh(enterprise.total_eal_lakh)}
           subtitle="Total cyber exposure this year"
           icon={<IndianRupee size={16} />}
-          accentColor="#ef4444"
+          accentColor={TOKENS.critical}
           demo={usingDemo.enterprise}
         />
         <KPICard
@@ -107,7 +106,7 @@ export default function FinancialDashboard() {
           value={formatRupees(enterprise.var_95_inr)}
           subtitle="Worst-case annual scenario"
           icon={<TrendingUp size={16} />}
-          accentColor="#f97316"
+          accentColor={TOKENS.sevHigh}
           demo={usingDemo.enterprise}
         />
         <KPICard
@@ -115,7 +114,7 @@ export default function FinancialDashboard() {
           value={`${formatRupees(currentSpend)}/yr`}
           subtitle={`vs. ${formatLakh(enterprise.total_eal_lakh)} annual loss exposure`}
           icon={<Wallet size={16} />}
-          accentColor="#2563eb"
+          accentColor={TOKENS.primaryBlue}
           demo={usingDemo.enterprise}
         />
         <KPICard
@@ -123,12 +122,12 @@ export default function FinancialDashboard() {
           value="980%"
           subtitle="Top action: Enable MFA"
           icon={<Percent size={16} />}
-          accentColor="#22c55e"
+          accentColor={TOKENS.success}
         />
       </div>
 
       {/* Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
+      <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }}>
         <div className="card">
           <div className="card-title">Financial Risk by Asset</div>
           <FinancialBreakdownBar data={barData} height={260} />
@@ -178,7 +177,7 @@ export default function FinancialDashboard() {
       </div>
 
       {/* Row 3 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div className="dashboard-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
         <div className="card">
           <div className="card-title">Top Recommended Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -193,16 +192,24 @@ export default function FinancialDashboard() {
                   <span
                     style={{
                       fontSize: '0.6875rem',
-                      fontWeight: 700,
+                      fontWeight: 600,
                       padding: '2px 8px',
                       borderRadius: 9999,
-                      background: 'rgba(34,197,94,0.15)',
-                      color: 'var(--sev-low)',
+                      background: 'var(--color-bg)',
+                      border: '1px solid var(--color-success)',
+                      color: 'var(--color-success)',
                     }}
                   >
                     ROSI {a.rosi_pct}%
                   </span>
-                  <button className="btn-primary" style={{ padding: '4px 10px', fontSize: '0.6875rem' }}>
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '4px 10px', fontSize: '0.6875rem' }}
+                    onClick={() => {
+                      toast.success('Remediation queued', `${a.name} added to the remediation queue.`);
+                      navigate('/remediation-queue');
+                    }}
+                  >
                     Implement Now
                   </button>
                 </div>
@@ -259,21 +266,21 @@ export default function FinancialDashboard() {
             <AreaChart data={MOCK_FORECAST} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
               <defs>
                 <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                  <stop offset="5%" stopColor={TOKENS.critical} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={TOKENS.critical} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="colorActions" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                  <stop offset="5%" stopColor={TOKENS.success} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={TOKENS.success} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
-              <XAxis dataKey="day" tick={{ fill: '#8b949e', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `D${v}`} />
-              <YAxis tick={{ fill: '#8b949e', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}L`} />
-              <Tooltip contentStyle={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, color: '#f0f6fc' }} />
-              <Legend wrapperStyle={{ fontSize: 11, color: '#8b949e' }} />
-              <Area type="monotone" dataKey="current" name="No action" stroke="#ef4444" fill="url(#colorCurrent)" strokeWidth={2} />
-              <Area type="monotone" dataKey="withActions" name="With actions" stroke="#22c55e" fill="url(#colorActions)" strokeWidth={2} />
+              <CartesianGrid strokeDasharray="3 3" stroke={TOKENS.divider} vertical={false} />
+              <XAxis dataKey="day" tick={{ fill: TOKENS.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `D${v}`} />
+              <YAxis tick={{ fill: TOKENS.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}L`} />
+              <Tooltip contentStyle={{ background: TOKENS.bg, border: `1px solid ${TOKENS.border}`, borderRadius: 8, color: TOKENS.textPrimary, boxShadow: '0 2px 6px rgba(60,64,67,0.15)' }} />
+              <Legend wrapperStyle={{ fontSize: 11, color: TOKENS.textSecondary }} />
+              <Area type="monotone" dataKey="current" name="No action" stroke={TOKENS.critical} fill="url(#colorCurrent)" strokeWidth={2} isAnimationActive animationDuration={500} />
+              <Area type="monotone" dataKey="withActions" name="With actions" stroke={TOKENS.success} fill="url(#colorActions)" strokeWidth={2} isAnimationActive animationDuration={500} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

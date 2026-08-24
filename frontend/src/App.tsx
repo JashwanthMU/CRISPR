@@ -1,6 +1,11 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Layout/Sidebar';
 import TopBar from './components/Layout/TopBar';
+import ToastHost from './components/common/ToastHost';
+import CommandPalette from './components/common/CommandPalette';
+import { openCommandPalette, closeCommandPalette, useUiStore } from './lib/uiStore';
+
 import SecurityDashboard from './pages/SecurityDashboard';
 import FinancialDashboard from './pages/FinancialDashboard';
 import Findings from './pages/Findings';
@@ -10,28 +15,110 @@ import Scenarios from './pages/Scenarios';
 import Investments from './pages/Investments';
 import Compliance from './pages/Compliance';
 
+import AttackPaths from './pages/AttackPaths';
+import Resources from './pages/Resources';
+import Vulnerabilities from './pages/Vulnerabilities';
+import Secrets from './pages/Secrets';
+import ThreatIntelligence from './pages/ThreatIntelligence';
+import CloudSecurity from './pages/CloudSecurity';
+import IdentitySecurity from './pages/IdentitySecurity';
+import CodeSecurity from './pages/CodeSecurity';
+import RepositoryDetail from './pages/RepositoryDetail';
+import ScaSbom from './pages/ScaSbom';
+import Recommendations from './pages/Recommendations';
+import RemediationQueue from './pages/RemediationQueue';
+import Policies from './pages/Policies';
+import Reports from './pages/Reports';
+import Integrations from './pages/Integrations';
+import ApiReference from './pages/ApiReference';
+import SettingsPage from './pages/Settings';
+import VSCodeDemo from './pages/VSCodeDemo';
+
+function useGlobalShortcuts() {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMeta = e.ctrlKey || e.metaKey;
+      if (isMeta && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const isOpen = useUiStore.getState().commandPaletteOpen;
+        isOpen ? closeCommandPalette() : openCommandPalette();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+}
+
+function Shell() {
+  useGlobalShortcuts();
+  const collapsed = useUiStore((s) => s.sidebarCollapsed);
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-base)' }}>
+      <Sidebar />
+      <div
+        className="app-main"
+        style={{
+          flex: 1,
+          marginLeft: collapsed ? 68 : 240,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
+          transition: 'margin-left 0.15s ease',
+          minWidth: 0,
+        }}
+      >
+        <TopBar />
+        <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/security" replace />} />
+            <Route path="/security" element={<SecurityDashboard />} />
+            <Route path="/financial" element={<FinancialDashboard />} />
+
+            <Route path="/findings" element={<Findings />} />
+            <Route path="/assets" element={<Assets />} />
+            <Route path="/risks" element={<Risks />} />
+            <Route path="/attack-paths" element={<AttackPaths />} />
+            <Route path="/resources" element={<Resources />} />
+
+            <Route path="/vulnerabilities" element={<Vulnerabilities />} />
+            <Route path="/secrets" element={<Secrets />} />
+            <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
+            <Route path="/cloud-security" element={<CloudSecurity />} />
+            <Route path="/identity-security" element={<IdentitySecurity />} />
+            <Route path="/code-security" element={<CodeSecurity />} />
+            <Route path="/code-security/repositories/:id" element={<RepositoryDetail />} />
+            <Route path="/code-security/sca" element={<ScaSbom />} />
+
+            <Route path="/scenarios" element={<Scenarios />} />
+            <Route path="/recommendations" element={<Recommendations />} />
+            <Route path="/remediation-queue" element={<RemediationQueue />} />
+            <Route path="/investments" element={<Investments />} />
+
+            <Route path="/compliance" element={<Compliance />} />
+            <Route path="/policies" element={<Policies />} />
+            <Route path="/reports" element={<Reports />} />
+
+            <Route path="/integrations" element={<Integrations />} />
+            <Route path="/api-reference" element={<ApiReference />} />
+            <Route path="/settings" element={<SettingsPage />} />
+
+            <Route path="/demo/vscode" element={<VSCodeDemo />} />
+
+            <Route path="*" element={<Navigate to="/security" replace />} />
+          </Routes>
+        </main>
+      </div>
+      <ToastHost />
+      <CommandPalette />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-base)' }}>
-        <Sidebar />
-        <div style={{ flex: 1, marginLeft: 240, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <TopBar />
-          <main style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/security" replace />} />
-              <Route path="/security" element={<SecurityDashboard />} />
-              <Route path="/financial" element={<FinancialDashboard />} />
-              <Route path="/findings" element={<Findings />} />
-              <Route path="/assets" element={<Assets />} />
-              <Route path="/risks" element={<Risks />} />
-              <Route path="/scenarios" element={<Scenarios />} />
-              <Route path="/investments" element={<Investments />} />
-              <Route path="/compliance" element={<Compliance />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+      <Shell />
     </BrowserRouter>
   );
 }

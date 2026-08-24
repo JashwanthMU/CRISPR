@@ -6,7 +6,7 @@ interface Props {
   showValue?: boolean;
 }
 
-export default function ProgressBar({ value, color = '#2563eb', height = 6, label, showValue = true }: Props) {
+export default function ProgressBar({ value, color = 'var(--color-primary-blue)', height = 6, label, showValue = true }: Props) {
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div>
