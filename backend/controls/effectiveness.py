@@ -1,11 +1,3 @@
-"""
-Control effectiveness per asset. Returns 0.0 (no controls) to ~0.95 (full coverage).
-
-*** TEMPORARY IMPLEMENTATION ***
-Owned by ishwarya. Stubbed here so I'm risk engine is unblocked.
-"""
-
-
 def calculate_control_effectiveness(controls: dict) -> float:
     score = 0.0
     score += controls.get("mfa_coverage", 0) * 0.25
@@ -15,7 +7,6 @@ def calculate_control_effectiveness(controls: dict) -> float:
     score += controls.get("segmentation", 0) * 0.15
     score += controls.get("logging_coverage", 0) * 0.05
     return round(min(score, 0.95), 3)
-
 
 DEMO_CONTROLS = {
     "A001": {"mfa_coverage": 0.80, "edr_coverage": 1.0, "waf_enabled": True, "patch_compliance": 0.75, "segmentation": 0.40, "logging_coverage": 0.92},

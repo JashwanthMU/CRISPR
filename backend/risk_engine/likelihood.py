@@ -1,14 +1,4 @@
-"""Threat likelihood model - returns probability 0.0-1.0"""
-
-
-def calculate_likelihood(
-    cvss: float,
-    exploit_in_wild: bool,
-    patch_age_days: int,
-    internet_facing: bool,
-    control_effectiveness: float,
-    threat_intel_active: bool,
-) -> float:
+def calculate_likelihood(cvss, exploit_in_wild, patch_age_days, internet_facing, control_effectiveness, threat_intel_active) -> float:
     score = 0.0
     score += (cvss / 10) * 0.25
     score += (0.95 if exploit_in_wild else 0.3) * 0.20
