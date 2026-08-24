@@ -1,0 +1,4 @@
+[
+  {"finding_id":"IAM001","source_type":"IAM","source_name":"Okta","asset_id":"A003","finding_type":"MFA_GAP","title":"12 privileged accounts without MFA on Payment API","cve":null,"severity":"HIGH","mfa_coverage":0.58,"privileged_accounts":12,"confidence":1.0,"first_seen":"2026-08-01","status":"OPEN"},
+  {"finding_id":"IAM002","source_type":"IAM","source_name":"Okta","asset_id":"A001","finding_type":"OVER_PRIVILEGE","title":"8 service accounts with admin rights on Payment Gateway","cve":null,"severity":"MEDIUM","confidence":1.0,"first_seen":"2026-08-01","status":"OPEN"}
+]
