@@ -1,0 +1,8 @@
+[
+  {"asset_id":"A001","name":"Payment Gateway","type":"api_gateway","business_unit":"Finance","business_service":"Digital Payments","criticality":5,"data_sensitivity":5,"revenue_dependency":5,"internet_facing":true,"is_regulated":true,"value_inr":50000000},
+  {"asset_id":"A002","name":"Payment Database","type":"database","business_unit":"Finance","business_service":"Digital Payments","criticality":5,"data_sensitivity":5,"revenue_dependency":5,"internet_facing":false,"is_regulated":true,"value_inr":30000000},
+  {"asset_id":"A003","name":"Authentication API","type":"api_gateway","business_unit":"Engineering","business_service":"Digital Payments","criticality":5,"data_sensitivity":4,"revenue_dependency":5,"internet_facing":true,"is_regulated":true,"value_inr":20000000},
+  {"asset_id":"A004","name":"Customer Portal","type":"web_app","business_unit":"Product","business_service":"Customer Onboarding","criticality":4,"data_sensitivity":4,"revenue_dependency":3,"internet_facing":true,"is_regulated":true,"value_inr":10000000},
+  {"asset_id":"A005","name":"HR Portal","type":"web_app","business_unit":"HR","business_service":"Internal HR","criticality":2,"data_sensitivity":3,"revenue_dependency":1,"internet_facing":false,"is_regulated":false,"value_inr":2000000},
+  {"asset_id":"A006","name":"Test Server","type":"server","business_unit":"Engineering","business_service":"Dev/Test","criticality":1,"data_sensitivity":1,"revenue_dependency":0,"internet_facing":false,"is_regulated":false,"value_inr":500000}
+]
