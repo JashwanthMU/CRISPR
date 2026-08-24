@@ -70,3 +70,37 @@ def init_database() -> None:
             ON bug_bounty_reports (status)
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS assets (
+                asset_id VARCHAR(32) PRIMARY KEY,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS findings (
+                finding_id VARCHAR(64) PRIMARY KEY,
+                source_type VARCHAR(40) NOT NULL,
+                source_name VARCHAR(120) NOT NULL,
+                asset_id VARCHAR(32) NOT NULL,
+                payload JSONB NOT NULL,
+                first_seen DATE,
+                ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_findings_source_type
+            ON findings (source_type)
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_findings_asset_id
+            ON findings (asset_id)
+            """
+        )

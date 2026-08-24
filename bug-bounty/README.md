@@ -63,6 +63,22 @@ Vite runs at <http://127.0.0.1:5173> and talks to the backend at
 3. `PATCH /api/bug-bounty/reports/{report_id}/review` accepts or rejects it.
 4. Accepted reports automatically appear in `GET /api/findings`.
 
+## Live connector ingestion
+
+Assets and findings from Bug Bounty, Vulnerability Scanner, EDR, XDR, SIEM,
+IAM, and Threat Intel are upserted into PostgreSQL when the backend starts.
+Security users can also trigger an immediate refresh from the application or API:
+
+```text
+POST /api/ingestion/refresh
+GET  /api/ingestion/status
+```
+
+Both endpoints require a security-team bearer token. The application refreshes
+its report queue every five seconds, and the **Sync sources** button performs an
+immediate connector refresh. All `/api/findings` endpoints query the live
+PostgreSQL-backed connectors, with JSON fallback only when the database is down.
+
 Authentication is role-enforced by the backend. Public deployments should use a
 strong `AUTH_SECRET`, managed credentials, HTTPS, rate limiting, and an enterprise
 identity provider.

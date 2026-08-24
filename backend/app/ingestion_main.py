@@ -3,9 +3,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import auth, bug_bounty, findings
+from backend.app.api import auth, bug_bounty, findings, ingestion
 from backend.app.auth import ensure_default_security_user
 from backend.database.connection import init_database
+from backend.ingestion.store import refresh_demo_sources
 
 
 app = FastAPI(title="CRISPR Ingestion API", version="1.0.0")
@@ -18,6 +19,7 @@ app.add_middleware(
 
 app.include_router(findings.router, prefix="/api/findings", tags=["Findings"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(ingestion.router, prefix="/api/ingestion", tags=["Ingestion"])
 app.include_router(
     bug_bounty.router, prefix="/api/bug-bounty", tags=["Bug Bounty"]
 )
@@ -27,6 +29,7 @@ app.include_router(
 def startup() -> None:
     init_database()
     ensure_default_security_user()
+    refresh_demo_sources()
 
 
 @app.get("/api/health")

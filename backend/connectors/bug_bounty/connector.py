@@ -6,14 +6,18 @@ from pathlib import Path
 from psycopg import Error as PsycopgError
 
 from backend.database.connection import get_connection
+from backend.ingestion.store import fetch_findings as fetch_stored
 
 
 DATA_PATH = Path(__file__).resolve().parents[3] / "data/demo/bug_bounty.json"
 
 
 def fetch_findings() -> list[dict]:
-    with DATA_PATH.open(encoding="utf-8") as file:
-        findings = json.load(file)
+    try:
+        findings = fetch_stored("BUG_BOUNTY")
+    except PsycopgError:
+        with DATA_PATH.open(encoding="utf-8") as file:
+            return json.load(file)
     try:
         with get_connection() as connection:
             reports = connection.execute(
