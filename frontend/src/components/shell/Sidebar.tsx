@@ -13,7 +13,7 @@ import SidebarGroup from './SidebarGroup';
 import SidebarItem from './SidebarItem';
 import SidebarResizer from './SidebarResizer';
 import OrganizationSelector from './OrganizationSelector';
-import { CrisprMark, CrisprMarkCompact } from '../../assets/branding/CrisprMark';
+import { CrisprMark } from '../../assets/branding/CrisprMark';
 import { BRAND } from '../../config/branding';
 
 /**
@@ -57,7 +57,7 @@ export default function Sidebar() {
           aria-label={`${BRAND.name} — go to Security Dashboard`}
           title={collapsed ? BRAND.name : undefined}
         >
-          {collapsed ? <CrisprMarkCompact size={28} /> : <CrisprMark size={28} />}
+          {collapsed ? <CrisprMark size={40} /> : <CrisprMark size={28} />}
           {!collapsed && (
             <span className="sidebar-brand-text">
               <span className="sidebar-brand-name">{BRAND.name}</span>
