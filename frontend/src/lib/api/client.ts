@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearSession, getAccessToken } from '../auth';
 
 // Shared axios instance for the whole app. Kept separate from
 // src/services/api.ts (legacy endpoints already wired into existing pages)
@@ -9,9 +10,16 @@ const BASE = (import.meta as any).env?.VITE_API_URL || '';
 
 export const httpClient = axios.create({ baseURL: BASE, timeout: 8000 });
 
+httpClient.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 httpClient.interceptors.response.use(
   (r) => r,
   (err) => {
+    if (err?.response?.status === 401) clearSession();
     console.warn('[api] request failed', err?.message);
     return Promise.resolve({ data: null });
   }

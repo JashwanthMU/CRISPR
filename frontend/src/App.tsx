@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AppShell from './components/shell/AppShell';
 import ToastHost from './components/common/ToastHost';
 import CommandPalette from './components/common/CommandPalette';
@@ -32,6 +32,8 @@ import Integrations from './pages/Integrations';
 import ApiReference from './pages/ApiReference';
 import SettingsPage from './pages/Settings';
 import VSCodeDemo from './pages/VSCodeDemo';
+import Login from './pages/Login';
+import { getSession } from './lib/auth';
 
 function useGlobalShortcuts() {
   useEffect(() => {
@@ -98,10 +100,26 @@ function Shell() {
   );
 }
 
+function ProtectedShell() {
+  const location = useLocation();
+  const [authenticated, setAuthenticated] = useState(() => getSession()?.user.role === 'SECURITY');
+
+  useEffect(() => {
+    const update = () => setAuthenticated(getSession()?.user.role === 'SECURITY');
+    window.addEventListener('crispr:auth-changed', update);
+    return () => window.removeEventListener('crispr:auth-changed', update);
+  }, []);
+
+  return authenticated ? <Shell /> : <Navigate to="/login" replace state={{ from: location.pathname }} />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Shell />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/*" element={<ProtectedShell />} />
+      </Routes>
     </BrowserRouter>
   );
 }

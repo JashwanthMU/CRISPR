@@ -145,6 +145,62 @@ h3 {
   margin: 0;
 }
 
+/* Authentication — intentionally flat, restrained, and console-like. */
+.login-page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: var(--color-bg-secondary);
+}
+.login-brand { margin-bottom: 24px; }
+.login-card {
+  width: min(100%, 380px);
+  padding: 28px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.login-card h1 { font-size: 1.5rem; font-weight: 500; text-align: center; }
+.login-card > p { margin: 8px 0 24px; color: var(--color-text-secondary); text-align: center; }
+.login-card form { display: grid; gap: 8px; }
+.login-card label { margin-top: 8px; color: var(--color-text-primary); font-weight: 500; }
+.login-card input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.login-card input:focus { outline: 2px solid var(--color-primary-blue); outline-offset: 1px; }
+.login-card button {
+  height: 40px;
+  margin-top: 14px;
+  color: #fff;
+  background: var(--color-primary-blue);
+  border: 1px solid var(--color-primary-dark);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-card button:hover { background: var(--color-primary-dark); }
+.login-card button:disabled { cursor: wait; opacity: .7; }
+.login-error {
+  margin-top: 8px;
+  padding: 10px;
+  color: var(--color-critical);
+  border: 1px solid var(--color-critical);
+  border-radius: var(--radius-sm);
+}
+.login-help { margin-top: 18px; color: var(--color-text-secondary); font-size: .8125rem; }
+
 /* Page title (28-32px) helper */
 .page-title {
   font-size: 1.75rem;
