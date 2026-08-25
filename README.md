@@ -4,6 +4,13 @@
 
 CRISPR is a Smart India Hackathon prototype for **Problem Statement ID 26105**. It brings findings from security tools into one asset-aware risk picture, estimates financial exposure in Indian rupees, explains the drivers behind each risk, simulates control changes, and recommends a security portfolio for a given budget.
 
+## SIH 2026 Presentation - Team: P0werh0usE
+
+Our Smart India Hackathon 2026 presentation covers the CRISPR solution, technical architecture, FAIR-based financial risk engine, AI investment optimization, feasibility, impact, and references.
+
+[📄 View SIH 2026 Presentation](docs/presentation/SMART%20INDIA%20HACKATHON%202026.pdf)
+
+
 The included fictional organization is **NovaPay Financial Services**, an Indian fintech used only for demonstration.
 
 > **Prototype notice:** CRISPR uses deterministic demo data, calibrated risk values, and rule-based or unsupervised prototype models. It is not a production actuarial model and should not be used as the sole basis for security, legal, regulatory, or investment decisions.
