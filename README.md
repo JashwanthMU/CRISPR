@@ -1,5 +1,23 @@
 # CRISPR Prototype — Six Member Implementation Plan
 
+## Run the Integrated Platform
+
+Create a repository-root `.env` with `LLM_BASE_URL`, `LLM_API_KEY`, and
+`LLM_ENABLED`, then start the complete stack:
+
+```bash
+docker compose up --build
+```
+
+- Dashboard: `http://localhost:5173`
+- Bug bounty portal: `http://localhost:3000`
+- FastAPI and OpenAPI docs: `http://localhost:8000/docs`
+- Health check: `http://localhost:8000/api/health`
+
+The backend seeds PostgreSQL from `data/demo/` during startup and falls back
+to the JSON datasets when PostgreSQL is unavailable. Install
+`requirements-ml-v2.txt` only when working on future XGBoost/SHAP training.
+
 ## Core Workflow
 
 - Member 1: Harish Kumar N

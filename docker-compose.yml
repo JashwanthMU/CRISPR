@@ -10,16 +10,36 @@ services:
       - AUTH_SECRET=${AUTH_SECRET:-local-development-secret-change-me}
       - SECURITY_ADMIN_EMAIL=${SECURITY_ADMIN_EMAIL:-security@novapay.com}
       - SECURITY_ADMIN_PASSWORD=${SECURITY_ADMIN_PASSWORD:-NovaPay-Security-2026}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_ENABLED=${LLM_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+        VITE_API_MODE: live
+    ports: ["5173:80"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
   db:
     image: postgres:15
     environment:
       POSTGRES_USER: crispr
       POSTGRES_PASSWORD: crispr
       POSTGRES_DB: crispr
-    ports: ["5432:5432"]
     volumes:
       - crispr_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,12 +47,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
   bug-bounty:
     build:
       context: ./bug-bounty
+      args:
+        VITE_API_URL: ""
     ports: ["3000:80"]
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   crispr_postgres_data:

@@ -8,15 +8,8 @@ python-dotenv>=1.0.1
 psycopg[binary]>=3.2.0
 email-validator>=2.2.0
 
-# ── Data / ML ─────────────────────────────────────────────────
-pandas>=2.2.0
-numpy>=1.26.0
+# ── Prototype ML Runtime ───────────────────────────────────────
 scikit-learn>=1.4.0
-xgboost>=2.0.0
-scipy>=1.13.0
-
-# ── Explainability ────────────────────────────────────────────
-shap>=0.45.0
 
 # ── Optimization ─────────────────────────────────────────────
 PuLP>=2.8.0

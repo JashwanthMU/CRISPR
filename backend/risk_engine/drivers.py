@@ -17,7 +17,7 @@ def identify_risk_drivers(asset: dict, finding: dict, controls: dict) -> list[di
         drivers.append({"factor": "Multi-source confirmed evidence", "points": 14, "direction": "up"})
     if controls.get("mfa_coverage", 1) < 0.7:
         points = round((1 - controls["mfa_coverage"]) * 18)
-        drivers.append({"factor": f"MFA gap ({int(controls['mfa_coverage']*100)}% coverage)", "points": points, "direction": "up"})
+        drivers.append({"factor": f"MFA gap ({round(controls['mfa_coverage'] * 100)}% coverage)", "points": points, "direction": "up"})
     if controls.get("edr_coverage", 0) >= 0.9:
         drivers.append({"factor": "Full EDR coverage", "points": -8, "direction": "down"})
     if controls.get("waf_enabled"):

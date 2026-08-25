@@ -48,3 +48,12 @@ def normalize_all(raw_findings: list[dict]) -> list[Finding]:
         if f:
             normalized.append(f)
     return normalized
+
+def deduplicate_findings(findings: list[Finding]) -> list[Finding]:
+    groups: dict[tuple, Finding] = {}
+    for f in findings:
+        key = (f.asset_id, f.cve or f.finding_type)
+        existing = groups.get(key)
+        if existing is None or f.confidence > existing.confidence:
+            groups[key] = f
+    return list(groups.values())

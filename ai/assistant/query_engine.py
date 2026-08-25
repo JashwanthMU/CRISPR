@@ -12,7 +12,7 @@ import json
 from ai.tools import optimize_tools, risk_tools, scenario_tools
 from ai.tools.formatting import extract_budget_inr, format_inr, format_pct
 from ai.tools.guardrail import validate as guardrail_validate
-from ai.tools.llm import chat, is_available, route_with_llm
+from ai.tools.llm import chat, is_available
 from ml.anomaly_detection.detector import detect_anomalies
 from ml.forecasting.trend import DEFAULT_DAILY_GROWTH_RATE, forecast_eal
 
@@ -31,8 +31,6 @@ INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("enterprise_summary", ("overall", "enterprise", "total exposure", "total eal",
                             "how bad", "whole company", "entire organization")),
 ]
-
-ALL_INTENTS = [intent for intent, _ in INTENT_KEYWORDS]
 
 TASK_BY_INTENT = {
     "top_risk": "explain",
@@ -53,14 +51,64 @@ SYSTEM_PROMPT = (
     "If a figure is not in the data, omit it. Keep answers under 120 words."
 )
 
+GENERAL_SYSTEM_PROMPT = (
+    "You are CRISPR, a concise cybersecurity advisor. Answer the user's general "
+    "cybersecurity question accurately in plain language, including what it is, why "
+    "it matters, and the main mitigation. Do not claim knowledge of NovaPay's current "
+    "systems or risk figures. Never invent financial figures. Keep the answer under 140 words."
+)
+
 
 def route_intent(question: str) -> str:
     q = f" {question.lower().strip()} "
     for intent, keywords in INTENT_KEYWORDS:
         if any(keyword in q for keyword in keywords):
             return intent
-    llm_intent = route_with_llm(question, ALL_INTENTS)
-    return llm_intent or "unknown"
+    return "general_question"
+
+
+def _answer_general(question: str) -> tuple[str, dict, str]:
+    normalized = question.lower().strip()
+    if normalized in {"hi", "hii", "hello", "hey", "good morning", "good afternoon", "good evening"}:
+        return (
+            "Hello! Ask me about NovaPay's live risk posture, scenarios, investments, "
+            "or any general cybersecurity concept.",
+            {},
+            "template",
+        )
+    if normalized in {"bye", "goodbye", "see you", "thanks", "thank you"}:
+        return "Goodbye. Happy to help whenever you need me.", {}, "template"
+
+    fallback = (
+        "I can explain general cybersecurity concepts, but the language model is currently "
+        "unavailable. You can still ask about top risks, risk drivers, MFA, patch delays, "
+        "budgets, forecasts, or login anomalies."
+    )
+    if "idor" in normalized or "insecure direct object reference" in normalized:
+        fallback = (
+            "IDOR (Insecure Direct Object Reference) is an access-control vulnerability. "
+            "It occurs when an application accepts an object identifier—such as an account, "
+            "invoice, or user ID—but does not verify that the signed-in user is authorized to "
+            "access that object. An attacker may change the identifier to read or modify another "
+            "user's data. Prevent it with server-side authorization checks on every object request, "
+            "deny-by-default policies, indirect identifiers where useful, and access-control tests."
+        )
+
+    llm_answer = chat(
+        task="general",
+        system=GENERAL_SYSTEM_PROMPT,
+        user=question,
+        max_tokens=350,
+        temperature=0.2,
+        request_timeout_s=25.0,
+        max_attempts=2,
+    )
+    if not llm_answer:
+        return fallback, {}, "template"
+    guarded = guardrail_validate(llm_answer, {})
+    if not guarded["ok"]:
+        return fallback, {}, "template"
+    return guarded["text"], {}, "llm"
 
 
 def _answer_top_risk(question: str = "") -> tuple[str, dict]:
@@ -258,6 +306,10 @@ FULL_HANDLERS = {**HANDLERS, **HANDLERS_PARAM}
 
 def answer_question(question: str) -> dict:
     intent = route_intent(question)
+    if intent == "general_question":
+        answer, data, engine = _answer_general(question)
+        return {"answer": answer, "data": data, "intent": intent, "engine": engine}
+
     handler = FULL_HANDLERS.get(intent)
 
     if handler is None:
