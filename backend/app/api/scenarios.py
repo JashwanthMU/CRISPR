@@ -23,8 +23,8 @@ def run_scenario(
     implement_patching: Optional[bool] = Query(None),
     implement_segmentation: Optional[bool] = Query(None),
     edr_expand: Optional[bool] = Query(None),
-    patch_delay: Optional[int] = Query(None),
-    mfa_coverage: Optional[float] = Query(None),
+    patch_delay: Optional[int] = Query(None, ge=0, le=365, description="Days to delay patching (0-365)"),
+    mfa_coverage: Optional[float] = Query(None, ge=0.0, le=1.0),
 ):
     overrides = {}
     if implement_mfa is not None: overrides["implement_mfa"] = implement_mfa
@@ -66,6 +66,27 @@ def list_presets():
             "rosi_pct": rosi_pct,
         })
     return {"presets": enriched, "count": len(enriched)}
+
+
+@router.get("/compare")
+def compare_scenarios(
+    scenario_a: str = Query(..., description="Preset id, e.g. 'mfa'"),
+    scenario_b: str = Query(..., description="Preset id, e.g. 'patch_now'"),
+):
+    """Side-by-side comparison of two preset scenarios by id."""
+    presets = {p["id"]: p for p in PRESET_SCENARIOS}
+    if scenario_a not in presets or scenario_b not in presets:
+        return {"error": f"Unknown scenario id(s). Available: {list(presets.keys())}"}
+
+    assets = _load_assets()
+    result_a = simulate_enterprise(assets, presets[scenario_a]["params"])
+    result_b = simulate_enterprise(assets, presets[scenario_b]["params"])
+
+    return {
+        "scenario_a": {"id": scenario_a, "name": presets[scenario_a]["name"], **result_a},
+        "scenario_b": {"id": scenario_b, "name": presets[scenario_b]["name"], **result_b},
+        "reduction_delta_lakh": round(result_a["reduction_lakh"] - result_b["reduction_lakh"], 2),
+    }
 
 
 @router.get("/{scenario_id}")

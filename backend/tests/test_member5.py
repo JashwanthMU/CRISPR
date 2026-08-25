@@ -277,3 +277,56 @@ class TestComplianceAPI:
         scores = r.json()
         assert scores["RBI_CSF"] == 72
         assert scores["CIS_CONTROLS"] == 85
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. NEW ENDPOINTS — /optimize/recommend, /scenarios/compare
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestRecommendAPI:
+
+    def test_recommend_returns_at_most_three(self, client):
+        r = client.get("/api/optimize/recommend")
+        assert r.status_code == 200
+        assert len(r.json()["recommendations"]) <= 3
+
+    def test_recommend_respects_budget_cap(self, client):
+        r = client.get("/api/optimize/recommend?max_budget_inr=1000000")
+        assert r.status_code == 200
+        for rec in r.json()["recommendations"]:
+            assert rec["cost_inr"] <= 1_000_000
+
+    def test_recommend_sorted_by_roi_desc(self, client):
+        r = client.get("/api/optimize/recommend")
+        rois = [rec["roi"] for rec in r.json()["recommendations"]]
+        assert rois == sorted(rois, reverse=True)
+
+    def test_recommend_rejects_non_positive_budget(self, client):
+        r = client.get("/api/optimize/recommend?max_budget_inr=0")
+        assert r.status_code == 422
+
+
+class TestCompareAPI:
+
+    def test_compare_mfa_vs_patch_now(self, client):
+        r = client.get("/api/scenarios/compare?scenario_a=mfa&scenario_b=patch_now")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["scenario_a"]["id"] == "mfa"
+        assert data["scenario_b"]["id"] == "patch_now"
+
+    def test_compare_delta_is_correct(self, client):
+        r = client.get("/api/scenarios/compare?scenario_a=mfa&scenario_b=patch_now")
+        data = r.json()
+        expected_delta = round(
+            data["scenario_a"]["reduction_lakh"] - data["scenario_b"]["reduction_lakh"], 2
+        )
+        assert data["reduction_delta_lakh"] == expected_delta
+
+    def test_compare_invalid_scenario_id(self, client):
+        r = client.get("/api/scenarios/compare?scenario_a=fake&scenario_b=mfa")
+        assert r.status_code == 200
+        assert "error" in r.json()
+
+    def test_compare_requires_both_params(self, client):
+        r = client.get("/api/scenarios/compare?scenario_a=mfa")
+        assert r.status_code == 422
