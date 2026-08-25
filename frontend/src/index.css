@@ -1362,6 +1362,9 @@ table.density-comfortable th {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.app-sidebar.sidebar-collapsed .sidebar-item-label {
+  display: none;
+}
 .sidebar-item.collapsed {
   justify-content: center;
   padding: 10px 0;
