@@ -70,7 +70,9 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
-  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => payload.findings);
+  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) =>
+    Array.isArray(payload) ? payload : Array.isArray(payload?.findings) ? payload.findings : MOCK_FINDINGS,
+  );
 }
 
 export function getFinding(id: string): Promise<Finding | undefined> {
@@ -78,14 +80,18 @@ export function getFinding(id: string): Promise<Finding | undefined> {
 }
 
 export function getSources() {
-  return liveOrFallback('/api/findings/sources', MOCK_SOURCES);
+  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) =>
+    Array.isArray(payload) ? payload : Array.isArray(payload?.sources) ? payload.sources : MOCK_SOURCES,
+  );
 }
 
 // ----------------------------------------------------------------------------
 // Assets
 // ----------------------------------------------------------------------------
 export function getAssets(): Promise<Asset[]> {
-  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) => payload.assets);
+  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) =>
+    Array.isArray(payload) ? payload : Array.isArray(payload?.assets) ? payload.assets : MOCK_ASSETS,
+  );
 }
 
 export function getAsset(id: string): Promise<Asset | undefined> {
@@ -96,7 +102,9 @@ export function getAsset(id: string): Promise<Asset | undefined> {
 // Risk cases
 // ----------------------------------------------------------------------------
 export function getRiskCases(): Promise<RiskCase[]> {
-  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) => payload.risks);
+  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) =>
+    Array.isArray(payload) ? payload : Array.isArray(payload?.risks) ? payload.risks : MOCK_RISKS,
+  );
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
