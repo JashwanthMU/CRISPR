@@ -10,7 +10,7 @@ import RiskTrendChart from '../components/charts/RiskTrendChart';
 import { REPOSITORIES, CODE_ISSUES } from '../demo/fixtures';
 import { CATEGORY_ICON } from '../config/icons';
 import { activateOnEnter } from '../utils/a11y';
-import type { CodeIssue, Severity } from '../types';
+import type { CodeIssue } from '../types';
 import { TOKENS } from '../utils/format';
 
 const SDLC_SCORES = [
@@ -33,7 +33,7 @@ export default function CodeSecurity() {
   const [severityFilter, setSeverityFilter] = useState('all');
 
   const bySeverity = useMemo(() => {
-    const counts: Record<Severity, number> = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
     CODE_ISSUES.forEach((i) => {
       counts[i.severity] = (counts[i.severity] ?? 0) + i.issues;
     });
