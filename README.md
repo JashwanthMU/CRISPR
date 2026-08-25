@@ -10,10 +10,30 @@ Our Smart India Hackathon 2026 presentation covers the CRISPR solution, technica
 
 [📄 View SIH 2026 Presentation](docs/presentation/SMART%20INDIA%20HACKATHON%202026.pdf)
 
+## Live Prototype
+
+> **CRISPR Financial Risk Quantification Prototype**
+
+Experience the live CRISPR prototype running on AWS:
+
+### 🔗 [Open Live Prototype](http://3.12.111.128:5173/financial)
+
+The prototype demonstrates how CRISPR converts technical cybersecurity findings into **₹-denominated financial risk** and helps security teams prioritize and optimize remediation decisions.
+
+### What You Can Explore
+
+- **Financial Risk Quantification** - Convert vulnerability and asset data into Expected Annual Loss (EAL)
+- **Asset-Weighted Risk Scoring** - Prioritize risks using business and asset criticality rather than CVSS alone
+- **Risk Prioritization** - Identify which vulnerabilities create the greatest financial exposure
+- **AI Investment Optimization** - Determine the most effective security controls within a defined ₹ budget
+- **What-If Scenario Analysis** - Evaluate how security decisions affect financial exposure
+- **Natural Language Risk Queries** - Ask questions about organizational cyber risk in business language
+- **Compliance Mapping** - Connect findings with relevant cybersecurity and regulatory frameworks
+- **Executive Financial View** - Present cyber risk in a format suitable for management and decision-makers
+
+> **Prototype:** The live environment is intended for demonstration and evaluation of the CRISPR financial-risk workflow.
 
 The included fictional organization is **NovaPay Financial Services**, an Indian fintech used only for demonstration.
-
-> **Prototype notice:** CRISPR uses deterministic demo data, calibrated risk values, and rule-based or unsupervised prototype models. It is not a production actuarial model and should not be used as the sole basis for security, legal, regulatory, or investment decisions.
 
 ## Why CRISPR
 
