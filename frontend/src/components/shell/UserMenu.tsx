@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, SlidersHorizontal, Building2, KeyRound, HelpCircle, LogOut } from 'lucide-react';
 import { useUiStore, togglePopover, closePopover } from '../../lib/uiStore';
 import { toast } from '../../lib/toastStore';
+import { clearSession, getSession } from '../../lib/auth';
 
 const MENU_ITEMS = [
   { label: 'Profile', icon: User, path: '/settings' },
@@ -18,6 +19,7 @@ export default function UserMenu() {
   const open = openPopover === 'profile';
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const user = getSession()?.user;
 
   useEffect(() => {
     if (!open) return;
@@ -42,7 +44,8 @@ export default function UserMenu() {
 
   const signOut = () => {
     closePopover();
-    toast.info('Signed out (demo mode)', 'This is a demonstration environment — session state is unaffected.');
+    clearSession();
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -55,13 +58,13 @@ export default function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        NP
+        {(user?.name || 'ST').split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}
       </button>
       {open && (
         <div className="topbar-dropdown-panel user-menu-panel" role="menu" aria-label="User menu">
           <div className="user-menu-header">
-            <div className="user-menu-name">Neha Patel</div>
-            <div className="user-menu-role">CISO · NovaPay</div>
+            <div className="user-menu-name">{user?.name || 'Security Team'}</div>
+            <div className="user-menu-role">{user?.email}</div>
           </div>
           {MENU_ITEMS.map((item) => {
             const Icon = item.icon;

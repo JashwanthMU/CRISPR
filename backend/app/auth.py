@@ -18,9 +18,20 @@ from psycopg import IntegrityError, OperationalError
 from backend.database.connection import get_connection
 
 
-TOKEN_SECRET = os.getenv("AUTH_SECRET", "change-this-secret-outside-local-development")
+TOKEN_SECRET = os.getenv("AUTH_SECRET", "")
+TOKEN_ISSUER = "crispr-api"
+TOKEN_AUDIENCE = "crispr-web"
 TOKEN_LIFETIME_HOURS = 12
 bearer = HTTPBearer(auto_error=False)
+
+
+def validate_auth_configuration() -> None:
+    """Fail closed when the signing key is missing or trivially weak."""
+    if len(TOKEN_SECRET) < 32:
+        raise RuntimeError(
+            "AUTH_SECRET must be set to at least 32 characters "
+            "(generate one with: openssl rand -hex 32)"
+        )
 
 
 def hash_password(password: str) -> str:
@@ -57,7 +68,7 @@ class UserRole(str, Enum):
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
-    password: str = Field(min_length=10, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
 
 
 class LoginRequest(BaseModel):
@@ -73,10 +84,21 @@ class AuthUser(BaseModel):
 
 
 def create_token(user: dict) -> str:
+    validate_auth_configuration()
     now = datetime.now(timezone.utc)
-    payload = _b64(json.dumps({"sub": str(user["user_id"]), "role": user["role"], "iat": int(now.timestamp()), "exp": int((now + timedelta(hours=TOKEN_LIFETIME_HOURS)).timestamp())}, separators=(",", ":")).encode())
-    signature = _b64(hmac.new(TOKEN_SECRET.encode(), payload.encode(), hashlib.sha256).digest())
-    return f"{payload}.{signature}"
+    header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}, separators=(",", ":")).encode())
+    payload = _b64(json.dumps({
+        "sub": str(user["user_id"]),
+        "role": user["role"],
+        "iss": TOKEN_ISSUER,
+        "aud": TOKEN_AUDIENCE,
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=TOKEN_LIFETIME_HOURS)).timestamp()),
+    }, separators=(",", ":")).encode())
+    signing_input = f"{header}.{payload}"
+    signature = _b64(hmac.new(TOKEN_SECRET.encode(), signing_input.encode(), hashlib.sha256).digest())
+    return f"{signing_input}.{signature}"
 
 
 def authenticate_user(email: str, password: str) -> dict | None:
@@ -100,12 +122,20 @@ def get_current_user(
     if not credentials:
         raise unauthorized
     try:
-        encoded, signature = credentials.credentials.split(".", 1)
-        expected = _b64(hmac.new(TOKEN_SECRET.encode(), encoded.encode(), hashlib.sha256).digest())
+        validate_auth_configuration()
+        header_encoded, payload_encoded, signature = credentials.credentials.split(".")
+        header = json.loads(_unb64(header_encoded))
+        if header != {"alg": "HS256", "typ": "JWT"}:
+            raise ValueError("Unsupported JWT header")
+        signing_input = f"{header_encoded}.{payload_encoded}"
+        expected = _b64(hmac.new(TOKEN_SECRET.encode(), signing_input.encode(), hashlib.sha256).digest())
         if not hmac.compare_digest(signature, expected):
             raise ValueError("Invalid signature")
-        payload = json.loads(_unb64(encoded))
-        if int(payload["exp"]) < int(datetime.now(timezone.utc).timestamp()):
+        payload = json.loads(_unb64(payload_encoded))
+        now = int(datetime.now(timezone.utc).timestamp())
+        if payload.get("iss") != TOKEN_ISSUER or payload.get("aud") != TOKEN_AUDIENCE:
+            raise ValueError("Invalid token issuer or audience")
+        if int(payload["exp"]) < now or int(payload["nbf"]) > now:
             raise ValueError("Expired token")
         user_id = UUID(payload["sub"])
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as error:
@@ -133,17 +163,25 @@ def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 def ensure_default_security_user() -> None:
-    """Create the local demo security account once, without overwriting it."""
+    """Ensure the configured security administrator exists with current credentials."""
     from uuid import uuid4
 
-    email = os.getenv("SECURITY_ADMIN_EMAIL", "security@novapay.com").lower()
-    password = os.getenv("SECURITY_ADMIN_PASSWORD", "NovaPay-Security-2026")
+    email = os.getenv("SECURITY_ADMIN_EMAIL", "").strip().lower()
+    if not email:
+        raise RuntimeError("SECURITY_ADMIN_EMAIL must be set")
+    password = os.getenv("SECURITY_ADMIN_PASSWORD", "")
+    if len(password) < 12:
+        raise RuntimeError("SECURITY_ADMIN_PASSWORD must be at least 12 characters")
+    password_hash = hash_password(password)
     with get_connection() as connection:
         connection.execute(
             """
             INSERT INTO users (user_id, name, email, password_hash, role)
             VALUES (%s, %s, %s, %s, 'SECURITY')
-            ON CONFLICT (email) DO NOTHING
+            ON CONFLICT (email) DO UPDATE SET
+                name = EXCLUDED.name,
+                password_hash = EXCLUDED.password_hash,
+                role = 'SECURITY'
             """,
-            (uuid4(), "NovaPay Security Team", email, hash_password(password)),
+            (uuid4(), "NovaPay Security Team", email, password_hash),
         )

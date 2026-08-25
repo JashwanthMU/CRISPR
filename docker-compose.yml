@@ -3,13 +3,19 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    ports: ["8000:8000"]
+    expose: ["8000"]
     volumes: ["./data:/app/data"]
     environment:
-      - DATABASE_URL=postgresql://crispr:crispr@db:5432/crispr
-      - AUTH_SECRET=${AUTH_SECRET:-local-development-secret-change-me}
-      - SECURITY_ADMIN_EMAIL=${SECURITY_ADMIN_EMAIL:-security@novapay.com}
-      - SECURITY_ADMIN_PASSWORD=${SECURITY_ADMIN_PASSWORD:-NovaPay-Security-2026}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      - DB_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - AUTH_SECRET=${AUTH_SECRET:?Set AUTH_SECRET in .env (openssl rand -hex 32)}
+      - SECURITY_ADMIN_EMAIL=${SECURITY_ADMIN_EMAIL:?Set SECURITY_ADMIN_EMAIL in .env}
+      - SECURITY_ADMIN_PASSWORD=${SECURITY_ADMIN_PASSWORD:?Set SECURITY_ADMIN_PASSWORD in .env}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:3000,http://localhost:3000}
+      - API_DOCS_ENABLED=${API_DOCS_ENABLED:-false}
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_ENABLED=${LLM_ENABLED:-false}
@@ -37,13 +43,13 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: crispr
-      POSTGRES_PASSWORD: crispr
-      POSTGRES_DB: crispr
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     volumes:
       - crispr_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U crispr -d crispr"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10

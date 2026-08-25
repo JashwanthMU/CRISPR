@@ -7,6 +7,7 @@ Run: PYTHONPATH=. pytest backend/tests/test_member5.py -v
 import json
 import pytest
 from pathlib import Path
+from uuid import uuid4
 from fastapi.testclient import TestClient
 
 
@@ -22,7 +23,16 @@ def assets():
 @pytest.fixture
 def client():
     from backend.app.main import app
-    return TestClient(app)
+    from backend.app.auth import AuthUser, require_security
+
+    app.dependency_overrides[require_security] = lambda: AuthUser(
+        user_id=uuid4(),
+        name="Test Security User",
+        email="security-test@example.com",
+        role="SECURITY",
+    )
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
