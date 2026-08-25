@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 
-ARG VITE_API_URL=http://localhost:8000
+ARG VITE_API_URL=
 ARG VITE_API_MODE=live
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_API_MODE=${VITE_API_MODE}

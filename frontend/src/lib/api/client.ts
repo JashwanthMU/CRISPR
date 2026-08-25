@@ -4,7 +4,8 @@ import axios from 'axios';
 // src/services/api.ts (legacy endpoints already wired into existing pages)
 // so we don't risk breaking working call-sites; new code should prefer
 // src/lib/api/index.ts.
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+// Use same-origin API requests in Docker/AWS; frontend Nginx proxies /api.
+const BASE = (import.meta as any).env?.VITE_API_URL || '';
 
 export const httpClient = axios.create({ baseURL: BASE, timeout: 8000 });
 

@@ -14,6 +14,9 @@ docker compose up --build
 - FastAPI and OpenAPI docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/api/health`
 
+For EC2 deployment, environment setup, security-group rules, proxy verification,
+and AI troubleshooting, see [AWS deployment](docs/deployment/aws.md).
+
 The backend seeds PostgreSQL from `data/demo/` during startup and falls back
 to the JSON datasets when PostgreSQL is unavailable. Install
 `requirements-ml-v2.txt` only when working on future XGBoost/SHAP training.
