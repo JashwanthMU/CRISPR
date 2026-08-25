@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+// An empty base URL uses the deployed page's origin. Nginx proxies /api to the
+// backend container, so browsers never need an EC2-specific hostname.
+const BASE = (import.meta as any).env?.VITE_API_URL || '';
 
 const api = axios.create({ baseURL: BASE, timeout: 8000 });
 
