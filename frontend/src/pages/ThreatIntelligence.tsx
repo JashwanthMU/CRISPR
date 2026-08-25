@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Radar } from 'lucide-react';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
 import FilterBar from '../components/common/FilterBar';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import { MOCK_FINDINGS } from '../utils/mock';
+import { getFindings } from '../services/api';
 import { TOKENS } from '../utils/format';
 
-const THREAT_FINDINGS = MOCK_FINDINGS.filter((f) => f.source_type === 'THREAT_INTEL');
+const FALLBACK_THREAT_FINDINGS = MOCK_FINDINGS.filter((f) => f.source_type === 'THREAT_INTEL');
 
 const THREAT_ACTORS = [
   { name: 'APT-Nexus (financially motivated)', targets: 'APAC payment infrastructure', confidence: 'High', lastActivity: '2026-08-20' },
@@ -17,13 +18,20 @@ const THREAT_ACTORS = [
 
 export default function ThreatIntelligence() {
   const [search, setSearch] = useState('');
+  const [threatFindings, setThreatFindings] = useState<any[]>(FALLBACK_THREAT_FINDINGS);
+
+  useEffect(() => {
+    getFindings().then((response) => {
+      if (response?.data) setThreatFindings(response.data.filter((finding: any) => finding.source_type === 'THREAT_INTEL'));
+    });
+  }, []);
 
   const filtered = useMemo(
-    () => THREAT_FINDINGS.filter((f) => !search || f.title.toLowerCase().includes(search.toLowerCase())),
-    [search]
+    () => threatFindings.filter((f) => !search || f.title.toLowerCase().includes(search.toLowerCase())),
+    [search, threatFindings]
   );
 
-  const columns: ColumnDef<(typeof THREAT_FINDINGS)[number]>[] = [
+  const columns: ColumnDef<any>[] = [
     { key: 'severity', header: 'Severity', sortValue: (f) => f.severity, render: (f) => <SeverityBadge severity={f.severity} /> },
     { key: 'title', header: 'Intelligence', sortValue: (f) => f.title, render: (f) => f.title },
     { key: 'asset_id', header: 'Related Asset', sortValue: (f) => f.asset_id, render: (f) => f.asset_id },

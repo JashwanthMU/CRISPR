@@ -5,8 +5,8 @@ import KPICard from '../components/common/KPICard';
 import FinancialBreakdownBar from '../components/charts/FinancialBreakdownBar';
 import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
-import { getEnterprise, getRisks, getCompliance, optimize } from '../services/api';
-import { MOCK_ENTERPRISE, MOCK_RISKS, MOCK_COMPLIANCE, MOCK_FORECAST, MOCK_ACTIONS, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
+import { getCompliance, getControls, getEnterprise, getForecast, getGaps, getRisks, optimize } from '../services/api';
+import { MOCK_ENTERPRISE, MOCK_RISKS, MOCK_COMPLIANCE, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
 import { formatRupees, formatLakh, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
 
@@ -37,6 +37,9 @@ export default function FinancialDashboard() {
   const [enterprise, setEnterprise] = useState<any>(MOCK_ENTERPRISE);
   const [risks, setRisks] = useState<any[]>(MOCK_RISKS);
   const [compliance, setCompliance] = useState<any[]>(MOCK_COMPLIANCE);
+  const [gaps, setGaps] = useState<any[]>([]);
+  const [actions, setActions] = useState<any[]>([]);
+  const [forecast, setForecast] = useState<any[]>([]);
   const [usingDemo, setUsingDemo] = useState({ enterprise: false, risks: false, compliance: false });
 
   const [selectedAssetId, setSelectedAssetId] = useState('A003');
@@ -45,13 +48,31 @@ export default function FinancialDashboard() {
   const [optimizing, setOptimizing] = useState(false);
 
   useEffect(() => {
-    Promise.all([getEnterprise(), getRisks(), getCompliance()]).then(([e, r, c]) => {
+    Promise.all([getEnterprise(), getRisks(), getCompliance(), getGaps(), getControls(), getForecast()]).then(([e, r, c, g, controls, trend]) => {
       if (e?.data) setEnterprise(e.data);
       else setUsingDemo((u) => ({ ...u, enterprise: true }));
       if (r?.data) setRisks(r.data);
       else setUsingDemo((u) => ({ ...u, risks: true }));
       if (c?.data) setCompliance(c.data);
       else setUsingDemo((u) => ({ ...u, compliance: true }));
+      if (g?.data) setGaps(g.data);
+      if (controls?.data) {
+        setActions(
+          controls.data
+            .map((control: any) => ({
+              ...control,
+              savings_inr: control.risk_reduction_inr,
+              rosi_pct: control.cost_inr > 0
+                ? Math.round(((control.risk_reduction_inr - control.cost_inr) / control.cost_inr) * 100)
+                : 0,
+            }))
+            .sort((left: any, right: any) => right.rosi_pct - left.rosi_pct)
+            .slice(0, 3),
+        );
+      }
+      if (trend?.data) {
+        setForecast(trend.data.map((point: any) => ({ day: point.day, current: point.eal_inr / 100_000 })));
+      }
     });
   }, []);
 
@@ -181,7 +202,7 @@ export default function FinancialDashboard() {
         <div className="card">
           <div className="card-title">Top Recommended Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {MOCK_ACTIONS.map((a) => (
+            {actions.map((a) => (
               <div key={a.name} style={{ border: '1px solid var(--bg-border)', borderRadius: 8, padding: 12, background: 'var(--bg-elevated)' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)', marginBottom: 6 }}>{a.name}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 8 }}>
@@ -230,24 +251,17 @@ export default function FinancialDashboard() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>RBI CSF</td>
-                <td style={{ color: complianceColor(72), fontWeight: 700 }}>72%</td>
-                <td>MFA gap</td>
-                <td>{formatRupees(4860000)}</td>
-              </tr>
-              <tr>
-                <td>ISO 27001</td>
-                <td style={{ color: complianceColor(76), fontWeight: 700 }}>76%</td>
-                <td>Segmentation</td>
-                <td>{formatRupees(3870000)}</td>
-              </tr>
-              <tr>
-                <td>NIST CSF</td>
-                <td style={{ color: complianceColor(82), fontWeight: 700 }}>82%</td>
-                <td>Patching</td>
-                <td>{formatRupees(3100000)}</td>
-              </tr>
+              {gaps.slice(0, 3).map((gap) => {
+                const framework = compliance.find((item) => item.framework === gap.framework);
+                return (
+                  <tr key={`${gap.framework}-${gap.control}`}>
+                    <td>{gap.framework.replace(/_/g, ' ')}</td>
+                    <td style={{ color: complianceColor(framework?.score ?? 0), fontWeight: 700 }}>{framework?.score ?? '—'}%</td>
+                    <td>{gap.control}</td>
+                    <td>{formatRupees(gap.impact_inr)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -263,15 +277,11 @@ export default function FinancialDashboard() {
         <div className="card">
           <div className="card-title">90-Day Risk Forecast</div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={MOCK_FORECAST} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+            <AreaChart data={forecast} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
               <defs>
                 <linearGradient id="colorCurrent" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={TOKENS.critical} stopOpacity={0.25} />
                   <stop offset="95%" stopColor={TOKENS.critical} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorActions" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={TOKENS.success} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={TOKENS.success} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={TOKENS.divider} vertical={false} />
@@ -280,7 +290,6 @@ export default function FinancialDashboard() {
               <Tooltip contentStyle={{ background: TOKENS.bg, border: `1px solid ${TOKENS.border}`, borderRadius: 8, color: TOKENS.textPrimary, boxShadow: '0 2px 6px rgba(60,64,67,0.15)' }} />
               <Legend wrapperStyle={{ fontSize: 11, color: TOKENS.textSecondary }} />
               <Area type="monotone" dataKey="current" name="No action" stroke={TOKENS.critical} fill="url(#colorCurrent)" strokeWidth={2} isAnimationActive animationDuration={500} />
-              <Area type="monotone" dataKey="withActions" name="With actions" stroke={TOKENS.success} fill="url(#colorActions)" strokeWidth={2} isAnimationActive animationDuration={500} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

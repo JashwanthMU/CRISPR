@@ -45,10 +45,11 @@ export default function SecurityDashboard() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
 
-  const riskScore = useDemoStore((s) => s.riskScore);
+  const demoRiskScore = useDemoStore((s) => s.riskScore);
   const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
   const isRunning = useDemoStore((s) => s.isRunning);
   const filters = useUiStore((s) => s.filters);
+  const riskScore = enterprise?.enterprise_risk_score ?? demoRiskScore;
 
   useEffect(() => {
     Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings()]).then(([e, r, s, f]) => {

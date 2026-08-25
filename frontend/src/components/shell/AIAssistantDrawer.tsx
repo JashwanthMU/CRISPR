@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Bot, Send, Sparkles, ShieldAlert, Globe, TrendingUp, ScrollText } from 'lucide-react';
 import { useUiStore, closeAIDrawer } from '../../lib/uiStore';
-import { useDemoStore } from '../../demo/demoStore';
 import { queryAssistant } from '../../services/api';
-import { formatLakh } from '../../utils/format';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -29,8 +27,6 @@ const SUGGESTED_PROMPTS = [
  */
 export default function AIAssistantDrawer() {
   const open = useUiStore((s) => s.aiDrawerOpen);
-  const riskScore = useDemoStore((s) => s.riskScore);
-  const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,28 +49,7 @@ export default function AIAssistantDrawer() {
     return () => window.removeEventListener('keydown', onEscape);
   }, [open]);
 
-  const localAnswer = (q: string): string => {
-    const query = q.toLowerCase();
-    const delta = riskScore - previousRiskScore;
-    if (query.includes('highest') && query.includes('risk')) {
-      return 'Your highest-risk finding is the Authentication API auth-bypass, corroborated across 4 independent sources (Bug Bounty, Vulnerability Scanner, XDR, IAM) with 94% confidence. It is the single largest driver of the current enterprise risk score.';
-    }
-    if (query.includes('exposed asset')) {
-      return 'Three assets are directly internet-exposed without a WAF: the Public API, Authentication API, and Customer Portal. All three support the Digital Payments business service — I\'d recommend reviewing them from the Resources page.';
-    }
-    if (query.includes('why') && query.includes('risk')) {
-      return delta > 0
-        ? `Enterprise risk increased ${delta} point${delta === 1 ? '' : 's'} (${previousRiskScore} → ${riskScore}) primarily from the Authentication API risk case after new corroborating evidence was correlated during the last analysis run.`
-        : `Enterprise risk is currently ${riskScore}, down from ${previousRiskScore} in the prior period, driven by recent remediation progress on the top risk cases.`;
-    }
-    if (query.includes('summarize') || query.includes('today')) {
-      return "Today's activity: 1 repository connected, ingestion and correlation completed, 12 risk cases and 12 findings generated, and 1 board report produced. Enterprise risk score is currently " + riskScore + '/100.';
-    }
-    if (query.includes('mfa')) {
-      return `Enabling MFA everywhere would reduce Authentication API's Expected Annual Loss by roughly ${formatLakh(48.6)} for an estimated ₹15L implementation cost — the single highest-ROSI action available right now.`;
-    }
-    return "I can help investigate risk cases, findings, exposed assets, and remediation priorities across CRISPR. Try one of the suggested prompts, or ask me something specific about NovaPay's current security posture.";
-  };
+  const unavailableAnswer = "The AI Advisor cannot reach the deterministic backend for this question. Start the backend and retry so I can answer from current risk data.";
 
   const send = async (question: string) => {
     if (!question.trim() || loading) return;
@@ -83,10 +58,10 @@ export default function AIAssistantDrawer() {
     setLoading(true);
     try {
       const res = await queryAssistant(question);
-      const answer = res?.data?.answer || res?.data?.response || localAnswer(question);
+      const answer = res?.data?.answer || res?.data?.response || unavailableAnswer;
       setMessages((m) => [...m, { role: 'assistant', text: answer }]);
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', text: localAnswer(question) }]);
+      setMessages((m) => [...m, { role: 'assistant', text: unavailableAnswer }]);
     } finally {
       setLoading(false);
     }

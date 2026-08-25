@@ -39,7 +39,7 @@ SOURCE_CONFIDENCE_BOOST: dict[SourceType, float] = {
     # VULNERABILITY_SCANNER and CSPM contribute no boost - baseline sources.
 }
 
-MAX_CONFIDENCE = 1.00
+MAX_CONFIDENCE = 0.94
 
 SEVERITY_RANK = {
     Severity.CRITICAL: 4,

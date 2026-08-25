@@ -92,8 +92,8 @@ export default function Compliance() {
                 <tr key={i}>
                   <td>{LABELS[g.framework] ?? g.framework}</td>
                   <td>{g.control}</td>
-                  <td style={{ maxWidth: 220 }}>{g.gap_description}</td>
-                  <td style={{ color: 'var(--color-critical)', fontWeight: 500 }}>{formatRupees(g.financial_impact_inr)}</td>
+                  <td style={{ maxWidth: 220 }}>{g.gap ?? g.gap_description}</td>
+                  <td style={{ color: 'var(--color-critical)', fontWeight: 500 }}>{formatRupees(g.impact_inr ?? g.financial_impact_inr)}</td>
                   <td>
                     <span
                       style={{

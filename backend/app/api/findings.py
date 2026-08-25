@@ -5,6 +5,9 @@ from collections import Counter, defaultdict
 from fastapi import APIRouter
 
 from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
+from backend.connectors.cmdb.connector import get_source_info as get_cmdb_info
+from backend.connectors.cspm.connector import fetch_findings as fetch_cspm
+from backend.connectors.cspm.connector import get_source_info as get_cspm_info
 from backend.connectors.edr.connector import fetch_findings as fetch_edr
 from backend.connectors.iam.connector import fetch_findings as fetch_iam
 from backend.connectors.siem.connector import fetch_findings as fetch_siem
@@ -22,6 +25,7 @@ CONNECTORS = (
     fetch_siem,
     fetch_iam,
     fetch_threat_intel,
+    fetch_cspm,
 )
 
 def load_all_findings() -> list[dict]:
@@ -38,10 +42,13 @@ def get_all_findings() -> dict:
 @router.get("/sources")
 def get_sources() -> list[dict]:
     counts = Counter(finding["source_type"] for finding in load_all_findings())
-    return [
-        {"source": source, "count": count, "status": "connected"}
-        for source, count in sorted(counts.items())
-    ]
+    source_info = {
+        source: {"source": source, "count": count, "status": "connected"}
+        for source, count in counts.items()
+    }
+    for info in (get_cspm_info(), get_cmdb_info()):
+        source_info[info["source"]] = info
+    return [source_info[source] for source in sorted(source_info)]
 
 @router.get("/correlate")
 def group_findings_by_asset() -> dict:

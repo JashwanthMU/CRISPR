@@ -1,25 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, BadgeIcon, Lock, Clock } from 'lucide-react';
 import { formatRupees } from '../utils/format';
-import { MOCK_RISKS } from '../utils/mock';
+import { getPresets, getScenarios } from '../services/api';
 
 interface SimResult {
   beforeEal: number;
   afterEal: number;
-  beforeScore: number;
-  afterScore: number;
   perAsset: { asset: string; before: number; after: number }[];
 }
 
-const PRESETS = [
-  { key: 'mfa', label: 'Enable MFA', icon: <CheckCircle2 size={16} />, savings: 4860000, cost: 1500000, rosi: 224, negative: false },
-  { key: 'patch', label: 'Patch Immediately', icon: <BadgeIcon size={16} />, savings: 3100000, cost: 1200000, rosi: 158, negative: false },
-  { key: 'segmentation', label: 'Add Segmentation', icon: <Lock size={16} />, savings: 3870000, cost: 3000000, rosi: null, negative: false },
-  { key: 'delay', label: 'Delay Patching 30d', icon: <Clock size={16} />, savings: -2100000, cost: 0, rosi: null, negative: true },
-];
+interface Preset {
+  id: string;
+  name: string;
+  params: Record<string, boolean | number>;
+  cost_inr: number;
+  reduction_inr: number;
+  rosi_pct: number | null;
+}
 
-const BASE_EAL_INR = 84000000;
-const BASE_SCORE = 78;
+const iconForPreset = (id: string) => {
+  if (id === 'mfa') return <CheckCircle2 size={16} />;
+  if (id === 'patch_now') return <BadgeIcon size={16} />;
+  if (id === 'segment') return <Lock size={16} />;
+  return <Clock size={16} />;
+};
 
 export default function Scenarios() {
   const [mfa, setMfa] = useState(false);
@@ -27,37 +31,43 @@ export default function Scenarios() {
   const [segmentation, setSegmentation] = useState(false);
   const [edrCoverage, setEdrCoverage] = useState(60);
   const [result, setResult] = useState<SimResult | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [simulating, setSimulating] = useState(false);
+
+  useEffect(() => {
+    getPresets().then((response) => setPresets(response?.data ?? []));
+  }, []);
+
+  const runWithParams = async (params: Record<string, boolean | number>) => {
+    setSimulating(true);
+    const response = await getScenarios(params);
+    const data = response?.data;
+    if (data) {
+      setResult({
+        beforeEal: data.before_total_eal_inr,
+        afterEal: data.after_total_eal_inr,
+        perAsset: (data.per_asset ?? []).map((row: any) => ({
+          asset: row.asset_name,
+          before: row.before_eal_inr,
+          after: row.after_eal_inr,
+        })),
+      });
+    }
+    setSimulating(false);
+  };
 
   const simulate = () => {
-    let deltaInr = 0;
-    if (mfa) deltaInr -= 4860000;
-    if (segmentation) deltaInr -= 3870000;
-    if (patching === '30day') deltaInr += 2100000;
-    if (patching === '60day') deltaInr += 4200000;
-    if (patching === 'immediate') deltaInr -= 3100000;
-    deltaInr -= ((edrCoverage - 60) / 40) * 1800000;
-
-    const afterEal = Math.max(3000000, BASE_EAL_INR + deltaInr);
-    const scoreDelta = Math.round(((BASE_EAL_INR - afterEal) / BASE_EAL_INR) * 60);
-    const afterScore = Math.max(15, Math.min(100, BASE_SCORE - scoreDelta));
-
-    const ratio = afterEal / BASE_EAL_INR;
-    const perAsset = MOCK_RISKS.map((r) => ({
-      asset: r.asset_name,
-      before: r.eal_inr,
-      after: Math.round(r.eal_inr * ratio),
-    }));
-
-    setResult({ beforeEal: BASE_EAL_INR, afterEal, beforeScore: BASE_SCORE, afterScore, perAsset });
+    const params: Record<string, boolean | number> = {};
+    if (mfa) params.implement_mfa = true;
+    if (segmentation) params.implement_segmentation = true;
+    if (patching === 'immediate') params.implement_patching = true;
+    if (patching === '30day') params.patch_delay = 30;
+    if (patching === '60day') params.patch_delay = 60;
+    if (edrCoverage === 100) params.edr_expand = true;
+    void runWithParams(params);
   };
 
-  const applyPreset = (key: string) => {
-    if (key === 'mfa') setMfa(true);
-    if (key === 'patch') setPatching('immediate');
-    if (key === 'segmentation') setSegmentation(true);
-    if (key === 'delay') setPatching('30day');
-    setTimeout(simulate, 0);
-  };
+  const applyPreset = (preset: Preset) => void runWithParams(preset.params);
 
   const diff = result ? result.afterEal - result.beforeEal : 0;
   const diffGood = diff < 0;
@@ -161,8 +171,8 @@ export default function Scenarios() {
               />
             </div>
 
-            <button className="btn-primary" onClick={simulate}>
-              SIMULATE
+            <button className="btn-primary" onClick={simulate} disabled={simulating}>
+              {simulating ? 'SIMULATING…' : 'SIMULATE'}
             </button>
           </div>
         </div>
@@ -178,7 +188,6 @@ export default function Scenarios() {
                     Before EAL
                   </div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--sev-critical)' }}>{formatRupees(result.beforeEal)}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Risk score {result.beforeScore}</div>
                 </div>
                 <div style={{ padding: 16, borderRadius: 8, background: 'var(--bg-elevated)', textAlign: 'center' }}>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -187,7 +196,6 @@ export default function Scenarios() {
                   <div style={{ fontSize: '1.75rem', fontWeight: 800, color: diffGood ? 'var(--sev-low)' : 'var(--sev-critical)' }}>
                     {formatRupees(result.afterEal)}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Risk score {result.afterScore}</div>
                 </div>
               </div>
 
@@ -245,9 +253,11 @@ export default function Scenarios() {
       <div className="card">
         <div className="card-title">Quick Presets</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          {PRESETS.map((p) => (
+          {presets.map((p) => {
+            const negative = p.reduction_inr < 0;
+            return (
             <div
-              key={p.key}
+              key={p.id}
               style={{
                 border: '1px solid var(--bg-border)',
                 borderRadius: 8,
@@ -255,24 +265,24 @@ export default function Scenarios() {
                 background: 'var(--bg-elevated)',
                 cursor: 'pointer',
               }}
-              onClick={() => applyPreset(p.key)}
+              onClick={() => applyPreset(p)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: p.negative ? 'var(--sev-critical)' : 'var(--accent-blue)' }}>
-                {p.icon}
-                <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{p.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: negative ? 'var(--sev-critical)' : 'var(--accent-blue)' }}>
+                {iconForPreset(p.id)}
+                <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{p.name}</span>
               </div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: p.negative ? 'var(--sev-critical)' : 'var(--sev-low)' }}>
-                {p.negative ? '↑ increases risk by ' : 'Saves '}
-                {formatRupees(Math.abs(p.savings))}
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: negative ? 'var(--sev-critical)' : 'var(--sev-low)' }}>
+                {negative ? '↑ increases risk by ' : 'Saves '}
+                {formatRupees(Math.abs(p.reduction_inr))}
               </div>
-              {p.cost > 0 && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Costs {formatRupees(p.cost)}</div>
+              {p.cost_inr > 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>Costs {formatRupees(p.cost_inr)}</div>
               )}
-              {p.rosi && (
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--sev-low)', marginTop: 6 }}>ROSI {p.rosi}%</div>
+              {p.rosi_pct != null && (
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--sev-low)', marginTop: 6 }}>ROSI {p.rosi_pct}%</div>
               )}
             </div>
-          ))}
+          );})}
         </div>
       </div>
     </div>

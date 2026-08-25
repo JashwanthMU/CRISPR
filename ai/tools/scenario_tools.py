@@ -9,7 +9,8 @@ GET /api/scenarios while staying safe for in-process use.
 import json
 from pathlib import Path
 
-from backend.scenario_engine.simulator import simulate_enterprise
+from backend.app.api.risks import get_enterprise_summary
+from backend.scenario_engine.simulator import align_enterprise_baseline, simulate_enterprise
 
 _ASSETS_PATH = Path(__file__).resolve().parents[2] / "data" / "demo" / "assets.json"
 
@@ -20,7 +21,9 @@ def _assets() -> list:
 
 
 def _run(overrides: dict) -> dict:
-    return simulate_enterprise(_assets(), overrides)
+    result = simulate_enterprise(_assets(), overrides)
+    baseline = get_enterprise_summary()["total_eal_inr"]
+    return align_enterprise_baseline(result, baseline)
 
 
 def get_current_state() -> dict:

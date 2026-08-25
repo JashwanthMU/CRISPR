@@ -164,6 +164,46 @@ def simulate_enterprise(assets: list, overrides: dict) -> dict:
     }
 
 
+def align_enterprise_baseline(result: dict, baseline_eal_inr: float) -> dict:
+    baseline = round(baseline_eal_inr)
+    original_before = result.get("before_total_eal_inr", 0)
+    reduction = result.get("reduction_inr", 0)
+    rows = result.get("per_asset", [])
+    aligned_rows = []
+    allocated_before = 0
+    allocated_reduction = 0
+
+    for index, row in enumerate(rows):
+        is_last = index == len(rows) - 1
+        share = row.get("before_eal_inr", 0) / original_before if original_before else 0
+        before = baseline - allocated_before if is_last else round(baseline * share)
+        asset_reduction = reduction - allocated_reduction if is_last else round(reduction * share)
+        after = before - asset_reduction
+        aligned_rows.append({
+            **row,
+            "before_eal_inr": before,
+            "before_eal_lakh": round(before / 100_000, 2),
+            "after_eal_inr": after,
+            "after_eal_lakh": round(after / 100_000, 2),
+            "reduction_inr": asset_reduction,
+            "reduction_lakh": round(asset_reduction / 100_000, 2),
+            "reduction_pct": round(asset_reduction / before * 100, 1) if before else 0,
+        })
+        allocated_before += before
+        allocated_reduction += asset_reduction
+
+    after_total = baseline - reduction
+    return {
+        **result,
+        "before_total_eal_inr": baseline,
+        "before_total_eal_lakh": round(baseline / 100_000, 2),
+        "after_total_eal_inr": after_total,
+        "after_total_eal_lakh": round(after_total / 100_000, 2),
+        "reduction_pct": round(reduction / baseline * 100, 1) if baseline else 0,
+        "per_asset": aligned_rows,
+    }
+
+
 PRESET_SCENARIOS = [
     {"id": "mfa", "name": "Implement MFA for privileged accounts",
      "description": "Raise MFA coverage to 100% across all assets",

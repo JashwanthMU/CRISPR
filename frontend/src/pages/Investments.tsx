@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { optimize } from '../services/api';
+import { getControls, optimize } from '../services/api';
 import { MOCK_CONTROLS, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
 import { formatRupees, TOKENS } from '../utils/format';
 
 export default function Investments() {
   const [budgetLakh, setBudgetLakh] = useState(100); // ₹100L default
   const [result, setResult] = useState<any>(MOCK_OPTIMIZE_RESULT);
+  const [controls, setControls] = useState<any[]>(MOCK_CONTROLS);
   const [optimizing, setOptimizing] = useState(false);
 
   const budgetInr = budgetLakh * 100000;
@@ -24,7 +25,10 @@ export default function Investments() {
   };
 
   useEffect(() => {
-    setResult(MOCK_OPTIMIZE_RESULT);
+    Promise.all([optimize(budgetInr), getControls()]).then(([optimization, catalogue]) => {
+      if (optimization?.data) setResult(optimization.data);
+      if (catalogue?.data) setControls(catalogue.data);
+    });
   }, []);
 
   const selectedNames = new Set((result?.selected_controls ?? []).map((c: any) => c.name));
@@ -153,7 +157,7 @@ export default function Investments() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_CONTROLS.map((c) => {
+            {controls.map((c) => {
               const selected = selectedNames.has(c.name);
               return (
                 <tr key={c.name} style={{ opacity: selected ? 1 : 0.45 }}>
@@ -161,7 +165,7 @@ export default function Investments() {
                   <td>{formatRupees(c.cost_inr)}</td>
                   <td>{formatRupees(c.risk_reduction_inr)}</td>
                   <td>{c.complexity}</td>
-                  <td>{c.weeks}w</td>
+                  <td>{c.time_weeks ?? c.weeks}w</td>
                   <td>
                     <span
                       style={{

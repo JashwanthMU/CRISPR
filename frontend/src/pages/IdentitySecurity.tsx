@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { UserCog } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
 import ProgressBar from '../components/common/ProgressBar';
 import { MOCK_ASSETS } from '../utils/mock';
+import { getAssets } from '../services/api';
 
 const IDENTITY_RISKS = [
   { identity: 'svc-payments-deploy', type: 'Service Account', privilege: 'Admin', mfa: false, risk: 'CRITICAL' },
@@ -16,7 +18,18 @@ import { TOKENS } from '../utils/format';
 const RISK_COLOR: Record<string, string> = { CRITICAL: TOKENS.critical, HIGH: TOKENS.sevHigh, MEDIUM: TOKENS.warning, LOW: TOKENS.success };
 
 export default function IdentitySecurity() {
-  const avgMfa = Math.round(MOCK_ASSETS.reduce((a, x) => a + (x.controls?.mfa_pct ?? 0), 0) / MOCK_ASSETS.length);
+  const [assets, setAssets] = useState<any[]>(MOCK_ASSETS);
+  const mfaPercent = (asset: any) => {
+    if (typeof asset.controls?.mfa_coverage === 'number') return Math.round(asset.controls.mfa_coverage * 100);
+    return Math.round(asset.controls?.mfa_pct ?? 0);
+  };
+  const avgMfa = assets.length ? Math.round(assets.reduce((total, asset) => total + mfaPercent(asset), 0) / assets.length) : 0;
+
+  useEffect(() => {
+    getAssets().then((response) => {
+      if (response?.data) setAssets(response.data);
+    });
+  }, []);
 
   return (
     <div className="page-container page-stack">
@@ -67,8 +80,8 @@ export default function IdentitySecurity() {
       <div className="card">
         <div className="card-title">MFA Coverage by Asset</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {MOCK_ASSETS.map((a) => (
-            <ProgressBar key={a.asset_id} value={a.controls?.mfa_pct ?? 0} color={(a.controls?.mfa_pct ?? 0) >= 70 ? TOKENS.success : TOKENS.critical} label={a.name} />
+          {assets.map((a) => (
+            <ProgressBar key={a.asset_id} value={mfaPercent(a)} color={mfaPercent(a) >= 70 ? TOKENS.success : TOKENS.critical} label={a.name} />
           ))}
         </div>
       </div>

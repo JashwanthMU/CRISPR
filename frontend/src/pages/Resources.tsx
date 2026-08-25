@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Boxes } from 'lucide-react';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
 import FilterBar from '../components/common/FilterBar';
@@ -6,6 +6,7 @@ import { MOCK_ASSETS } from '../utils/mock';
 import { ASSET_TYPE_ICON } from '../config/icons';
 import { formatRupees, riskColor } from '../utils/format';
 import ProgressBar from '../components/common/ProgressBar';
+import { getAssets } from '../services/api';
 
 interface Resource {
   asset_id: string;
@@ -19,7 +20,7 @@ interface Resource {
   lastObserved: string;
 }
 
-const RESOURCES: Resource[] = MOCK_ASSETS.map((a) => ({
+const toResources = (assets: any[]): Resource[] => assets.map((a) => ({
   asset_id: a.asset_id,
   name: a.name,
   type: a.type,
@@ -32,20 +33,27 @@ const RESOURCES: Resource[] = MOCK_ASSETS.map((a) => ({
 }));
 
 export default function Resources() {
+  const [resources, setResources] = useState<Resource[]>(toResources(MOCK_ASSETS));
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [envFilter, setEnvFilter] = useState('all');
 
   const filtered = useMemo(
     () =>
-      RESOURCES.filter((r) => {
+      resources.filter((r) => {
         if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
         if (typeFilter !== 'all' && r.type !== typeFilter) return false;
         if (envFilter !== 'all' && r.environment !== envFilter) return false;
         return true;
       }),
-    [search, typeFilter, envFilter]
+    [resources, search, typeFilter, envFilter]
   );
+
+  useEffect(() => {
+    getAssets().then((response) => {
+      if (response?.data) setResources(toResources(response.data));
+    });
+  }, []);
 
   const columns: ColumnDef<Resource>[] = [
     {
@@ -116,7 +124,7 @@ export default function Resources() {
               ],
             },
           ]}
-          right={<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{RESOURCES.length} total resources</span>}
+          right={<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{resources.length} total resources</span>}
         />
         <DataTable columns={columns} rows={filtered} getRowId={(r) => r.asset_id} defaultSortKey="risk" pageSize={10} />
       </div>

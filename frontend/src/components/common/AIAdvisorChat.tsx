@@ -12,39 +12,8 @@ interface Props {
   suggestions: string[];
 }
 
-const FALLBACK_RESPONSES: Record<string, string> = {
-  default:
-    "Based on current risk data, the Authentication API is NovaPay's top exposure at ₹79.8L EAL (risk score 87), driven by a validated bug bounty finding, weak MFA coverage, and its internet-facing critical role in Digital Payments. I'd recommend prioritizing MFA enforcement — it alone would reduce EAL by ~₹48.6L for a ₹15L investment (ROSI 224%).",
-};
-
-function mockAnswer(question: string): string {
-  const q = question.toLowerCase();
-  if (q.includes('top') && q.includes('risk')) {
-    return 'Your top security risk is the Authentication API — risk score 87, EAL ₹79.8L. It is correlated across 4 independent sources (Bug Bounty, Vulnerability Scanner, XDR, and IAM), giving 94% confidence this is a real, active exposure, not a false positive.';
-  }
-  if (q.includes('auth')) {
-    return 'Authentication API is high risk because it is internet-facing, supports a critical business service (Digital Payments), has a validated bug bounty auth-bypass finding, and only 58% MFA coverage on privileged accounts. Multiple independent telemetry sources corroborate this — that correlation is what drives the 87/100 score.';
-  }
-  if (q.includes('exploit')) {
-    return 'CVE-2024-21887 (Authentication API) and CVE-2024-3400 (Payment Database) are both flagged by threat intel as actively exploited in the wild by known threat actor groups targeting APAC payment infrastructure. Both are CRITICAL severity and should be patched immediately.';
-  }
-  if (q.includes('mfa')) {
-    return 'Enabling MFA everywhere would cut Authentication API EAL from ₹79.8L to roughly ₹31.2L — a ₹48.6L annual risk reduction — for an estimated ₹15L implementation cost. That is a 224% ROSI, the single highest-return action available right now.';
-  }
-  if (q.includes('crore') || q.includes('budget') || (q.includes('1') && q.includes('cr'))) {
-    return "With a ₹1 crore (₹100L) budget, the optimizer selects MFA rollout, emergency patching, network segmentation, WAF deployment, and full EDR rollout — total spend ₹86L, delivering ₹161.3L in risk reduction (ROSI ~620%), with ₹14L of budget left unused because no further control passes the cost-benefit threshold.";
-  }
-  if (q.includes('delay') && q.includes('patch')) {
-    return 'Delaying patching by 30 days on CVE-2024-21887 increases Authentication API EAL by approximately ₹21L, as the exploitation window and threat actor dwell time both grow. We recommend patching immediately rather than deferring.';
-  }
-  if (q.includes('exposure') && q.includes('total')) {
-    return "NovaPay's total financial cyber exposure (Expected Annual Loss) is ₹84.0L across all monitored assets, with a 95th-percentile Value-at-Risk of ₹2.69 Cr in a worst-case scenario year.";
-  }
-  if (q.includes('business service') || q.includes('highest exposure')) {
-    return 'Digital Payments is the business service with the highest exposure — it includes the Authentication API and Payment Database, together accounting for roughly ₹141.8L of the ₹84L+ enterprise EAL.';
-  }
-  return FALLBACK_RESPONSES.default;
-}
+const unavailableAnswer =
+  'The AI Advisor cannot reach the deterministic risk engine right now. Start the backend and try again; no financial figures are shown without API data.';
 
 export default function AIAdvisorChat({ theme, suggestions }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -65,10 +34,10 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
     setLoading(true);
     try {
       const res = await queryAssistant(question);
-      const answer = res?.data?.answer || res?.data?.response || mockAnswer(question);
+      const answer = res?.data?.answer || res?.data?.response || unavailableAnswer;
       setMessages((m) => [...m, { role: 'assistant', text: answer }]);
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', text: mockAnswer(question) }]);
+      setMessages((m) => [...m, { role: 'assistant', text: unavailableAnswer }]);
     } finally {
       setLoading(false);
     }

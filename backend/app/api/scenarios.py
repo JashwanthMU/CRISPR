@@ -4,7 +4,8 @@ from fastapi import APIRouter, Query
 from typing import Optional
 import json
 from pathlib import Path
-from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
+from backend.scenario_engine.simulator import align_enterprise_baseline, simulate_enterprise, PRESET_SCENARIOS
+from backend.app.api.risks import get_enterprise_summary
 
 router = APIRouter()
 
@@ -15,6 +16,12 @@ def _load_assets() -> list:
         path = Path(__file__).resolve().parents[3] / "data" / "demo" / "assets.json"
     with open(path) as f:
         return json.load(f)
+
+
+def _simulate(overrides: dict) -> dict:
+    result = simulate_enterprise(_load_assets(), overrides)
+    baseline = get_enterprise_summary()["total_eal_inr"]
+    return align_enterprise_baseline(result, baseline)
 
 
 @router.get("")
@@ -33,8 +40,7 @@ def run_scenario(
     if edr_expand is not None: overrides["edr_expand"] = edr_expand
     if patch_delay is not None: overrides["patch_delay"] = patch_delay
     if mfa_coverage is not None: overrides["mfa_coverage"] = mfa_coverage
-    assets = _load_assets()
-    result = simulate_enterprise(assets, overrides)
+    result = _simulate(overrides)
     result["total_eal_inr"] = result["after_total_eal_inr"]
     result["total_eal_lakh"] = result["after_total_eal_lakh"]
     return result
@@ -42,10 +48,9 @@ def run_scenario(
 
 @router.get("/presets")
 def list_presets():
-    assets = _load_assets()
     enriched = []
     for preset in PRESET_SCENARIOS:
-        sim = simulate_enterprise(assets, preset["params"])
+        sim = _simulate(preset["params"])
         cost, reduction = preset["cost_inr"], sim["reduction_inr"]
         if cost > 0 and reduction > 0:
             rosi = round((reduction - cost) / cost, 2)
@@ -73,6 +78,5 @@ def run_preset(scenario_id: str):
     preset = next((p for p in PRESET_SCENARIOS if p["id"] == scenario_id), None)
     if not preset:
         return {"error": f"Unknown scenario '{scenario_id}'", "available": [p["id"] for p in PRESET_SCENARIOS]}
-    assets = _load_assets()
-    result = simulate_enterprise(assets, preset["params"])
+    result = _simulate(preset["params"])
     return {"scenario": preset, **result}

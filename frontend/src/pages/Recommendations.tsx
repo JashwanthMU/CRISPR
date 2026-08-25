@@ -1,16 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ListChecks, ArrowRight } from 'lucide-react';
 import { REMEDIATION_SCENARIOS } from '../demo/fixtures';
 import SeverityBadge from '../components/common/SeverityBadge';
 import { formatRupees } from '../utils/format';
 import { toast } from '../lib/toastStore';
+import { getControls } from '../services/api';
 
 export default function Recommendations() {
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [recommendations, setRecommendations] = useState(REMEDIATION_SCENARIOS);
 
-  const active = REMEDIATION_SCENARIOS.filter((s) => !dismissed.has(s.id)).sort((a, b) => b.riskReductionInr - a.riskReductionInr);
+  useEffect(() => {
+    getControls().then((response) => {
+      if (!response?.data) return;
+      setRecommendations(response.data.map((control: any) => ({
+        id: control.id,
+        title: control.name,
+        finding: 'Recommended by the deterministic budget optimizer catalogue',
+        affectedResource: 'NovaPay enterprise controls',
+        recommendedFix: control.name,
+        priority: control.risk_reduction_inr >= 4_000_000 ? 'CRITICAL' : control.risk_reduction_inr >= 2_000_000 ? 'HIGH' : 'MEDIUM',
+        estimatedEffort: `${control.time_weeks} week${control.time_weeks === 1 ? '' : 's'}`,
+        riskReductionInr: control.risk_reduction_inr,
+        status: 'NOT_STARTED',
+      })));
+    });
+  }, []);
+
+  const active = recommendations.filter((s) => !dismissed.has(s.id)).sort((a, b) => b.riskReductionInr - a.riskReductionInr);
 
   return (
     <div className="page-container page-stack">

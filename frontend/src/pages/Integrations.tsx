@@ -5,6 +5,7 @@ import IntegrationLogo from '../components/common/IntegrationLogo';
 import { toast } from '../lib/toastStore';
 import { TOKENS } from '../utils/format';
 import type { Integration, IntegrationStatus } from '../types';
+import { getSources } from '../services/api';
 
 const STATUS_COLOR: Record<IntegrationStatus, string> = {
   connected: TOKENS.success,
@@ -24,6 +25,21 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
 
 export default function Integrations() {
   const [items, setItems] = useState<Integration[]>(INTEGRATIONS.map((i) => ({ ...i })));
+
+  useEffect(() => {
+    getSources().then((response) => {
+      const sources = response?.data ?? [];
+      const sourceByKey = new Map<string, any>(
+        sources.map((source: any) => [String(source.source).toLowerCase().replace(/_/g, ''), source]),
+      );
+      setItems((current) => current.map((integration) => {
+        const source = sourceByKey.get(integration.key.replace(/_/g, ''));
+        return source
+          ? { ...integration, status: source.status, itemsIngested: source.count }
+          : integration;
+      }));
+    });
+  }, []);
 
   useEffect(() => {
     // Simulate any items in 'connecting' state resolving to 'connected' after a delay.

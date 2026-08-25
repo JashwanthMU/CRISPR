@@ -27,6 +27,7 @@ AVAILABILITY_TTL_S = 60.0
 
 MODEL_REGISTRY = {
     "route": "kr/gpt-5.6-sol",
+    "general": "kr/gpt-5.6-sol",
     "explain": "kr/claude-opus-5-thinking",
     "agent": "kr/claude-opus-5-thinking-agentic",
     "mitigate": "kr/gpt-5.6-sol-thinking",
@@ -34,6 +35,7 @@ MODEL_REGISTRY = {
 
 MODEL_FALLBACKS = {
     "route": ["kr/gpt-5.6-terra", "kr/gpt-5.6-luna"],
+    "general": ["kr/claude-opus-5", "kr/gpt-5.6-terra"],
     "explain": ["kr/claude-opus-5", "kr/gpt-5.6-sol-thinking"],
     "agent": ["kr/claude-opus-5-agentic", "kr/gpt-5.6-sol-thinking-agentic"],
     "mitigate": ["kr/claude-opus-5-thinking", "kr/gpt-5.6-sol"],
@@ -85,6 +87,8 @@ def chat(
     user: str,
     max_tokens: int = 700,
     temperature: float = 0.2,
+    request_timeout_s: float = REQUEST_TIMEOUT_S,
+    max_attempts: Optional[int] = None,
 ) -> Optional[str]:
     """Generate a completion with the task-appropriate model.
 
@@ -96,6 +100,8 @@ def chat(
         return None
     primary = MODEL_REGISTRY.get(task, MODEL_REGISTRY["explain"])
     models = [primary, *MODEL_FALLBACKS.get(task, MODEL_FALLBACKS["explain"])]
+    if max_attempts is not None:
+        models = models[:max_attempts]
     for model in dict.fromkeys(models):
         payload = {
             "model": model,
@@ -112,6 +118,7 @@ def chat(
                 "/chat/completions",
                 json=payload,
                 headers={"Authorization": f"Bearer {api_key}"},
+                timeout=request_timeout_s,
             )
             response.raise_for_status()
             body = response.json()

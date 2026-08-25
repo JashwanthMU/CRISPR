@@ -16,8 +16,8 @@ httpClient.interceptors.response.use(
   }
 );
 
-/** 'demo' (default, no backend required) or 'live' (calls the real backend). */
-export const API_MODE: 'demo' | 'live' = ((import.meta as any).env?.VITE_API_MODE === 'live' ? 'live' : 'demo');
+/** Live backend by default; set VITE_API_MODE=demo only for an offline presentation. */
+export const API_MODE: 'demo' | 'live' = ((import.meta as any).env?.VITE_API_MODE === 'demo' ? 'demo' : 'live');
 
 /** Simulated network latency so demo-mode UI still exercises loading states. */
 export function simulateLatency<T>(value: T, ms = 280): Promise<T> {

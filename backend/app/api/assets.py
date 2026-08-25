@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import json
 from pathlib import Path
 
@@ -28,7 +28,14 @@ def _asset_name_lookup(assets: list[dict]) -> dict:
 
 @router.get("")
 def get_assets():
-    assets = [enrich_asset(a) for a in load_assets()]
+    assets = []
+    for asset in load_assets():
+        enriched = enrich_asset(asset)
+        controls = DEMO_CONTROLS.get(asset["asset_id"], {})
+        enriched["control_effectiveness"] = calculate_control_effectiveness(controls)
+        enriched["control_effectiveness_pct"] = round(enriched["control_effectiveness"] * 100, 1)
+        enriched["controls"] = controls
+        assets.append(enriched)
     return {"total": len(assets), "assets": assets}
 
 
@@ -36,7 +43,7 @@ def get_assets():
 def get_asset_controls(asset_id: str):
     controls = DEMO_CONTROLS.get(asset_id)
     if controls is None:
-        return {"error": "no controls data for this asset"}, 404
+        raise HTTPException(status_code=404, detail="no controls data for this asset")
     return {"asset_id": asset_id, "controls": controls}
 
 
@@ -45,7 +52,7 @@ def get_asset(asset_id: str):
     assets = load_assets()
     asset = next((a for a in assets if a["asset_id"] == asset_id), None)
     if not asset:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="asset not found")
 
     enriched = enrich_asset(asset)
     controls = DEMO_CONTROLS.get(asset_id, {})
@@ -60,7 +67,7 @@ def get_asset_risk_cases(asset_id: str):
     assets = load_assets()
     asset_record = next((a for a in assets if a["asset_id"] == asset_id), None)
     if not asset_record:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="asset not found")
 
     raw_findings = get_findings_by_asset(asset_id)
     normalized = normalize_all(raw_findings)

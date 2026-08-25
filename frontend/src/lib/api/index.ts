@@ -34,11 +34,17 @@ import {
 import { REPOSITORIES, INTEGRATIONS, SCA_FINDINGS } from '../../demo/fixtures';
 import { runAnalysis as runDemoAnalysis } from '../../demo/demoStore';
 
-async function liveOrFallback<T>(path: string, fallback: T, method: 'get' | 'post' = 'get', body?: unknown): Promise<T> {
+async function liveOrFallback<T>(
+  path: string,
+  fallback: T,
+  method: 'get' | 'post' = 'get',
+  body?: unknown,
+  select: (payload: any) => T = (payload) => payload as T,
+): Promise<T> {
   if (API_MODE === 'demo') return simulateLatency(fallback);
   try {
     const res = method === 'get' ? await httpClient.get(path) : await httpClient.post(path, body);
-    return (res?.data as T) ?? fallback;
+    return res?.data == null ? fallback : select(res.data);
   } catch {
     return fallback;
   }
@@ -64,7 +70,7 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
-  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[]);
+  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => payload.findings);
 }
 
 export function getFinding(id: string): Promise<Finding | undefined> {
@@ -79,7 +85,7 @@ export function getSources() {
 // Assets
 // ----------------------------------------------------------------------------
 export function getAssets(): Promise<Asset[]> {
-  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[]);
+  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) => payload.assets);
 }
 
 export function getAsset(id: string): Promise<Asset | undefined> {
@@ -90,7 +96,7 @@ export function getAsset(id: string): Promise<Asset | undefined> {
 // Risk cases
 // ----------------------------------------------------------------------------
 export function getRiskCases(): Promise<RiskCase[]> {
-  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[]);
+  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) => payload.risks);
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
@@ -133,27 +139,26 @@ export function getReports() {
 }
 
 export function getCompliance() {
-  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE);
+  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE, 'get', undefined, (payload) => payload.frameworks);
 }
 
 // ----------------------------------------------------------------------------
 // Vulnerabilities (generic view distinct from SCA-specific findings)
 // ----------------------------------------------------------------------------
 export function getVulnerabilities(): Promise<Vulnerability[]> {
-  const derived: Vulnerability[] = (MOCK_FINDINGS as unknown as Finding[])
-    .filter((f) => f.cve)
-    .map((f) => ({
-      id: f.finding_id,
-      cve: f.cve!,
-      severity: f.severity,
-      cvss: f.severity === 'CRITICAL' ? 9.6 : f.severity === 'HIGH' ? 7.8 : 5.4,
-      component: f.asset_id,
-      affectedAssets: [f.asset_id],
-      exploitAvailable: f.finding_type === 'ACTIVE_EXPLOITATION' || f.status === 'VALIDATED',
+  return getFindings().then((findings) => findings
+    .filter((finding) => finding.cve)
+    .map((finding) => ({
+      id: finding.finding_id,
+      cve: finding.cve!,
+      severity: finding.severity,
+      cvss: finding.severity === 'CRITICAL' ? 9.6 : finding.severity === 'HIGH' ? 7.8 : 5.4,
+      component: finding.asset_id,
+      affectedAssets: [finding.asset_id],
+      exploitAvailable: finding.finding_type === 'ACTIVE_EXPLOITATION' || finding.status === 'VALIDATED',
       patchAvailable: true,
-      status: f.status,
-    }));
-  return liveOrFallback('/api/vulnerabilities', derived);
+      status: finding.status,
+    })));
 }
 
 // ----------------------------------------------------------------------------
