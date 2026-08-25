@@ -1,25 +1,42 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FileWarning, Building2, AlertTriangle, GitBranch, ScrollText, LayoutDashboard, Bug } from 'lucide-react';
-import { useUiStore, closeCommandPalette } from '../../lib/uiStore';
+import { Search, FileWarning, Building2, AlertTriangle, GitBranch, ScrollText, LayoutDashboard, Bug, Sparkles } from 'lucide-react';
+import { useUiStore, closeCommandPalette, openAIDrawer } from '../../lib/uiStore';
 import { MOCK_FINDINGS, MOCK_ASSETS, MOCK_RISKS } from '../../utils/mock';
 import { REPOSITORIES } from '../../demo/fixtures';
+import { NAV_GROUPS } from '../shell/navConfig';
+import { runAnalysis } from '../../demo/demoStore';
 import type { CommandResult, CommandResultType } from '../../types';
 
-const PAGE_RESULTS: CommandResult[] = [
-  { id: 'p1', type: 'page', title: 'Security Dashboard', subtitle: 'Overview', path: '/security' },
-  { id: 'p2', type: 'page', title: 'Financial Dashboard', subtitle: 'Overview', path: '/financial' },
-  { id: 'p3', type: 'page', title: 'Findings', subtitle: 'Investigate', path: '/findings' },
-  { id: 'p4', type: 'page', title: 'Risk Cases', subtitle: 'Investigate', path: '/risks' },
-  { id: 'p5', type: 'page', title: 'Attack Paths', subtitle: 'Investigate', path: '/attack-paths' },
-  { id: 'p6', type: 'page', title: 'Code Security', subtitle: 'Detect', path: '/code-security' },
-  { id: 'p7', type: 'page', title: 'Integrations', subtitle: 'Platform', path: '/integrations' },
-  { id: 'p8', type: 'page', title: 'Compliance', subtitle: 'Govern', path: '/compliance' },
-  { id: 'p9', type: 'page', title: 'Developer Workspace', subtitle: 'Platform', path: '/demo/vscode' },
-  { id: 'p10', type: 'page', title: 'SCA & SBOM', subtitle: 'Code Security', path: '/code-security/sca' },
+// "Pages" results are derived from the single shared nav config (see
+// src/components/shell/navConfig.tsx) instead of a second hardcoded list,
+// so the sidebar and command palette can never drift out of sync.
+const PAGE_RESULTS: CommandResult[] = NAV_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({
+    id: `page-${item.to}`,
+    type: 'page' as const,
+    title: item.label,
+    subtitle: group.title,
+    path: item.to,
+  }))
+);
+
+// "Actions" — real commands, not just navigation. Selecting one performs
+// the action directly instead of only opening a page.
+interface ActionResult {
+  id: string;
+  type: 'action';
+  title: string;
+  subtitle: string;
+  run: () => void;
+}
+
+const ACTION_RESULTS: ActionResult[] = [
+  { id: 'action-ai', type: 'action', title: 'Ask CRISPR AI', subtitle: 'Open the AI assistant', run: () => openAIDrawer() },
+  { id: 'action-run', type: 'action', title: 'Run Analysis', subtitle: 'Trigger a full ingestion → correlation → risk scan', run: () => runAnalysis() },
 ];
 
-const TYPE_ICON: Record<CommandResultType, any> = {
+const TYPE_ICON: Record<CommandResultType | 'action', any> = {
   asset: Building2,
   finding: FileWarning,
   risk_case: AlertTriangle,
@@ -28,6 +45,7 @@ const TYPE_ICON: Record<CommandResultType, any> = {
   report: ScrollText,
   page: LayoutDashboard,
   user: Building2,
+  action: Sparkles,
 };
 
 const RECENT_KEY = 'crispr_recent_searches';
@@ -65,9 +83,13 @@ export default function CommandPalette() {
     }
   }, [open]);
 
-  const results: CommandResult[] = useMemo(() => {
+  type AnyResult = CommandResult | ActionResult;
+
+  const results: AnyResult[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return PAGE_RESULTS;
+    const actionMatches = ACTION_RESULTS.filter((a) => !q || a.title.toLowerCase().includes(q));
+
+    if (!q) return [...PAGE_RESULTS, ...actionMatches];
 
     const assetResults: CommandResult[] = MOCK_ASSETS.filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
       id: a.asset_id,
@@ -101,11 +123,11 @@ export default function CommandPalette() {
     }));
     const pageResults = PAGE_RESULTS.filter((p) => p.title.toLowerCase().includes(q));
 
-    return [...pageResults, ...assetResults, ...riskResults, ...findingResults, ...repoResults].slice(0, 20);
+    return [...pageResults, ...assetResults, ...riskResults, ...findingResults, ...repoResults, ...actionMatches].slice(0, 20);
   }, [query]);
 
   const grouped = useMemo(() => {
-    const groups: Record<string, CommandResult[]> = {};
+    const groups: Record<string, AnyResult[]> = {};
     results.forEach((r) => {
       const key = r.type;
       groups[key] = groups[key] ?? [];
@@ -116,10 +138,14 @@ export default function CommandPalette() {
 
   const flatResults = results;
 
-  const goTo = (result: CommandResult) => {
+  const goTo = (result: AnyResult) => {
     pushRecent(query || result.title);
     closeCommandPalette();
-    navigate(result.path);
+    if (result.type === 'action') {
+      result.run();
+    } else {
+      navigate(result.path);
+    }
   };
 
   useEffect(() => {
@@ -158,6 +184,7 @@ export default function CommandPalette() {
     vulnerability: 'Vulnerabilities',
     report: 'Reports',
     user: 'Users',
+    action: 'Actions',
   };
 
   return (
@@ -192,7 +219,7 @@ export default function CommandPalette() {
           {Object.entries(grouped).map(([type, items]) => (
             <div key={type}>
               <div className="command-group-label">{GROUP_LABEL[type] ?? type}</div>
-              {items.map((r) => {
+              {(items as AnyResult[]).map((r) => {
                 runningIndex += 1;
                 const idx = runningIndex;
                 const Icon = TYPE_ICON[r.type];
