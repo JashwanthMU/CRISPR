@@ -31,7 +31,7 @@ Open:
 
 - Portal: <http://127.0.0.1:3000>
 - FastAPI documentation: <http://127.0.0.1:8000/docs>
-- PostgreSQL: `127.0.0.1:5432` (database/user/password: `crispr`)
+- PostgreSQL: private Docker service configured by the root `.env` file
 
 Local security-team login:
 

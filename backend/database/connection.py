@@ -8,14 +8,35 @@ import psycopg
 from psycopg.rows import dict_row
 
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://crispr:crispr@127.0.0.1:5432/crispr"
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+
+def _connection_settings() -> str | dict[str, str | int]:
+    """Use a cloud URL when supplied, otherwise require discrete DB settings."""
+    if DATABASE_URL:
+        return DATABASE_URL
+    required = ("DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD")
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        raise RuntimeError(f"Missing required database settings: {', '.join(missing)}")
+    return {
+        "host": os.environ["DB_HOST"],
+        "port": int(os.getenv("DB_PORT", "5432")),
+        "dbname": os.environ["DB_NAME"],
+        "user": os.environ["DB_USER"],
+        "password": os.environ["DB_PASSWORD"],
+    }
 
 
 @contextmanager
 def get_connection() -> Iterator[psycopg.Connection]:
-    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as connection:
+    settings = _connection_settings()
+    connection = (
+        psycopg.connect(settings, row_factory=dict_row)
+        if isinstance(settings, str)
+        else psycopg.connect(**settings, row_factory=dict_row)
+    )
+    with connection:
         yield connection
 
 
