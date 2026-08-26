@@ -16,7 +16,7 @@ Our Smart India Hackathon 2026 presentation covers the CRISPR solution, technica
 
 Experience the live CRISPR prototype running on AWS:
 
-### 🔗 [Open Live Prototype](http://3.12.111.128:5173/financial)
+[🔗 Open Live Prototype](https://crispr-hosting.vercel.app/login)
 
 The prototype demonstrates how CRISPR converts technical cybersecurity findings into **₹-denominated financial risk** and helps security teams prioritize and optimize remediation decisions.
 
