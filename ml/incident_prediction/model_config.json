@@ -250,10 +250,10 @@
       "precision": 0.5752,
       "recall": 0.4811,
       "confusion_matrix": {
-        "TN": 62400,
-        "FP": 1334,
-        "FN": 64,
-        "TP": 254
+        "TN": 63621,
+        "FP": 113,
+        "FN": 165,
+        "TP": 153
       }
     },
     "five_fold_stratified_cv": {
