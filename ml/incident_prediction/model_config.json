@@ -1,0 +1,118 @@
+{
+  "model_name": "CRISPR XGBoost Incident Likelihood v4",
+  "model_version": "xgb_v4_final",
+  "trained_on": "2026-08-28",
+  "framework": "XGBoost",
+  "xgboost_version": "3.4.1",
+  "problem_statement": "SIH 2026 -- AI-Powered Cyber Risk Quantification Platform",
+  "target_definition": "exploited = is_kev -- CISA Known Exploited Vulnerabilities catalog only. No EPSS threshold in label. No synthetic features.",
+  "features": [
+    "cvss_score",
+    "epss_score",
+    "epss_percentile",
+    "days_since_published",
+    "severity_encoded",
+    "is_cert_in",
+    "attack_vector",
+    "attack_complexity",
+    "privileges_required",
+    "user_interaction",
+    "scope",
+    "exploitability_score",
+    "impact_score",
+    "flag_rce",
+    "flag_sqli",
+    "flag_xss",
+    "flag_buffer_overflow",
+    "flag_priv_escalation",
+    "flag_dos",
+    "flag_dir_traversal"
+  ],
+  "feature_count": 20,
+  "data_sources": [
+    "NVD (Kaggle: nisargshroff2402/nvd-cybersecurity-dataset)",
+    "EPSS v4 -- FIRST.org daily exploitation probability",
+    "CISA KEV -- ground-truth labels",
+    "CERT-In advisories -- India-specific threat signal (curated list)"
+  ],
+  "dataset": {
+    "total_rows": 320258,
+    "training_rows": 256206,
+    "test_rows": 64052,
+    "positive_class_kev": 1592,
+    "negative_class": 318666,
+    "imbalance_ratio": 200.17
+  },
+  "hyperparameters": {
+    "n_estimators": 235,
+    "max_depth": 8,
+    "learning_rate": 0.06514171285644578,
+    "subsample": 0.9465242682827131,
+    "colsample_bytree": 0.787679491093159,
+    "min_child_weight": 9,
+    "reg_alpha": 1.0785964864810417e-05,
+    "reg_lambda": 0.00014144604283550518,
+    "gamma": 3.3577824889606505,
+    "scale_pos_weight": 200.16708542713567,
+    "tree_method": "hist",
+    "objective": "binary:logistic",
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "optimal_threshold": 0.975,
+  "metrics": {
+    "stratified_random_split": {
+      "roc_auc": 0.9819,
+      "pr_auc": 0.4788,
+      "f1_score": 0.524,
+      "precision": 0.5752,
+      "recall": 0.4811,
+      "confusion_matrix": {
+        "TN": 63621,
+        "FP": 113,
+        "FN": 165,
+        "TP": 153
+      }
+    },
+    "five_fold_stratified_cv": {
+      "roc_auc_mean": 0.9848,
+      "roc_auc_std": 0.0016,
+      "pr_auc_mean": 0.5029,
+      "pr_auc_std": 0.0372,
+      "f1_mean": 0.5202
+    },
+    "temporal_split": {
+      "available": true,
+      "roc_auc": 0.981,
+      "pr_auc": 0.4909
+    },
+    "ablation_no_epss": {
+      "roc_auc": 0.8528,
+      "pr_auc": 0.1238,
+      "epss_contribution_pr_auc": 0.355
+    },
+    "calibrated_model": {
+      "roc_auc": 0.9821,
+      "pr_auc": 0.4808
+    }
+  },
+  "india_context": {
+    "cert_in_cves_flagged": 34
+  },
+  "shap_top_features": [
+    "epss_percentile",
+    "epss_score",
+    "exploitability_score",
+    "days_since_published",
+    "cvss_score",
+    "impact_score",
+    "flag_rce",
+    "flag_xss"
+  ],
+  "known_limitations": [
+    "KEV positive class is small -- model may miss novel exploit patterns",
+    "attack_vector/complexity/privileges_required/user_interaction/scope were NOT available in this NVD source and default to -1 (unknown)",
+    "EPSS/NVD are global feeds -- India-specific signal only from CERT-In curated list",
+    "Temporal AUC lower than random-split AUC -- expected and disclosed"
+  ]
+}
