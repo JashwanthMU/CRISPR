@@ -1,11 +1,12 @@
 """
 CRISPR - Incident Likelihood Model V4
+Replaces rule-based V1 (ml/incident_prediction/model.py)
 
 Two models:
   final_model      - uncalibrated XGBoost (for CVE ranking)
   calibrated_model - Platt-scaled (for ₹ EAL calculation)
 
-Authors: Jashwanth M U(@JashwanthMU) and Christ Michael Jeniston S (@Kira-007)
+Authors: Jashwanth M U (@JashwanthMU) and Christ Michael Jeniston S (@Kira-007)
 """
 
 from __future__ import annotations
@@ -19,15 +20,26 @@ import numpy as np
 MODEL_DIR = Path(__file__).parent
 
 # Lazy-loaded globals — loaded once on first call, not at import time
-_xgb_model       = None
+_xgb_model        = None
 _calib_model      = None
 _config           = None
 _feature_list     = None
+_probability_bands = None  # NEW — loaded from model_config.json
 
 # CERT-In flagged CVEs — India signal
 # Full list maintained in ml/data/cert_in_cves.json
 _CERT_IN_PATH = MODEL_DIR.parent / "data" / "cert_in_cves.json"
 _cert_in_set: Optional[set] = None
+
+# Fallback bands — used only if model_config.json doesn't have probability_bands
+# (e.g. older model artifact). Keep in sync with the training notebook's
+# PROBABILITY_BANDS constant.
+_DEFAULT_BANDS = [
+    {"min": 0.90, "max": 1.00, "tier": "CRITICAL", "action": "Immediate remediation"},
+    {"min": 0.70, "max": 0.90, "tier": "HIGH",      "action": "High priority — schedule within days"},
+    {"min": 0.40, "max": 0.70, "tier": "MEDIUM",    "action": "Security review"},
+    {"min": 0.00, "max": 0.40, "tier": "LOW",       "action": "Monitor"},
+]
 
 
 def _load_cert_in() -> set:
@@ -37,7 +49,6 @@ def _load_cert_in() -> set:
             with _CERT_IN_PATH.open() as f:
                 _cert_in_set = set(json.load(f))
         else:
-            # Fallback: curated list of high-impact CERT-In CVEs
             _cert_in_set = {
                 "CVE-2024-21762", "CVE-2024-21887", "CVE-2024-3400",
                 "CVE-2024-1708",  "CVE-2024-20767", "CVE-2024-21338",
@@ -49,14 +60,14 @@ def _load_cert_in() -> set:
 
 def _load_models():
     """Load XGBoost model and config on first inference call."""
-    global _xgb_model, _calib_model, _config, _feature_list
+    global _xgb_model, _calib_model, _config, _feature_list, _probability_bands
 
     if _xgb_model is not None:
         return  # already loaded
 
-    xgb_path   = MODEL_DIR / "crispr_xgb_model.json"
-    calib_path = MODEL_DIR / "crispr_xgb_calibrated.pkl"
-    config_path= MODEL_DIR / "model_config.json"
+    xgb_path    = MODEL_DIR / "crispr_xgb_model.json"
+    calib_path  = MODEL_DIR / "crispr_xgb_calibrated.pkl"
+    config_path = MODEL_DIR / "model_config.json"
 
     if xgb_path.exists():
         try:
@@ -79,9 +90,27 @@ def _load_models():
         with config_path.open() as f:
             _config = json.load(f)
         _feature_list = _config.get("features", [])
+        _probability_bands = _config.get("probability_bands", _DEFAULT_BANDS)
+    else:
+        _probability_bands = _DEFAULT_BANDS
 
     if _xgb_model is None:
         print("Note: XGBoost model not found — using rule-based V1 fallback")
+
+
+def assign_tier(probability: float) -> dict:
+    """
+    Map a continuous probability to a CRISPR priority tier + recommended action.
+    Bands come from model_config.json (probability_bands), so retraining or
+    re-tuning bands doesn't require a code change here — just re-run Cell 22.
+    """
+    bands = _probability_bands or _DEFAULT_BANDS
+    for band in bands:
+        lo, hi = band["min"], band["max"]
+        if lo <= probability < hi or (probability >= hi and hi == 1.00):
+            return {"tier": band["tier"], "action": band["action"]}
+    # Fallback — should not normally hit this if bands cover [0, 1] fully
+    return {"tier": "LOW", "action": "Monitor"}
 
 
 def _rule_based_fallback(
@@ -92,7 +121,7 @@ def _rule_based_fallback(
     control_effectiveness: float,
 ) -> float:
     """
-    V1 rule-based model - used when XGBoost model is not available.
+    V1 rule-based model — used when XGBoost model is not available.
     Kept here for backward compatibility and graceful degradation.
     """
     score  = (cvss / 10.0) * 0.25
@@ -156,7 +185,7 @@ def predict_incident(
     patch_age_days:        int,
     internet_facing:       bool,
     control_effectiveness: float,
-    # Extended features (from NVD enrichment - use defaults if not available)
+    # Extended features (from NVD enrichment — use defaults if not available)
     cve_id:                Optional[str] = None,
     epss_score:            float = 0.0,
     epss_percentile:       float = 0.0,
@@ -181,10 +210,19 @@ def predict_incident(
     Predict exploitation likelihood for a CVE.
 
     Returns:
-        probability:   float 0.02–0.95 - feeds into FAIR EAL calculation
+        probability:   float 0.02–0.95 — feeds into FAIR EAL calculation
+        tier:          CRITICAL / HIGH / MEDIUM / LOW — from probability_bands
+        action:        recommended next step for that tier
         model_used:    which model produced the output
         is_cert_in:    whether CVE appears in CERT-In advisories (India signal)
         contributions: dict of weighted feature contributions (rule-based fallback only)
+
+    NOTE: CRISPR does not gate on a single binary threshold. Recall@K analysis
+    (see docs/ml/recall_at_k.csv) showed a single cutoff trades recall for
+    precision sharply — at K=500 ranked candidates, the model surfaces 60.7%
+    of confirmed exploits; at K=1000, 73.3%. The tier bands below are the
+    production-facing decision surface; the raw probability is preserved for
+    ranking and EAL calculation.
     """
     _load_models()
     cert_in_set = _load_cert_in()
@@ -229,18 +267,20 @@ def predict_incident(
         X = [[feature_dict.get(f, 0) for f in _feature_list]]
 
         try:
-            import numpy as np
             X_arr = np.array(X, dtype=float)
             prob  = float(model_to_use.predict_proba(X_arr)[0][1])
             prob  = max(0.02, min(0.95, prob))
+            tier_info = assign_tier(prob)
 
             model_name = (
-                f"xgb_v4_calibrated (Platt)" if use_calibrated and _calib_model
+                "xgb_v4_calibrated (Platt)" if use_calibrated and _calib_model
                 else "xgb_v4_uncalibrated"
             )
 
             return {
                 "probability":   round(prob, 3),
+                "tier":          tier_info["tier"],
+                "action":        tier_info["action"],
                 "model":         model_name,
                 "model_version": _config.get("model_version", "xgb_v4") if _config else "xgb_v4",
                 "is_cert_in":    bool(is_cert_in_flag),
@@ -261,8 +301,12 @@ def predict_incident(
     if is_cert_in_flag:
         prob = min(prob * 1.10, 0.95)
 
+    tier_info = assign_tier(prob)
+
     return {
         "probability":   round(prob, 3),
+        "tier":          tier_info["tier"],
+        "action":        tier_info["action"],
         "model":         "rule_based_v1_fallback",
         "model_version": "v1",
         "is_cert_in":    bool(is_cert_in_flag),
@@ -296,7 +340,8 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
             epss_score=float(risk_row.get("epss_score", 0.0)),
         )
     except (TypeError, ValueError, KeyError) as e:
-        return {"probability": 0.1, "model": "error_fallback", "error": str(e)}
+        return {"probability": 0.1, "tier": "LOW", "action": "Monitor",
+                "model": "error_fallback", "error": str(e)}
 
 
 def get_model_info() -> dict:
@@ -308,8 +353,11 @@ def get_model_info() -> dict:
             "trained_on":       _config.get("trained_on"),
             "pr_auc":           _config.get("metrics", {}).get(
                                  "stratified_random_split", {}).get("pr_auc"),
+            "recall_at_k":      _config.get("recall_at_k"),
+            "probability_bands":_config.get("probability_bands", _DEFAULT_BANDS),
             "features":         _feature_list,
             "india_signal":     "CERT-In advisory flag (is_cert_in)",
             "calibrated":       (MODEL_DIR / "crispr_xgb_calibrated.pkl").exists(),
+            "known_limitations":_config.get("known_limitations", []),
         }
     return {"model_version": "rule_based_v1", "trained_on": None}
