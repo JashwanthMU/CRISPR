@@ -226,3 +226,9 @@ export function getComplianceGaps() {
 export function getRecommend() {
   return liveOrFallback('/api/optimize/recommend', []);
 }
+
+export function getForecast() {
+  return liveOrFallback('/api/assistant/forecast', [], 'get', undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
+  );
+}
