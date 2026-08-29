@@ -25,7 +25,7 @@ def _load_assets() -> list[dict]:
 def _load_risk_inputs() -> list[dict]:
     """
     Risk cases are derived from real scanner findings (data/demo/vulnerabilities.json),
-    One risk case per CVE/vulnerability finding.
+    not hand-typed numbers. One risk case per CVE/vulnerability finding.
     """
     if not VULNS_PATH.exists():
         return []
@@ -43,6 +43,18 @@ def _load_risk_inputs() -> list[dict]:
             "confidence": f.get("confidence", 0.7),
             "finding_id": f.get("finding_id"),
             "title": f.get("title"),
+            # Optional NVD/EPSS enrichment - present only after running
+            # scripts/enrich_vulnerabilities.py; absent findings fall back
+            # to predict_from_risk_row()'s own defaults, not fabricated values.
+            "epss_score": f.get("epss_score"),
+            "epss_percentile": f.get("epss_percentile"),
+            "attack_vector": f.get("attack_vector"),
+            "attack_complexity": f.get("attack_complexity"),
+            "privileges_required": f.get("privileges_required"),
+            "user_interaction": f.get("user_interaction"),
+            "scope": f.get("scope"),
+            "exploitability_score": f.get("exploitability_score"),
+            "impact_score": f.get("impact_score"),
         })
     return inputs
 
@@ -66,6 +78,19 @@ def compute_risk(inp: dict, assets: list[dict]) -> dict:
         "internet_facing": asset.get("internet_facing", False),
         "control_effectiveness_pct": round(ce * 100, 1),
         "cve_id": inp.get("cve_id"),
+        # Pass real enrichment where available; predict_from_risk_row/
+        # predict_incident already default missing values sensibly, so
+        # None here just means "let the model use its own default", not
+        # a fabricated number.
+        "epss_score": inp.get("epss_score"),
+        "epss_percentile": inp.get("epss_percentile"),
+        "attack_vector": inp.get("attack_vector"),
+        "attack_complexity": inp.get("attack_complexity"),
+        "privileges_required": inp.get("privileges_required"),
+        "user_interaction": inp.get("user_interaction"),
+        "scope": inp.get("scope"),
+        "exploitability_score": inp.get("exploitability_score"),
+        "impact_score": inp.get("impact_score"),
     })
 
     used_model_probability = (

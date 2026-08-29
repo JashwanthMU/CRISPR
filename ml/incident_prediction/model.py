@@ -325,10 +325,14 @@ def predict_incident(
 def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
     """
     Convenience wrapper: build predict_incident() call from a risk engine row.
-    Used by backend/app/api/risks.py to get probability for each DEMO_RISK_INPUT.
+    Used by backend/app/api/risks.py to get probability for each finding.
+
+    Any field left as None in risk_row is simply omitted here, so
+    predict_incident()'s own parameter defaults apply - this never
+    substitutes a fabricated value for missing enrichment data.
     """
     try:
-        return predict_incident(
+        kwargs = dict(
             cvss=float(risk_row.get("cvss", 7.5)),
             exploit_in_wild=bool(risk_row.get("exploit_in_wild", False)),
             patch_age_days=int(risk_row.get("patch_age_days", 30)),
@@ -337,8 +341,20 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
                 risk_row.get("control_effectiveness_pct", 50.0)
             ) / 100.0,
             cve_id=risk_row.get("cve_id"),
-            epss_score=float(risk_row.get("epss_score", 0.0)),
         )
+        # Only pass enrichment fields that are actually present (not None) -
+        # letting predict_incident's own defaults apply otherwise.
+        optional_fields = (
+            "epss_score", "epss_percentile", "attack_vector",
+            "attack_complexity", "privileges_required", "user_interaction",
+            "scope", "exploitability_score", "impact_score",
+        )
+        for field in optional_fields:
+            value = risk_row.get(field)
+            if value is not None:
+                kwargs[field] = value
+
+        return predict_incident(**kwargs)
     except (TypeError, ValueError, KeyError) as e:
         return {"probability": 0.1, "tier": "LOW", "action": "Monitor",
                 "model": "error_fallback", "error": str(e)}
