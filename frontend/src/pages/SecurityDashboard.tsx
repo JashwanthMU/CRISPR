@@ -14,7 +14,7 @@ import FindingsSummary from '../components/dashboard/FindingsSummary';
 import SecurityPipeline from '../components/dashboard/SecurityPipeline';
 import SecurityInsights from '../components/dashboard/SecurityInsights';
 import RiskCaseDrawer from '../components/riskcases/RiskCaseDrawer';
-import { getEnterprise, getRiskCases, getSources, getFindings } from '../lib/api';
+import { getEnterprise, getRiskCases, getSources, getFindings, getForecast } from '../lib/api';
 import { MULTI_SERIES_TREND } from '../demo/fixtures';
 import { useDemoStore } from '../demo/demoStore';
 import { useUiStore, setFilter } from '../lib/uiStore';
@@ -44,6 +44,7 @@ export default function SecurityDashboard() {
   const [sources, setSources] = useState<any[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
+  const [trendData, setTrendData] = useState<any[]>([]);
 
   const demoRiskScore = useDemoStore((s) => s.riskScore);
   const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
@@ -52,11 +53,12 @@ export default function SecurityDashboard() {
   const riskScore = enterprise?.enterprise_risk_score ?? demoRiskScore;
 
   useEffect(() => {
-    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings()]).then(([e, r, s, f]) => {
+    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings(), getForecast()]).then(([e, r, s, f, t]) => {
       setEnterprise(e);
       setRisks(r);
       setSources(s);
       setFindings(f);
+      if (Array.isArray(t) && t.length) setTrendData(t);
     });
   }, []);
 
@@ -317,7 +319,7 @@ export default function SecurityDashboard() {
       <div className="card animate-in-3">
         <div className="card-title">Risk Trend</div>
         <InteractiveTrendChart
-          data={MULTI_SERIES_TREND}
+          data={trendData.length ? trendData : MULTI_SERIES_TREND}
           xKey="month"
           series={TREND_SERIES}
           defaultSeries={['enterpriseRisk']}

@@ -5,7 +5,7 @@ import FilterBar from '../components/common/FilterBar';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import { MOCK_FINDINGS } from '../utils/mock';
-import { getFindings } from '../services/api';
+import { getFindings } from '../lib/api';
 import { TOKENS } from '../utils/format';
 
 const FALLBACK_THREAT_FINDINGS = MOCK_FINDINGS.filter((f) => f.source_type === 'THREAT_INTEL');

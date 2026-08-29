@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { UserCog } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
 import ProgressBar from '../components/common/ProgressBar';
-import { MOCK_ASSETS } from '../utils/mock';
-import { getAssets } from '../services/api';
+import { getAssets } from '../lib/api';
 
 const IDENTITY_RISKS = [
   { identity: 'svc-payments-deploy', type: 'Service Account', privilege: 'Admin', mfa: false, risk: 'CRITICAL' },
@@ -18,7 +17,7 @@ import { TOKENS } from '../utils/format';
 const RISK_COLOR: Record<string, string> = { CRITICAL: TOKENS.critical, HIGH: TOKENS.sevHigh, MEDIUM: TOKENS.warning, LOW: TOKENS.success };
 
 export default function IdentitySecurity() {
-  const [assets, setAssets] = useState<any[]>(MOCK_ASSETS);
+  const [assets, setAssets] = useState<any[]>([]);
   const mfaPercent = (asset: any) => {
     if (typeof asset.controls?.mfa_coverage === 'number') return Math.round(asset.controls.mfa_coverage * 100);
     return Math.round(asset.controls?.mfa_pct ?? 0);

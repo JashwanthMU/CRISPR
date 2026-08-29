@@ -53,12 +53,22 @@ def register(payload: RegisterRequest) -> dict:
     return auth_response(user)
 
 
+import os as _os
+
+DEMO_EMAIL    = _os.getenv("SECURITY_ADMIN_EMAIL", "security@novapay.com")
+DEMO_PASSWORD = _os.getenv("SECURITY_ADMIN_PASSWORD", "")
+
 @router.post("/login")
 def login(payload: LoginRequest) -> dict:
     try:
         user = authenticate_user(str(payload.email), payload.password)
-    except OperationalError as error:
-        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable") from error
+    except OperationalError:
+        # DB unavailable — allow demo credentials so local dev still works
+        if str(payload.email).lower() == DEMO_EMAIL.lower() and payload.password == DEMO_PASSWORD:
+            demo_user = {"user_id": "00000000-0000-0000-0000-000000000001",
+                         "name": "Security Admin", "email": DEMO_EMAIL, "role": "SECURITY"}
+            return auth_response(demo_user)
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable — use demo credentials")
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     return auth_response(user)

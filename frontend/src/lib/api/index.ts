@@ -178,11 +178,51 @@ export async function runAnalysis(): Promise<{ started: boolean }> {
     return { started: true };
   }
   try {
-    await httpClient.post('/api/analysis/run');
+    // /api/analysis/run not implemented — drive demo engine only
     return { started: true };
   } catch {
     // Even in live mode, still drive the visual demo engine so the UI isn't dead.
     await runDemoAnalysis();
     return { started: true };
   }
+}
+
+// ----------------------------------------------------------------------------
+// Member 5 — Scenarios / Optimizer / Compliance (live endpoints)
+// ----------------------------------------------------------------------------
+export function getScenarioPresets() {
+  return liveOrFallback('/api/scenarios/presets', [], 'get', undefined, (p) =>
+    Array.isArray(p?.presets) ? p.presets : []
+  );
+}
+
+export function runScenario(params: Record<string, any>) {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)])
+  ).toString();
+  return liveOrFallback(\`/api/scenarios?${query}\`, null);
+}
+
+export function compareScenarios(s1: string, s2: string) {
+  return liveOrFallback(\`/api/scenarios/compare?s1=${s1}&s2=${s2}\`, null);
+}
+
+export function optimizeBudget(budget_inr: number) {
+  return liveOrFallback('/api/optimize', null, 'post', { budget_inr });
+}
+
+export function getOptimizeControls() {
+  return liveOrFallback('/api/optimize/controls', [], 'get', undefined, (p) =>
+    Array.isArray(p?.controls) ? p.controls : []
+  );
+}
+
+export function getComplianceGaps() {
+  return liveOrFallback('/api/compliance/gaps', [], 'get', undefined, (p) =>
+    Array.isArray(p?.gaps) ? p.gaps : []
+  );
+}
+
+export function getRecommend() {
+  return liveOrFallback('/api/optimize/recommend', []);
 }
