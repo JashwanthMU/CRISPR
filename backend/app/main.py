@@ -70,8 +70,16 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health():
-    return {
-        "status": "ok",
-        "service": "CRISPR",
-        "database": "connected" if getattr(app.state, "database_ready", False) else "demo_json_fallback",
-    }
+    db_status = "demo_json_fallback"
+    if getattr(app.state, "database_ready", False):
+        db_status = "connected"
+    else:
+        try:
+            from backend.database.connection import get_connection
+            with get_connection() as conn:
+                conn.execute("SELECT 1")
+            db_status = "connected"
+            app.state.database_ready = True
+        except Exception:
+            pass
+    return {"status": "ok", "service": "CRISPR", "database": db_status}

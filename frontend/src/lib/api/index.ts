@@ -200,11 +200,11 @@ export function runScenario(params: Record<string, any>) {
   const query = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)])
   ).toString();
-  return liveOrFallback(\`/api/scenarios?${query}\`, null);
+  return liveOrFallback(`/api/scenarios?${query}`, null);
 }
 
 export function compareScenarios(s1: string, s2: string) {
-  return liveOrFallback(\`/api/scenarios/compare?s1=${s1}&s2=${s2}\`, null);
+  return liveOrFallback(`/api/scenarios/compare?s1=${s1}&s2=${s2}`, null);
 }
 
 export function optimizeBudget(budget_inr: number) {
@@ -225,4 +225,10 @@ export function getComplianceGaps() {
 
 export function getRecommend() {
   return liveOrFallback('/api/optimize/recommend', []);
+}
+
+export function getForecast() {
+  return liveOrFallback('/api/assistant/forecast', [], 'get', undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
+  );
 }

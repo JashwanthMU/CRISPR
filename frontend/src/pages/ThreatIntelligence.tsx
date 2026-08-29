@@ -22,7 +22,8 @@ export default function ThreatIntelligence() {
 
   useEffect(() => {
     getFindings().then((response) => {
-      if (response?.data) setThreatFindings(response.data.filter((finding: any) => finding.source_type === 'THREAT_INTEL'));
+      const findings = Array.isArray(response) ? response : [];
+      setThreatFindings(findings.filter((finding: any) => finding.source_type === 'THREAT_INTEL'));
     });
   }, []);
 

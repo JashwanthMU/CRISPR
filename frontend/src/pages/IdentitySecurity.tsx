@@ -26,7 +26,7 @@ export default function IdentitySecurity() {
 
   useEffect(() => {
     getAssets().then((response) => {
-      if (response?.data) setAssets(response.data);
+      if (Array.isArray(response)) setAssets(response);
     });
   }, []);
 
