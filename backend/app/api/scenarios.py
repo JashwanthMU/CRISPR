@@ -73,6 +73,48 @@ def list_presets():
     return {"presets": enriched, "count": len(enriched)}
 
 
+@router.get('/compare')
+def compare_scenarios(
+    s1: str = Query(..., description='First scenario id: mfa | patch_now | segment | delay_30'),
+    s2: str = Query(..., description='Second scenario id: mfa | patch_now | segment | delay_30'),
+):
+    """Compare two scenarios side by side."""
+    p1 = next((p for p in PRESET_SCENARIOS if p["id"] == s1), None)
+    p2 = next((p for p in PRESET_SCENARIOS if p["id"] == s2), None)
+    errors = []
+    if not p1: errors.append(f"Unknown scenario '{s1}'")
+    if not p2: errors.append(f"Unknown scenario '{s2}'")
+    if errors:
+        return {"error": errors, "available": [p["id"] for p in PRESET_SCENARIOS]}
+    assets = _load_assets()
+    r1 = simulate_enterprise(assets, p1["params"])
+    r2 = simulate_enterprise(assets, p2["params"])
+    winner = s1 if r1["reduction_inr"] >= r2["reduction_inr"] else s2
+    return {
+        "scenario_1": {
+            "id": s1, "name": p1["name"],
+            "cost_inr": p1["cost_inr"],
+            "cost_lakh": round(p1["cost_inr"] / 100_000, 1),
+            "reduction_inr": r1["reduction_inr"],
+            "reduction_lakh": r1["reduction_lakh"],
+            "before_eal_lakh": r1["before_total_eal_lakh"],
+            "after_eal_lakh": r1["after_total_eal_lakh"],
+            "rosi": round((r1["reduction_inr"] - p1["cost_inr"]) / p1["cost_inr"], 2) if p1["cost_inr"] > 0 else None,
+        },
+        "scenario_2": {
+            "id": s2, "name": p2["name"],
+            "cost_inr": p2["cost_inr"],
+            "cost_lakh": round(p2["cost_inr"] / 100_000, 1),
+            "reduction_inr": r2["reduction_inr"],
+            "reduction_lakh": r2["reduction_lakh"],
+            "before_eal_lakh": r2["before_total_eal_lakh"],
+            "after_eal_lakh": r2["after_total_eal_lakh"],
+            "rosi": round((r2["reduction_inr"] - p2["cost_inr"]) / p2["cost_inr"], 2) if p2["cost_inr"] > 0 else None,
+        },
+        "winner": winner,
+        "difference_lakh": round((r1["reduction_inr"] - r2["reduction_inr"]) / 100_000, 2),
+    }
+
 @router.get("/{scenario_id}")
 def run_preset(scenario_id: str):
     preset = next((p for p in PRESET_SCENARIOS if p["id"] == scenario_id), None)
@@ -82,44 +124,3 @@ def run_preset(scenario_id: str):
     return {"scenario": preset, **result}
 
 
-@router.get('/compare')
-def compare_scenarios(
-    s1: str = Query(..., description='First scenario id: mfa | patch_now | segment | delay_30'),
-    s2: str = Query(..., description='Second scenario id: mfa | patch_now | segment | delay_30'),
-):
-    """Compare two scenarios side by side — used by frontend comparison view."""
-    p1 = next((p for p in PRESET_SCENARIOS if p['id'] == s1), None)
-    p2 = next((p for p in PRESET_SCENARIOS if p['id'] == s2), None)
-    errors = []
-    if not p1: errors.append(f"Unknown scenario '{s1}'")
-    if not p2: errors.append(f"Unknown scenario '{s2}'")
-    if errors:
-        return {'error': errors, 'available': [p['id'] for p in PRESET_SCENARIOS]}
-    assets = _load_assets()
-    r1 = simulate_enterprise(assets, p1['params'])
-    r2 = simulate_enterprise(assets, p2['params'])
-    winner = s1 if r1['reduction_inr'] >= r2['reduction_inr'] else s2
-    return {
-        'scenario_1': {
-            'id': s1, 'name': p1['name'],
-            'cost_inr': p1['cost_inr'],
-            'cost_lakh': round(p1['cost_inr'] / 100_000, 1),
-            'reduction_inr': r1['reduction_inr'],
-            'reduction_lakh': r1['reduction_lakh'],
-            'before_eal_lakh': r1['before_total_eal_lakh'],
-            'after_eal_lakh': r1['after_total_eal_lakh'],
-            'rosi': round((r1['reduction_inr'] - p1['cost_inr']) / p1['cost_inr'], 2) if p1['cost_inr'] > 0 else None,
-        },
-        'scenario_2': {
-            'id': s2, 'name': p2['name'],
-            'cost_inr': p2['cost_inr'],
-            'cost_lakh': round(p2['cost_inr'] / 100_000, 1),
-            'reduction_inr': r2['reduction_inr'],
-            'reduction_lakh': r2['reduction_lakh'],
-            'before_eal_lakh': r2['before_total_eal_lakh'],
-            'after_eal_lakh': r2['after_total_eal_lakh'],
-            'rosi': round((r2['reduction_inr'] - p2['cost_inr']) / p2['cost_inr'], 2) if p2['cost_inr'] > 0 else None,
-        },
-        'winner': winner,
-        'difference_lakh': round((r1['reduction_inr'] - r2['reduction_inr']) / 100_000, 2),
-    }
