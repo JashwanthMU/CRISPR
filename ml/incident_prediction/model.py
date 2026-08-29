@@ -269,8 +269,34 @@ def predict_incident(
         try:
             X_arr = np.array(X, dtype=float)
             prob  = float(model_to_use.predict_proba(X_arr)[0][1])
-            prob  = max(0.02, min(0.95, prob))
-            tier_info = assign_tier(prob)
+
+            if use_calibrated:
+                # Calibrated probability feeds directly into EAL (rupees), so
+                # a 0.02 floor would inflate a genuinely near-zero-risk
+                # finding's dollar exposure by up to ~33x (0.0006 -> 0.02).
+                # Only clip at a much smaller floor to avoid degenerate math
+                # (e.g. a hard zero), never to manufacture a minimum EAL.
+                prob = max(0.0005, min(0.98, prob))
+            else:
+                # Raw/uncalibrated score is used for ranking only, never for
+                # a rupee figure - a 0.02 floor here just keeps every CVE
+                # sortable and doesn't distort a financial number.
+                prob = max(0.02, min(0.95, prob))
+
+            # Tier bands (probability_bands in model_config.json) were
+            # validated against the RAW/uncalibrated score distribution
+            # (see threshold_sweep in model_config.json - all entries are
+            # 0.5-0.975, i.e. raw-model range). Calibrated probabilities for
+            # this demo's findings cluster well under 0.40, so applying the
+            # same bands to calibrated output means every finding reads as
+            # LOW regardless of actual relative risk. Always compute tier
+            # from the raw score, independent of which score feeds the EAL.
+            if use_calibrated:
+                raw_prob = float(_xgb_model.predict_proba(X_arr)[0][1]) if _xgb_model is not None else prob
+                raw_prob = max(0.02, min(0.95, raw_prob))
+                tier_info = assign_tier(raw_prob)
+            else:
+                tier_info = assign_tier(prob)
 
             model_name = (
                 "xgb_v4_calibrated (Platt)" if use_calibrated and _calib_model
@@ -278,14 +304,14 @@ def predict_incident(
             )
 
             return {
-                "probability":   round(prob, 3),
+                "probability":   round(prob, 4),
                 "tier":          tier_info["tier"],
                 "action":        tier_info["action"],
                 "model":         model_name,
                 "model_version": _config.get("model_version", "xgb_v4") if _config else "xgb_v4",
                 "is_cert_in":    bool(is_cert_in_flag),
                 "epss_score":    epss_score,
-                "contributions": None,  # SHAP on-demand - not computed here for speed
+                "contributions": None,  # SHAP on-demand — not computed here for speed
             }
         except Exception as e:
             print(f"XGBoost inference error: {e} — falling back to rule-based")
