@@ -24,7 +24,14 @@
     "scope": 1,
     "exploitability_score": 2.3,
     "impact_score": 6.0,
-    "published_date": "2024-01-12"
+    "published_date": "2024-01-12",
+    "flag_rce": 1,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS002",
@@ -51,7 +58,14 @@
     "scope": 1,
     "exploitability_score": 3.9,
     "impact_score": 6.0,
-    "published_date": "2024-04-12"
+    "published_date": "2024-04-12",
+    "flag_rce": 1,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS003",
@@ -78,7 +92,14 @@
     "scope": 0,
     "exploitability_score": 3.9,
     "impact_score": 3.6,
-    "published_date": "2023-10-10"
+    "published_date": "2023-10-10",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 1,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS004",
@@ -105,7 +126,14 @@
     "scope": 0,
     "exploitability_score": 3.9,
     "impact_score": 5.2,
-    "published_date": "2025-03-21"
+    "published_date": "2025-03-21",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 1,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS005",
@@ -132,7 +160,14 @@
     "scope": 0,
     "exploitability_score": 3.9,
     "impact_score": 5.9,
-    "published_date": "2025-04-07"
+    "published_date": "2025-04-07",
+    "flag_rce": 1,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS006",
@@ -176,7 +211,14 @@
     "scope": 1,
     "exploitability_score": 3.1,
     "impact_score": 6.0,
-    "published_date": "2025-10-03"
+    "published_date": "2025-10-03",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS008",
@@ -203,7 +245,14 @@
     "scope": 0,
     "exploitability_score": 3.9,
     "impact_score": 5.9,
-    "published_date": "2025-04-03"
+    "published_date": "2025-04-03",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS009",
@@ -230,7 +279,14 @@
     "scope": 1,
     "exploitability_score": 2.2,
     "impact_score": 6.0,
-    "published_date": "2025-04-03"
+    "published_date": "2025-04-03",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 1,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   },
   {
     "finding_id": "VS010",
@@ -274,6 +330,13 @@
     "scope": 0,
     "exploitability_score": 3.9,
     "impact_score": 5.9,
-    "published_date": "2025-01-14"
+    "published_date": "2025-01-14",
+    "flag_rce": 0,
+    "flag_sqli": 0,
+    "flag_xss": 0,
+    "flag_buffer_overflow": 0,
+    "flag_priv_escalation": 0,
+    "flag_dos": 0,
+    "flag_dir_traversal": 0
   }
 ]
