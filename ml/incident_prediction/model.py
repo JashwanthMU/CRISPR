@@ -58,6 +58,52 @@ def _load_cert_in() -> set:
     return _cert_in_set
 
 
+class PortableCalibratedModel:
+    """
+    Drop-in replacement for the pickled CalibratedClassifierCV, built from
+    portable artifacts (per-fold XGBoost boosters in native JSON format +
+    plain-float Platt/sigmoid calibration coefficients) instead of a raw
+    pickled buffer.
+
+    Why this exists: crispr_xgb_calibrated.pkl embeds XGBoost's internal
+    C++ buffer via pickle, which is not guaranteed portable across
+    platforms/builds - confirmed failing with
+    "XGBoostError: input stream corrupted" on at least one Windows machine
+    despite an identical (SHA256-verified) file and identical xgboost/
+    sklearn/joblib versions to a machine where it loads fine. XGBoost's own
+    docs recommend Booster.save_model() (portable JSON/UBJ) over pickle for
+    exactly this reason.
+
+    Numerically verified equivalent to the original pickle's predict_proba
+    output (max abs diff ~1.9e-08, i.e. floating-point noise) - see
+    tools/export_portable_model.py for the export + verification script.
+    """
+
+    def __init__(self, manifest: dict, portable_dir: Path):
+        import xgboost as xgb
+        self.feature_names = None  # set from model_config.json by caller
+        self.folds = []
+        for fold in manifest["folds"]:
+            booster = xgb.Booster()
+            booster.load_model(str(portable_dir / fold["booster_file"]))
+            self.folds.append((booster, fold["sigmoid_a"], fold["sigmoid_b"]))
+
+    @staticmethod
+    def _sigmoid_calibrate(raw_score, a, b):
+        return 1.0 / (1.0 + np.exp(a * raw_score + b))
+
+    def predict_proba(self, X):
+        import xgboost as xgb
+        dmatrix = xgb.DMatrix(np.asarray(X, dtype=float), feature_names=self.feature_names)
+        fold_preds = [
+            self._sigmoid_calibrate(booster.predict(dmatrix), a, b)
+            for booster, a, b in self.folds
+        ]
+        prob_class_1 = np.mean(fold_preds, axis=0)
+        # Match sklearn's predict_proba shape: (n_samples, 2)
+        return np.column_stack([1 - prob_class_1, prob_class_1])
+
+
 def _load_models():
     """Load XGBoost model and config on first inference call."""
     global _xgb_model, _calib_model, _config, _feature_list, _probability_bands
@@ -65,9 +111,11 @@ def _load_models():
     if _xgb_model is not None:
         return  # already loaded
 
-    xgb_path    = MODEL_DIR / "crispr_xgb_model.json"
-    calib_path  = MODEL_DIR / "crispr_xgb_calibrated.pkl"
-    config_path = MODEL_DIR / "model_config.json"
+    xgb_path      = MODEL_DIR / "crispr_xgb_model.json"
+    calib_path    = MODEL_DIR / "crispr_xgb_calibrated.pkl"
+    portable_dir  = MODEL_DIR / "portable"
+    manifest_path = portable_dir / "manifest.json"
+    config_path   = MODEL_DIR / "model_config.json"
 
     if xgb_path.exists():
         try:
@@ -78,7 +126,18 @@ def _load_models():
             print(f"Warning: XGBoost model load failed: {e}")
             _xgb_model = None
 
-    if calib_path.exists():
+    # Prefer the portable reconstruction (immune to the pickle
+    # cross-platform issue); fall back to the legacy pickle only if the
+    # portable artifacts haven't been generated yet.
+    if manifest_path.exists():
+        try:
+            manifest = json.load(manifest_path.open())
+            _calib_model = PortableCalibratedModel(manifest, portable_dir)
+            print("Loaded calibrated model from portable artifacts (not pickle).")
+        except Exception as e:
+            print(f"Warning: Portable calibrated model load failed: {e}")
+            _calib_model = None
+    elif calib_path.exists():
         try:
             import joblib
             _calib_model = joblib.load(calib_path)
@@ -91,6 +150,8 @@ def _load_models():
             _config = json.load(f)
         _feature_list = _config.get("features", [])
         _probability_bands = _config.get("probability_bands", _DEFAULT_BANDS)
+        if _calib_model is not None and hasattr(_calib_model, "feature_names"):
+            _calib_model.feature_names = _feature_list
     else:
         _probability_bands = _DEFAULT_BANDS
 
