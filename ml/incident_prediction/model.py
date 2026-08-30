@@ -19,19 +19,20 @@ import numpy as np
 
 MODEL_DIR = Path(__file__).parent
 
-# Lazy-loaded globals - loaded once on first call, not at import time
+# Lazy-loaded globals — loaded once on first call, not at import time
 _xgb_model        = None
 _calib_model      = None
 _config           = None
 _feature_list     = None
-_probability_bands = None  # NEW - loaded from model_config.json
+_probability_bands = None  # NEW — loaded from model_config.json
+_shap_explainer    = None  # NEW — lazy-loaded, None until first explain_prediction() call
 
-# CERT-In flagged CVEs - India signal
+# CERT-In flagged CVEs — India signal
 # Full list maintained in ml/data/cert_in_cves.json
 _CERT_IN_PATH = MODEL_DIR.parent / "data" / "cert_in_cves.json"
 _cert_in_set: Optional[set] = None
 
-# Fallback bands - used only if model_config.json doesn't have probability_bands
+# Fallback bands — used only if model_config.json doesn't have probability_bands
 # (e.g. older model artifact). Keep in sync with the training notebook's
 # PROBABILITY_BANDS constant.
 _DEFAULT_BANDS = [
@@ -46,6 +47,9 @@ def _load_cert_in() -> set:
     global _cert_in_set
     if _cert_in_set is None:
         if _CERT_IN_PATH.exists():
+            # utf-8-sig strips a UTF-8 BOM if present, and is a no-op if not -
+            # the source file was saved with a BOM (e.g. by Excel/PowerShell)
+            # which crashes plain utf-8 json.load()
             with _CERT_IN_PATH.open(encoding="utf-8-sig") as f:
                 _cert_in_set = set(json.load(f))
         else:
@@ -156,21 +160,21 @@ def _load_models():
         _probability_bands = _DEFAULT_BANDS
 
     if _xgb_model is None:
-        print("Note: XGBoost model not found - using rule-based V1 fallback")
+        print("Note: XGBoost model not found — using rule-based V1 fallback")
 
 
 def assign_tier(probability: float) -> dict:
     """
     Map a continuous probability to a CRISPR priority tier + recommended action.
     Bands come from model_config.json (probability_bands), so retraining or
-    re-tuning bands doesn't require a code change here - just re-run Cell 22.
+    re-tuning bands doesn't require a code change here — just re-run Cell 22.
     """
     bands = _probability_bands or _DEFAULT_BANDS
     for band in bands:
         lo, hi = band["min"], band["max"]
         if lo <= probability < hi or (probability >= hi and hi == 1.00):
             return {"tier": band["tier"], "action": band["action"]}
-    # Fallback - should not normally hit this if bands cover [0, 1] fully
+    # Fallback — should not normally hit this if bands cover [0, 1] fully
     return {"tier": "LOW", "action": "Monitor"}
 
 
@@ -182,7 +186,7 @@ def _rule_based_fallback(
     control_effectiveness: float,
 ) -> float:
     """
-    V1 rule-based model - used when XGBoost model is not available.
+    V1 rule-based model — used when XGBoost model is not available.
     Kept here for backward compatibility and graceful degradation.
     """
     score  = (cvss / 10.0) * 0.25
@@ -240,13 +244,75 @@ def _build_feature_vector(
     }
 
 
+def _get_shap_explainer():
+    """Lazy-load a SHAP TreeExplainer against fold 0's raw booster.
+
+    Using a single fold (not the full 5-fold ensemble) is a deliberate,
+    disclosed simplification: TreeExplainer computes exact Shapley values
+    per-tree, and averaging that across 5 separately-trained boosters would
+    need a bespoke multi-model aggregation, not something shap supports
+    out of the box for a CalibratedClassifierCV-style ensemble. Fold 0's
+    explanation is representative (all 5 folds are trained on the same
+    feature set with the same hyperparameters, just different CV splits)
+    but is not a formal ensemble-averaged explanation.
+    """
+    global _shap_explainer
+    if _shap_explainer is not None:
+        return _shap_explainer
+    if _xgb_model is None:
+        return None
+    try:
+        import shap
+        _shap_explainer = shap.TreeExplainer(_xgb_model.get_booster())
+    except Exception as e:
+        print(f"Warning: SHAP explainer init failed: {e}")
+        _shap_explainer = False  # sentinel: don't retry every call
+    return _shap_explainer if _shap_explainer else None
+
+
+def explain_prediction(feature_dict: dict) -> Optional[dict]:
+    """
+    Per-prediction SHAP contributions for a single finding - answers
+    "why did the model say this" for one specific CVE, as opposed to the
+    global SHAP summary in docs/ml/shap_summary.png which only shows
+    average feature importance across the whole training set.
+
+    Returns None (not a fabricated explanation) if SHAP or the model
+    isn't available - callers should treat this as optional enrichment,
+    not a guaranteed field.
+    """
+    _load_models()
+    explainer = _get_shap_explainer()
+    if explainer is None or not _feature_list:
+        return None
+    try:
+        X = np.array([[feature_dict.get(f, 0) for f in _feature_list]], dtype=float)
+        shap_values = explainer.shap_values(X)[0]
+        contributions = sorted(
+            zip(_feature_list, shap_values.tolist()),
+            key=lambda pair: abs(pair[1]),
+            reverse=True,
+        )
+        return {
+            "top_contributors": [
+                {"feature": f, "shap_value": round(v, 4)} for f, v in contributions[:5]
+            ],
+            "base_value": round(float(explainer.expected_value), 4),
+            "note": "Computed from a single representative fold (fold 0), "
+                    "not a formal 5-fold ensemble average - see docstring.",
+        }
+    except Exception as e:
+        print(f"SHAP explanation failed: {e}")
+        return None
+
+
 def predict_incident(
     cvss:                  float,
     exploit_in_wild:       bool,
     patch_age_days:        int,
     internet_facing:       bool,
     control_effectiveness: float,
-    # Extended features (from NVD enrichment - use defaults if not available)
+    # Extended features (from NVD enrichment — use defaults if not available)
     cve_id:                Optional[str] = None,
     epss_score:            float = 0.0,
     epss_percentile:       float = 0.0,
@@ -266,13 +332,14 @@ def predict_incident(
     user_interaction:      int   = -1,
     scope:                 int   = -1,
     use_calibrated:        bool  = True,  # True for ₹ EAL; False for ranking
+    explain:               bool  = False,  # True to compute per-prediction SHAP (slower)
 ) -> dict:
     """
     Predict exploitation likelihood for a CVE.
 
     Returns:
-        probability:   float 0.02–0.95 - feeds into FAIR EAL calculation
-        tier:          CRITICAL / HIGH / MEDIUM / LOW - from probability_bands
+        probability:   float 0.02–0.95 — feeds into FAIR EAL calculation
+        tier:          CRITICAL / HIGH / MEDIUM / LOW — from probability_bands
         action:        recommended next step for that tier
         model_used:    which model produced the output
         is_cert_in:    whether CVE appears in CERT-In advisories (India signal)
@@ -280,7 +347,7 @@ def predict_incident(
 
     NOTE: CRISPR does not gate on a single binary threshold. Recall@K analysis
     (see docs/ml/recall_at_k.csv) showed a single cutoff trades recall for
-    precision sharply - at K=500 ranked candidates, the model surfaces 60.7%
+    precision sharply — at K=500 ranked candidates, the model surfaces 60.7%
     of confirmed exploits; at K=1000, 73.3%. The tier bands below are the
     production-facing decision surface; the raw probability is preserved for
     ranking and EAL calculation.
@@ -304,7 +371,7 @@ def predict_incident(
         epss_score      = 0.70
         epss_percentile = 0.97
 
-    # Try XGBoost model 
+    # ── Try XGBoost model ────────────────────────────────────────
     model_to_use = _calib_model if (use_calibrated and _calib_model) else _xgb_model
 
     if model_to_use is not None and _feature_list:
@@ -324,7 +391,7 @@ def predict_incident(
             flag_dos=flag_dos, flag_dir_traversal=flag_dir_traversal,
         )
 
-        # Build feature vector in training order (critical - must match training)
+        # Build feature vector in training order (critical — must match training)
         X = [[feature_dict.get(f, 0) for f in _feature_list]]
 
         try:
@@ -372,12 +439,12 @@ def predict_incident(
                 "model_version": _config.get("model_version", "xgb_v4") if _config else "xgb_v4",
                 "is_cert_in":    bool(is_cert_in_flag),
                 "epss_score":    epss_score,
-                "contributions": None,  # SHAP on-demand — not computed here for speed
+                "contributions": explain_prediction(feature_dict) if explain else None,
             }
         except Exception as e:
             print(f"XGBoost inference error: {e} — falling back to rule-based")
 
-    # Fallback: rule-based V1 
+    # ── Fallback: rule-based V1 ──────────────────────────────────
     prob = _rule_based_fallback(
         cvss=cvss, exploit_in_wild=exploit_in_wild,
         patch_age_days=patch_age_days, internet_facing=internet_facing,
@@ -428,6 +495,7 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
                 risk_row.get("control_effectiveness_pct", 50.0)
             ) / 100.0,
             cve_id=risk_row.get("cve_id"),
+            explain=bool(risk_row.get("explain", False)),
         )
         # Only pass enrichment fields that are actually present (not None) -
         # letting predict_incident's own defaults apply otherwise.
@@ -435,6 +503,9 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
             "epss_score", "epss_percentile", "attack_vector",
             "attack_complexity", "privileges_required", "user_interaction",
             "scope", "exploitability_score", "impact_score",
+            "days_since_published", "flag_rce", "flag_sqli", "flag_xss",
+            "flag_buffer_overflow", "flag_priv_escalation", "flag_dos",
+            "flag_dir_traversal",
         )
         for field in optional_fields:
             value = risk_row.get(field)
@@ -448,7 +519,7 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
 
 
 def get_model_info() -> dict:
-    """Return model metadata - used by /api/health and /api/assistant."""
+    """Return model metadata — used by /api/health and /api/assistant."""
     _load_models()
     if _config:
         return {
