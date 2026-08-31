@@ -6,6 +6,10 @@ from psycopg import Error as PsycopgError
 
 from backend.app.auth import ensure_default_security_user, require_security, validate_auth_configuration
 from backend.app.api import (
+    remediation,
+    policies,
+    reports,
+    integrations,
     assistant,
     assets,
     auth,
@@ -54,6 +58,10 @@ app.include_router(assistant.router,    prefix="/api/assistant",   tags=["AI"], 
 app.include_router(auth.router,         prefix="/api/auth",        tags=["Authentication"])
 app.include_router(ingestion.router,    prefix="/api/ingestion",   tags=["Ingestion"])
 app.include_router(bug_bounty.router,   prefix="/api/bug-bounty",  tags=["Bug Bounty"])
+app.include_router(remediation.router,  prefix="/api/remediation",   tags=["Remediation"],  dependencies=security_only)
+app.include_router(policies.router,     prefix="/api/policies",      tags=["Policies"],     dependencies=security_only)
+app.include_router(reports.router,      prefix="/api/reports",        tags=["Reports"],      dependencies=security_only)
+app.include_router(integrations.router, prefix="/api/integrations",   tags=["Integrations"], dependencies=security_only)
 
 
 @app.on_event("startup")
