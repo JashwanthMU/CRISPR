@@ -478,15 +478,23 @@ def predict_incident(
 
 def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
     """
-    Convenience wrapper: build predict_incident() call from a risk engine row.
-    Used by backend/app/api/risks.py to get probability for each finding.
-
-    Any field left as None in risk_row is simply omitted here, so
-    predict_incident()'s own parameter defaults apply - this never
-    substitutes a fabricated value for missing enrichment data.
+    Full-feature wrapper: consumes all enriched NVD/EPSS fields from
+    risks.py, not just the 6 original fields.
     """
     try:
-        kwargs = dict(
+        # Encode categorical string fields to int codes
+        # (must match training encoding: NETWORK→0, ADJACENT→1, LOCAL→2, PHYSICAL→3)
+        av_map  = {"NETWORK": 0, "ADJACENT": 1, "LOCAL": 2, "PHYSICAL": 3}
+        ac_map  = {"LOW": 0, "HIGH": 1}
+        pr_map  = {"NONE": 0, "LOW": 1, "HIGH": 2}
+        ui_map  = {"NONE": 0, "REQUIRED": 1}
+        sc_map  = {"UNCHANGED": 0, "CHANGED": 1}
+
+        def encode(val, mapping, default=-1):
+            if val is None: return default
+            return mapping.get(str(val).upper(), default)
+
+        return predict_incident(
             cvss=float(risk_row.get("cvss", 7.5)),
             exploit_in_wild=bool(risk_row.get("exploit_in_wild", False)),
             patch_age_days=int(risk_row.get("patch_age_days", 30)),
@@ -495,27 +503,32 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
                 risk_row.get("control_effectiveness_pct", 50.0)
             ) / 100.0,
             cve_id=risk_row.get("cve_id"),
+            # Full NVD/EPSS enrichment — now wired from risks.py
+            epss_score=float(risk_row["epss_score"])
+                       if risk_row.get("epss_score") is not None else 0.0,
+            epss_percentile=float(risk_row["epss_percentile"])
+                            if risk_row.get("epss_percentile") is not None else 0.0,
+            days_since_published=int(risk_row["days_since_published"])
+                                  if risk_row.get("days_since_published") is not None else 30,
+            exploitability_score=float(risk_row.get("exploitability_score") or 0.0),
+            impact_score=float(risk_row.get("impact_score") or 0.0),
+            attack_vector=encode(risk_row.get("attack_vector"), av_map),
+            attack_complexity=encode(risk_row.get("attack_complexity"), ac_map),
+            privileges_required=encode(risk_row.get("privileges_required"), pr_map),
+            user_interaction=encode(risk_row.get("user_interaction"), ui_map),
+            scope=encode(risk_row.get("scope"), sc_map),
+            flag_rce=int(risk_row.get("flag_rce") or 0),
+            flag_sqli=int(risk_row.get("flag_sqli") or 0),
+            flag_xss=int(risk_row.get("flag_xss") or 0),
+            flag_buffer_overflow=int(risk_row.get("flag_buffer_overflow") or 0),
+            flag_priv_escalation=int(risk_row.get("flag_priv_escalation") or 0),
+            flag_dos=int(risk_row.get("flag_dos") or 0),
+            flag_dir_traversal=int(risk_row.get("flag_dir_traversal") or 0),
+            use_calibrated=True,
             explain=bool(risk_row.get("explain", False)),
         )
-        # Only pass enrichment fields that are actually present (not None) -
-        # letting predict_incident's own defaults apply otherwise.
-        optional_fields = (
-            "epss_score", "epss_percentile", "attack_vector",
-            "attack_complexity", "privileges_required", "user_interaction",
-            "scope", "exploitability_score", "impact_score",
-            "days_since_published", "flag_rce", "flag_sqli", "flag_xss",
-            "flag_buffer_overflow", "flag_priv_escalation", "flag_dos",
-            "flag_dir_traversal",
-        )
-        for field in optional_fields:
-            value = risk_row.get(field)
-            if value is not None:
-                kwargs[field] = value
-
-        return predict_incident(**kwargs)
     except (TypeError, ValueError, KeyError) as e:
-        return {"probability": 0.1, "tier": "LOW", "action": "Monitor",
-                "model": "error_fallback", "error": str(e)}
+        return {"probability": 0.1, "model": "error_fallback", "error": str(e)}
 
 
 def get_model_info() -> dict:
