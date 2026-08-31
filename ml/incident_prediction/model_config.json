@@ -1,0 +1,307 @@
+{
+  "model_name": "CRISPR XGBoost Incident Likelihood v4",
+  "model_version": "xgb_v4_final",
+  "trained_on": "2026-08-28",
+  "framework": "XGBoost",
+  "xgboost_version": "3.4.1",
+  "problem_statement": "SIH 2026 -- AI-Powered Cyber Risk Quantification Platform",
+  "target_definition": "exploited = is_kev -- CISA Known Exploited Vulnerabilities catalog only. No EPSS threshold in label. No synthetic features.",
+  "features": [
+    "cvss_score",
+    "epss_score",
+    "epss_percentile",
+    "days_since_published",
+    "severity_encoded",
+    "is_cert_in",
+    "attack_vector",
+    "attack_complexity",
+    "privileges_required",
+    "user_interaction",
+    "scope",
+    "exploitability_score",
+    "impact_score",
+    "flag_rce",
+    "flag_sqli",
+    "flag_xss",
+    "flag_buffer_overflow",
+    "flag_priv_escalation",
+    "flag_dos",
+    "flag_dir_traversal"
+  ],
+  "feature_count": 20,
+  "data_sources": [
+    "NVD (Kaggle: nisargshroff2402/nvd-cybersecurity-dataset)",
+    "EPSS v4 -- FIRST.org daily exploitation probability",
+    "CISA KEV -- ground-truth labels",
+    "CERT-In advisories -- India-specific threat signal (curated list)"
+  ],
+  "dataset": {
+    "total_rows": 320258,
+    "training_rows": 256206,
+    "test_rows": 64052,
+    "positive_class_kev": 1592,
+    "negative_class": 318666,
+    "imbalance_ratio": 200.17
+  },
+  "hyperparameters": {
+    "n_estimators": 235,
+    "max_depth": 8,
+    "learning_rate": 0.06514171285644578,
+    "subsample": 0.9465242682827131,
+    "colsample_bytree": 0.787679491093159,
+    "min_child_weight": 9,
+    "reg_alpha": 1.0785964864810417e-05,
+    "reg_lambda": 0.00014144604283550518,
+    "gamma": 3.3577824889606505,
+    "scale_pos_weight": 200.16708542713567,
+    "tree_method": "hist",
+    "objective": "binary:logistic",
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "optimal_threshold_reference_only": 0.975,
+  "probability_bands": [
+    {
+      "min": 0.9,
+      "max": 1.0,
+      "tier": "CRITICAL",
+      "action": "Immediate remediation"
+    },
+    {
+      "min": 0.7,
+      "max": 0.9,
+      "tier": "HIGH",
+      "action": "High priority \u2014 schedule within days"
+    },
+    {
+      "min": 0.4,
+      "max": 0.7,
+      "tier": "MEDIUM",
+      "action": "Security review"
+    },
+    {
+      "min": 0.0,
+      "max": 0.4,
+      "tier": "LOW",
+      "action": "Monitor"
+    }
+  ],
+  "threshold_sweep": [
+    {
+      "threshold": 0.975,
+      "precision": 0.5752,
+      "recall": 0.4811,
+      "f1": 0.524,
+      "TP": 153,
+      "FP": 113,
+      "FN": 165,
+      "TN": 63621
+    },
+    {
+      "threshold": 0.95,
+      "precision": 0.4331,
+      "recall": 0.5597,
+      "f1": 0.4883,
+      "TP": 178,
+      "FP": 233,
+      "FN": 140,
+      "TN": 63501
+    },
+    {
+      "threshold": 0.925,
+      "precision": 0.3689,
+      "recall": 0.6195,
+      "f1": 0.4624,
+      "TP": 197,
+      "FP": 337,
+      "FN": 121,
+      "TN": 63397
+    },
+    {
+      "threshold": 0.9,
+      "precision": 0.3302,
+      "recall": 0.6541,
+      "f1": 0.4388,
+      "TP": 208,
+      "FP": 422,
+      "FN": 110,
+      "TN": 63312
+    },
+    {
+      "threshold": 0.875,
+      "precision": 0.2962,
+      "recall": 0.6698,
+      "f1": 0.4108,
+      "TP": 213,
+      "FP": 506,
+      "FN": 105,
+      "TN": 63228
+    },
+    {
+      "threshold": 0.85,
+      "precision": 0.2804,
+      "recall": 0.6887,
+      "f1": 0.3985,
+      "TP": 219,
+      "FP": 562,
+      "FN": 99,
+      "TN": 63172
+    },
+    {
+      "threshold": 0.8,
+      "precision": 0.2449,
+      "recall": 0.717,
+      "f1": 0.3651,
+      "TP": 228,
+      "FP": 703,
+      "FN": 90,
+      "TN": 63031
+    },
+    {
+      "threshold": 0.75,
+      "precision": 0.2243,
+      "recall": 0.7327,
+      "f1": 0.3434,
+      "TP": 233,
+      "FP": 806,
+      "FN": 85,
+      "TN": 62928
+    },
+    {
+      "threshold": 0.7,
+      "precision": 0.2047,
+      "recall": 0.7453,
+      "f1": 0.3211,
+      "TP": 237,
+      "FP": 921,
+      "FN": 81,
+      "TN": 62813
+    },
+    {
+      "threshold": 0.6,
+      "precision": 0.1771,
+      "recall": 0.7767,
+      "f1": 0.2884,
+      "TP": 247,
+      "FP": 1148,
+      "FN": 71,
+      "TN": 62586
+    },
+    {
+      "threshold": 0.5,
+      "precision": 0.1599,
+      "recall": 0.7987,
+      "f1": 0.2665,
+      "TP": 254,
+      "FP": 1334,
+      "FN": 64,
+      "TN": 62400
+    }
+  ],
+  "recall_at_k": [
+    {
+      "K": 50,
+      "positives_caught": 38,
+      "total_positives": 318,
+      "recall_at_k": 0.1195,
+      "precision_at_k": 0.76
+    },
+    {
+      "K": 100,
+      "positives_caught": 72,
+      "total_positives": 318,
+      "recall_at_k": 0.2264,
+      "precision_at_k": 0.72
+    },
+    {
+      "K": 250,
+      "positives_caught": 146,
+      "total_positives": 318,
+      "recall_at_k": 0.4591,
+      "precision_at_k": 0.584
+    },
+    {
+      "K": 500,
+      "positives_caught": 193,
+      "total_positives": 318,
+      "recall_at_k": 0.6069,
+      "precision_at_k": 0.386
+    },
+    {
+      "K": 1000,
+      "positives_caught": 233,
+      "total_positives": 318,
+      "recall_at_k": 0.7327,
+      "precision_at_k": 0.233
+    },
+    {
+      "K": 2000,
+      "positives_caught": 266,
+      "total_positives": 318,
+      "recall_at_k": 0.8365,
+      "precision_at_k": 0.133
+    }
+  ],
+  "metrics": {
+    "stratified_random_split": {
+      "roc_auc": 0.9819,
+      "pr_auc": 0.4788,
+      "f1_score": 0.524,
+      "precision": 0.5752,
+      "recall": 0.4811,
+      "confusion_matrix": {
+        "TN": 63621,
+        "FP": 113,
+        "FN": 165,
+        "TP": 153
+      }
+    },
+    "five_fold_stratified_cv": {
+      "roc_auc_mean": 0.9848,
+      "roc_auc_std": 0.0016,
+      "pr_auc_mean": 0.5029,
+      "pr_auc_std": 0.0372,
+      "f1_mean": 0.5202
+    },
+    "temporal_split": {
+      "available": true,
+      "roc_auc": 0.981,
+      "pr_auc": 0.4909
+    },
+    "ablation_no_epss": {
+      "roc_auc": 0.8528,
+      "pr_auc": 0.1238,
+      "epss_contribution_pr_auc": 0.355
+    },
+    "calibrated_model": {
+      "roc_auc": 0.9821,
+      "pr_auc": 0.4808
+    }
+  },
+  "india_context": {
+    "cert_in_cves_flagged": 34
+  },
+  "shap_top_features": [
+    "epss_percentile",
+    "epss_score",
+    "exploitability_score",
+    "days_since_published",
+    "cvss_score",
+    "impact_score",
+    "flag_rce",
+    "flag_xss"
+  ],
+  "known_limitations": [
+    "KEV positive class is small -- model may miss novel exploit patterns",
+    "attack_vector/complexity/privileges_required/user_interaction/scope were NOT available in this NVD source and default to -1 (unknown) -- SHAP confirms these contribute zero signal",
+    "EPSS/NVD are global feeds -- India-specific signal only from CERT-In curated list",
+    "Temporal AUC lower than random-split AUC -- expected and disclosed",
+    "At the binary reference threshold (0.975), recall is 48.1% -- roughly half of confirmed-exploited CVEs fall below the strict cutoff. False-negative analysis shows two distinct patterns: (a) borderline cases scoring 0.94-0.96, just under threshold, recoverable by using a lower operating tier; and (b) a genuine blind spot of ~34 high-CVSS/high-EPSS CVEs (EPSS > 0.5) that the model underrates even so -- e.g. CVSS 9.3-9.8 with EPSS 0.82-0.87 scored as low as 0.19-0.46 probability. CRISPR mitigates this by using probability_bands and recall_at_k ranking rather than a single binary cutoff for remediation prioritization: at K=500 the model surfaces 60.7% of all confirmed exploits, and at K=1000, 73.3%, which is the operative metric for a limited-capacity security team rather than the binary precision/recall pair alone."
+  ],
+  "deployment": {
+    "ranking_model": "crispr_xgb_model.json (load with xgb.XGBClassifier().load_model())",
+    "eal_model": "crispr_xgb_calibrated.pkl (load with joblib.load())",
+    "inference_module": "ml/incident_prediction/model.py",
+    "output": "continuous probability 0.02-0.95 + tier label via assign_tier() -- feeds FAIR EAL calculation and priority ranking, not a bare 0/1 classification"
+  }
+}

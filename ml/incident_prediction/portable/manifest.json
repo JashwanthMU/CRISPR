@@ -1,0 +1,35 @@
+{
+  "n_folds": 5,
+  "classes": [
+    0,
+    1
+  ],
+  "calibration_method": "sigmoid",
+  "folds": [
+    {
+      "booster_file": "fold_0_booster.json",
+      "sigmoid_a": -6.84185804648487,
+      "sigmoid_b": 7.379933658382084
+    },
+    {
+      "booster_file": "fold_1_booster.json",
+      "sigmoid_a": -6.711732911273922,
+      "sigmoid_b": 7.273783493704036
+    },
+    {
+      "booster_file": "fold_2_booster.json",
+      "sigmoid_a": -6.9226962543029185,
+      "sigmoid_b": 7.40873800578722
+    },
+    {
+      "booster_file": "fold_3_booster.json",
+      "sigmoid_a": -6.859108289119862,
+      "sigmoid_b": 7.420657954662013
+    },
+    {
+      "booster_file": "fold_4_booster.json",
+      "sigmoid_a": -7.250995886072647,
+      "sigmoid_b": 7.690714489287845
+    }
+  ]
+}

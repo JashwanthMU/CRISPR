@@ -1,0 +1,102 @@
+[
+  {
+    "Feature":"epss_percentile",
+    "Mean |SHAP|":3.2579467297,
+    "Max |SHAP|":7.2504029274
+  },
+  {
+    "Feature":"epss_score",
+    "Mean |SHAP|":1.8189069033,
+    "Max |SHAP|":3.2549054623
+  },
+  {
+    "Feature":"exploitability_score",
+    "Mean |SHAP|":1.5718095303,
+    "Max |SHAP|":6.8972830772
+  },
+  {
+    "Feature":"days_since_published",
+    "Mean |SHAP|":1.0311514139,
+    "Max |SHAP|":4.2296299934
+  },
+  {
+    "Feature":"cvss_score",
+    "Mean |SHAP|":0.5426267982,
+    "Max |SHAP|":2.3470840454
+  },
+  {
+    "Feature":"impact_score",
+    "Mean |SHAP|":0.4007724226,
+    "Max |SHAP|":2.1387629509
+  },
+  {
+    "Feature":"flag_rce",
+    "Mean |SHAP|":0.198547259,
+    "Max |SHAP|":1.7957527637
+  },
+  {
+    "Feature":"flag_xss",
+    "Mean |SHAP|":0.1620941013,
+    "Max |SHAP|":1.7035380602
+  },
+  {
+    "Feature":"flag_dos",
+    "Mean |SHAP|":0.107073456,
+    "Max |SHAP|":1.7366131544
+  },
+  {
+    "Feature":"flag_sqli",
+    "Mean |SHAP|":0.0956626981,
+    "Max |SHAP|":4.3643817902
+  },
+  {
+    "Feature":"flag_buffer_overflow",
+    "Mean |SHAP|":0.0764735639,
+    "Max |SHAP|":1.6643587351
+  },
+  {
+    "Feature":"severity_encoded",
+    "Mean |SHAP|":0.0360322595,
+    "Max |SHAP|":0.3104084134
+  },
+  {
+    "Feature":"flag_dir_traversal",
+    "Mean |SHAP|":0.0236255806,
+    "Max |SHAP|":1.9726464748
+  },
+  {
+    "Feature":"flag_priv_escalation",
+    "Mean |SHAP|":0.0141158411,
+    "Max |SHAP|":0.9537085891
+  },
+  {
+    "Feature":"is_cert_in",
+    "Mean |SHAP|":0.0085879266,
+    "Max |SHAP|":0.021185074
+  },
+  {
+    "Feature":"scope",
+    "Mean |SHAP|":0.0,
+    "Max |SHAP|":0.0
+  },
+  {
+    "Feature":"attack_vector",
+    "Mean |SHAP|":0.0,
+    "Max |SHAP|":0.0
+  },
+  {
+    "Feature":"user_interaction",
+    "Mean |SHAP|":0.0,
+    "Max |SHAP|":0.0
+  },
+  {
+    "Feature":"privileges_required",
+    "Mean |SHAP|":0.0,
+    "Max |SHAP|":0.0
+  },
+  {
+    "Feature":"attack_complexity",
+    "Mean |SHAP|":0.0,
+    "Max |SHAP|":0.0
+  }
+]
