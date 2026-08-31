@@ -2,7 +2,7 @@
 
 **Cyber-risk quantification and security investment decision support for Indian enterprises**
 
-CRISPR is a Smart India Hackathon prototype for **Problem Statement ID 26105**. It brings findings from security tools into one asset-aware risk picture, estimates financial exposure in Indian rupees, explains the drivers behind each risk, simulates control changes, and recommends a security portfolio for a given budget.
+>CRISPR is a Smart India Hackathon prototype for **Problem Statement ID 26105**. It brings findings from security tools into one asset-aware risk picture, estimates financial exposure in Indian rupees, explains the drivers behind each risk, simulates control changes, and recommends a security portfolio for a given budget.
 
 ## SIH 2026 Presentation - Team: P0werh0usE
 
