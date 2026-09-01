@@ -168,6 +168,46 @@ def list_remediation():
     }
 
 
+def remediation_summary():
+    items = list(_state.values())
+    by_priority = {}
+    for item in items:
+        p = item["priority"]
+        by_priority.setdefault(p, {"total": 0, "resolved": 0, "risk_inr": 0})
+        by_priority[p]["total"] += 1
+        by_priority[p]["risk_inr"] += item["riskReductionInr"]
+        if item["status"] == "RESOLVED":
+            by_priority[p]["resolved"] += 1
+    return {
+        **_summary(items),
+        "by_priority": by_priority,
+    }
+
+@router.get("/stats/summary")
+def remediation_summary():
+    items = list(_state.values())
+    by_priority = {}
+    for item in items:
+        p = item["priority"]
+        by_priority.setdefault(p, {"total": 0, "resolved": 0, "risk_inr": 0})
+        by_priority[p]["total"] += 1
+        by_priority[p]["risk_inr"] += item["riskReductionInr"]
+        if item["status"] == "RESOLVED":
+            by_priority[p]["resolved"] += 1
+    open_items  = [i for i in items if i["status"] != "RESOLVED"]
+    in_progress = [i for i in items if i["status"] == "IN_PROGRESS"]
+    resolved    = [i for i in items if i["status"] == "RESOLVED"]
+    pending     = sum(i["riskReductionInr"] for i in open_items)
+    return {
+        "total":             len(items),
+        "open":              len(open_items),
+        "in_progress":       len(in_progress),
+        "resolved":          len(resolved),
+        "pending_risk_inr":  pending,
+        "pending_risk_lakh": round(pending / 100_000, 2),
+        "by_priority":       by_priority,
+    }
+
 @router.get("/{item_id}")
 def get_remediation_item(item_id: str):
     item = _state.get(item_id)
@@ -203,18 +243,3 @@ def assign_item(item_id: str, body: AssignRequest):
     return _state[item_id]
 
 
-@router.get("/stats/summary")
-def remediation_summary():
-    items = list(_state.values())
-    by_priority = {}
-    for item in items:
-        p = item["priority"]
-        by_priority.setdefault(p, {"total": 0, "resolved": 0, "risk_inr": 0})
-        by_priority[p]["total"] += 1
-        by_priority[p]["risk_inr"] += item["riskReductionInr"]
-        if item["status"] == "RESOLVED":
-            by_priority[p]["resolved"] += 1
-    return {
-        **_summary(items),
-        "by_priority": by_priority,
-    }
