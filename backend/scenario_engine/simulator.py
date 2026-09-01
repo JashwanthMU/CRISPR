@@ -73,9 +73,11 @@ def simulate_enterprise(assets: list, overrides: dict) -> dict:
         control_overrides["patch_compliance"] = 0.95
     if overrides.get("edr_expand") is True:
         control_overrides["edr_coverage"] = 1.0
+    # patch_delay goes into finding_overrides (not control_overrides)
+    # so it reaches finding_after in simulate_scenario
+    patch_delay_days = 0
     if "patch_delay" in overrides or "patch_delay_days" in overrides:
-        delay = overrides.get("patch_delay") or overrides.get("patch_delay_days") or 0
-        control_overrides["patch_delay_days"] = int(delay)
+        patch_delay_days = int(overrides.get("patch_delay") or overrides.get("patch_delay_days") or 0)
 
     per_asset = []
     before_total = 0
@@ -85,7 +87,11 @@ def simulate_enterprise(assets: list, overrides: dict) -> dict:
         aid = asset["asset_id"]
         base_controls = DEMO_CONTROLS.get(aid, {})
         finding = DEMO_FINDINGS.get(aid, {"cvss": 7.0, "exploit_in_wild": False, "patch_age_days": 30})
-        result = simulate_scenario(base_controls, control_overrides, asset, finding)
+        # Pass patch_delay_days into control_overrides so simulate_scenario applies it to finding_after
+        effective_overrides = dict(control_overrides)
+        if patch_delay_days > 0:
+            effective_overrides["patch_delay_days"] = patch_delay_days
+        result = simulate_scenario(base_controls, effective_overrides, asset, finding)
         per_asset.append(result)
         before_total += result["before_eal_inr"]
         after_total += result["after_eal_inr"]
