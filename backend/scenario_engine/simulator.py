@@ -8,13 +8,31 @@ from backend.controls.effectiveness import calculate_control_effectiveness, DEMO
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_loss_magnitude
 
+# Finding context per asset — covers all 20 NovaPay assets
+# A001-A006: original demo assets (high fidelity)
+# A007-A020: extended assets with realistic defaults
 DEMO_FINDINGS = {
-    "A001": {"cvss": 8.5, "exploit_in_wild": True, "patch_age_days": 18, "threat_intel_active": True},
-    "A002": {"cvss": 10.0, "exploit_in_wild": True, "patch_age_days": 14, "threat_intel_active": True},
-    "A003": {"cvss": 9.8, "exploit_in_wild": True, "patch_age_days": 21, "threat_intel_active": True},
-    "A004": {"cvss": 7.5, "exploit_in_wild": False, "patch_age_days": 30, "threat_intel_active": False},
-    "A005": {"cvss": 6.2, "exploit_in_wild": False, "patch_age_days": 50, "threat_intel_active": False},
-    "A006": {"cvss": 9.8, "exploit_in_wild": True, "patch_age_days": 90, "threat_intel_active": False},
+    "A001": {"cvss": 8.5,  "exploit_in_wild": True,  "patch_age_days": 18, "threat_intel_active": True},
+    "A002": {"cvss": 10.0, "exploit_in_wild": True,  "patch_age_days": 14, "threat_intel_active": True},
+    "A003": {"cvss": 9.8,  "exploit_in_wild": True,  "patch_age_days": 21, "threat_intel_active": True},
+    "A004": {"cvss": 7.5,  "exploit_in_wild": False, "patch_age_days": 30, "threat_intel_active": False},
+    "A005": {"cvss": 6.2,  "exploit_in_wild": False, "patch_age_days": 50, "threat_intel_active": False},
+    "A006": {"cvss": 9.8,  "exploit_in_wild": True,  "patch_age_days": 90, "threat_intel_active": False},
+    # Extended assets — realistic patch lag and exploitation data
+    "A007": {"cvss": 7.8,  "exploit_in_wild": True,  "patch_age_days": 25, "threat_intel_active": True},
+    "A008": {"cvss": 8.2,  "exploit_in_wild": True,  "patch_age_days": 18, "threat_intel_active": True},
+    "A009": {"cvss": 6.5,  "exploit_in_wild": False, "patch_age_days": 35, "threat_intel_active": False},
+    "A010": {"cvss": 9.1,  "exploit_in_wild": True,  "patch_age_days": 12, "threat_intel_active": True},
+    "A011": {"cvss": 5.8,  "exploit_in_wild": False, "patch_age_days": 45, "threat_intel_active": False},
+    "A012": {"cvss": 7.2,  "exploit_in_wild": True,  "patch_age_days": 28, "threat_intel_active": False},
+    "A013": {"cvss": 8.8,  "exploit_in_wild": True,  "patch_age_days": 16, "threat_intel_active": True},
+    "A014": {"cvss": 6.9,  "exploit_in_wild": False, "patch_age_days": 40, "threat_intel_active": False},
+    "A015": {"cvss": 9.3,  "exploit_in_wild": True,  "patch_age_days": 22, "threat_intel_active": True},
+    "A016": {"cvss": 5.5,  "exploit_in_wild": False, "patch_age_days": 60, "threat_intel_active": False},
+    "A017": {"cvss": 7.6,  "exploit_in_wild": True,  "patch_age_days": 33, "threat_intel_active": False},
+    "A018": {"cvss": 8.4,  "exploit_in_wild": True,  "patch_age_days": 19, "threat_intel_active": True},
+    "A019": {"cvss": 6.1,  "exploit_in_wild": False, "patch_age_days": 55, "threat_intel_active": False},
+    "A020": {"cvss": 7.0,  "exploit_in_wild": False, "patch_age_days": 42, "threat_intel_active": False},
 }
 
 def simulate_scenario(base_controls: dict, overrides: dict, asset: dict, finding: dict) -> dict:
