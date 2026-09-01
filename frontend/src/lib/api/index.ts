@@ -234,3 +234,66 @@ export function getForecast() {
 }
 export default httpClient;
 export { httpClient };
+
+// ----------------------------------------------------------------------------
+// Platform Connections — Phase 1 live endpoints
+// ----------------------------------------------------------------------------
+export function getRemediation() {
+  return liveOrFallback("/api/remediation", { items: [], summary: {}, count: 0 }, "get", undefined, (p) => p);
+}
+
+export function updateRemediationStatus(id: string, status: string) {
+  return liveOrFallback(`/api/remediation/${id}`, null, "post", { status });
+}
+
+export function getRemediationStats() {
+  return liveOrFallback("/api/remediation/stats/summary", {}, "get", undefined, (p) => p);
+}
+
+export function getPolicies() {
+  return liveOrFallback("/api/policies", { policies: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function togglePolicy(id: string) {
+  return liveOrFallback(`/api/policies/${id}/toggle`, null, "post", {});
+}
+
+export function getLiveIntegrations() {
+  return liveOrFallback("/api/integrations", { integrations: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function reconnectIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/reconnect`, null, "post", {});
+}
+
+export function disableIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/disable`, null, "post", {});
+}
+
+export function getThreatIntel() {
+  return liveOrFallback("/api/threat-intel", { actors: [], campaigns: [] }, "get", undefined, (p) => p);
+}
+
+export function getThreatActors() {
+  return liveOrFallback("/api/threat-intel/actors", [], "get", undefined, (p) =>
+    Array.isArray(p?.actors) ? p.actors : []
+  );
+}
+
+export function getAttackPaths() {
+  return liveOrFallback("/api/attack-paths", [], "get", undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.attack_paths) ? p.attack_paths : []
+  );
+}
+
+export function getSettings() {
+  return liveOrFallback("/api/settings", {}, "get", undefined, (p) => p);
+}
+
+export function updateSettings(data: Record<string, any>) {
+  return liveOrFallback("/api/settings", null, "post", data);
+}
+
+export function getReport(id: string) {
+  return liveOrFallback(`/api/reports/${id}`, null);
+}
