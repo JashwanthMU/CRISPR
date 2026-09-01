@@ -232,3 +232,5 @@ export function getForecast() {
     Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
   );
 }
+export default httpClient;
+export { httpClient };

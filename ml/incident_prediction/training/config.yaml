@@ -1,0 +1,12 @@
+version: 1.0
+model_type: xgboost
+target_col: "exploited"
+features:
+  - "cvss"
+  - "epss_score"
+  - "patch_age_days"
+  - "attack_vector"
+hyperparameters:
+  max_depth: 6
+  learning_rate: 0.1
+  n_estimators: 100

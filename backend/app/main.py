@@ -20,6 +20,9 @@ from backend.app.api import (
     optimization,
     risks,
     scenarios,
+    threat_intel,
+    attack_paths,
+    settings,
 )
 from backend.database.connection import init_database
 from backend.ingestion.store import refresh_demo_sources
@@ -62,6 +65,9 @@ app.include_router(remediation.router,  prefix="/api/remediation",   tags=["Reme
 app.include_router(policies.router,     prefix="/api/policies",      tags=["Policies"],     dependencies=security_only)
 app.include_router(reports.router,      prefix="/api/reports",        tags=["Reports"],      dependencies=security_only)
 app.include_router(integrations.router, prefix="/api/integrations",   tags=["Integrations"], dependencies=security_only)
+app.include_router(threat_intel.router, prefix="/api/threat-intel",   tags=["Threat Intel"], dependencies=security_only)
+app.include_router(attack_paths.router, prefix="/api/attack-paths",   tags=["Attack Paths"], dependencies=security_only)
+app.include_router(settings.router,     prefix="/api/settings",       tags=["Settings"], dependencies=security_only)
 
 
 @app.on_event("startup")

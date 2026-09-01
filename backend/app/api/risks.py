@@ -134,7 +134,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
         likelihood = model_result["probability"]
         model_used = model_result["model"]
     else:
-        likelihood = calculate_likelihood(
+        lh_dict = calculate_likelihood(
             cvss=inp["cvss"],
             exploit_in_wild=inp["exploit_in_wild"],
             patch_age_days=inp["patch_age_days"],
@@ -142,6 +142,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
             control_effectiveness=ce,
             threat_intel_active=inp["threat_intel"],
         )
+        likelihood = lh_dict["incident_probability"]
         model_used = "rule_based_fair_formula"
 
     # ── Financial impact: always the real FAIR loss calculator, never
@@ -193,18 +194,27 @@ def get_all_risks():
 
 @router.get("/enterprise")
 def get_enterprise_summary():
+    from backend.financial_engine.monte_carlo import run_monte_carlo
+    
     risks = _all_risks()
     total_eal = sum(r["eal_inr"] for r in risks)
     avg_score = sum(r["risk_score"] for r in risks) / len(risks) if risks else 0
     top_score = risks[0]["risk_score"] if risks else 0
     enterprise_risk_score = round((2 * top_score + avg_score) / 3)
 
+    mc_data = [{"incident_probability": r["likelihood"], "loss_magnitude_inr": r["loss_magnitude_inr"]} for r in risks]
+    mc = run_monte_carlo(mc_data)
+
     return {
         "enterprise_risk_score": enterprise_risk_score,
         "total_eal_inr": total_eal,
         "total_eal_lakh": round(total_eal / 100_000, 2),
-        "var_95_inr": round(total_eal * 3.2),
-        "var_95_lakh": round(total_eal * 3.2 / 100_000, 2),
+        "var_95_inr": mc["var_95"],
+        "var_95_lakh": round(mc["var_95"] / 100_000, 2),
+        "var_99_inr": mc["var_99"],
+        "var_99_lakh": round(mc["var_99"] / 100_000, 2),
+        "mean_annual_loss_inr": mc["mean_annual_loss"],
+        "tail_value_at_risk_95_inr": mc["tail_value_at_risk_95"],
         "top_risk": risks[0] if risks else None,
     }
 
@@ -224,3 +234,25 @@ def get_risk_by_asset(asset_id: str, explain: bool = False):
     computed = [compute_risk(inp, assets, explain=explain) for inp in matches]
     computed.sort(key=lambda x: x["eal_inr"], reverse=True)
     return computed[0] if len(computed) == 1 else {"asset_id": asset_id, "risk_cases": computed}
+@router.get("/{asset_id}/telemetry-model")
+def get_telemetry_model(asset_id: str, version: str = "v1"):
+    assets = _load_assets()
+    asset = next((a for a in assets if a["asset_id"] == asset_id), None)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    inputs = _load_risk_inputs()
+    findings = [inp for inp in inputs if inp["asset_id"] == asset_id]
+    
+    controls = get_controls_for_asset(asset_id)
+    
+    # Mock telemetry for now, since it's a demo
+    telemetry = {
+        "iam": {"risk_score": 0.8},
+        "siem": {"alert_severity": 0.5},
+        "edr": {"alert_severity": 0.6},
+        "cspm": {"misconfig_score": 0.7}
+    }
+    
+    from backend.risk_engine.incident_model import calculate_telemetry_incident_probability
+    return calculate_telemetry_incident_probability(asset, findings, telemetry, controls, version=version)

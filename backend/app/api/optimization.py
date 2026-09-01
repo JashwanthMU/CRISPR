@@ -4,6 +4,8 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 from backend.optimizer.knapsack import optimize_budget, CONTROLS
+from backend.scenario_engine.simulator import simulate_enterprise
+from backend.app.api.risks import _load_assets
 
 router = APIRouter()
 
@@ -24,21 +26,33 @@ def optimize_get(budget: float = Query(10_000_000)):
     return optimize_budget(float(budget))
 
 
+def _get_controls_with_reduction():
+    assets = _load_assets()
+    controls_with_reduction = []
+    for c in CONTROLS:
+        res = simulate_enterprise(assets, c.get("overrides", {}))
+        c_copy = dict(c)
+        c_copy["risk_reduction_inr"] = res["reduction_inr"]
+        controls_with_reduction.append(c_copy)
+    return controls_with_reduction
+
+
 @router.get("/controls")
 def list_controls():
+    controls_with_reduction = _get_controls_with_reduction()
     return {
-        "controls": CONTROLS,
-        "count": len(CONTROLS),
-        "total_catalogue_cost_inr": sum(c["cost_inr"] for c in CONTROLS),
-        "total_catalogue_reduction_inr": sum(c["risk_reduction_inr"] for c in CONTROLS),
+        "controls": controls_with_reduction,
+        "count": len(controls_with_reduction),
+        "total_catalogue_cost_inr": sum(c["cost_inr"] for c in controls_with_reduction),
+        "total_catalogue_reduction_inr": sum(c["risk_reduction_inr"] for c in controls_with_reduction),
     }
 
 
 @router.get('/recommend')
 def recommend_quick_wins():
     """Top 3 quick wins under 50L budget — for dashboard cards."""
-    from backend.optimizer.knapsack import CONTROLS
-    quick_wins = [c for c in CONTROLS if c['cost_inr'] <= 5_000_000]
+    controls_with_reduction = _get_controls_with_reduction()
+    quick_wins = [c for c in controls_with_reduction if c['cost_inr'] <= 5_000_000]
     ranked = sorted(quick_wins, key=lambda c: c['risk_reduction_inr'] / c['cost_inr'], reverse=True)[:3]
     return {
         'quick_wins': [

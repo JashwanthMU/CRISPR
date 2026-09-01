@@ -68,7 +68,7 @@ def _generate_report_data(report_id: str) -> dict:
         from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
         import json
         from pathlib import Path
-        assets = json.load(open(Path("data/demo/assets.json")))
+        assets = json.load(open(Path(__file__).resolve().parents[3] / "data/demo/assets.json"))
         mfa = simulate_enterprise(assets, {"implement_mfa": True})
         return {
             "enterprise_risk_score": 78,

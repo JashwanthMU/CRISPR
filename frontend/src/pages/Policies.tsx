@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from '../lib/toastStore';
+import api from '../lib/api';
 
 interface Policy {
   id: string;
@@ -11,21 +12,23 @@ interface Policy {
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
 }
 
-const INITIAL_POLICIES: Policy[] = [
-  { id: 'pol-1', name: 'Require MFA for all privileged accounts', description: 'Blocks provisioning of admin-tier IAM roles without MFA enforced.', framework: 'RBI CSF', enabled: true, severity: 'CRITICAL' },
-  { id: 'pol-2', name: 'Disallow public S3 buckets in production', description: 'Flags and auto-remediates publicly readable storage buckets.', framework: 'ISO 27001', enabled: true, severity: 'CRITICAL' },
-  { id: 'pol-3', name: 'Require signed commits on protected branches', description: 'Enforces commit signature verification on main/master branches.', framework: 'CIS Controls', enabled: false, severity: 'MEDIUM' },
-  { id: 'pol-4', name: 'Block deploys with unresolved critical CVEs', description: 'CI/CD pipelines fail if a critical, reachable CVE is unresolved.', framework: 'NIST CSF', enabled: true, severity: 'HIGH' },
-  { id: 'pol-5', name: 'Rotate service account secrets every 90 days', description: 'Flags secrets older than 90 days for mandatory rotation.', framework: 'SEBI CSCRF', enabled: false, severity: 'HIGH' },
-];
-
 export default function Policies() {
-  const [policies, setPolicies] = useState(INITIAL_POLICIES);
+  const [policies, setPolicies] = useState<Policy[]>([]);
 
-  const toggle = (id: string) => {
-    setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p)));
-    const p = policies.find((x) => x.id === id);
-    if (p) toast.success(p.enabled ? 'Policy disabled' : 'Policy enabled', p.name);
+  useEffect(() => {
+    api.get('/api/policies').then((res) => {
+      setPolicies(res.data.policies || []);
+    });
+  }, []);
+
+  const toggle = async (id: string) => {
+    try {
+      const res = await api.patch(`/api/policies/${id}/toggle`);
+      setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: res.data.enabled } : p)));
+      toast.success(res.data.message);
+    } catch (e) {
+      toast.error('Failed to toggle policy');
+    }
   };
 
   return (

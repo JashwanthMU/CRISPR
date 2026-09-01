@@ -1,4 +1,5 @@
 from backend.constants import INDIA_PENALTIES, DOWNTIME_COST_PER_HOUR
+from backend.financial_engine.monte_carlo import run_monte_carlo
 
 def calculate_loss_magnitude(asset: dict) -> dict:
     asset_type = asset.get("type", "web_app")
@@ -33,6 +34,14 @@ def calculate_eal(likelihood: float, loss_magnitude: dict) -> dict:
         "loss_magnitude_inr": total_loss,
         "eal_inr": round(eal),
         "eal_lakh": round(eal / 100_000, 2),
-        "var_95_inr": round(eal * 3.2),
         "risk_score": min(int(likelihood * 100 + (total_loss / 1_000_000)), 100),
+    }
+
+def calculate_enterprise_risk(assets_risk_data: list) -> dict:
+    mc_results = run_monte_carlo(assets_risk_data)
+    total_eal = sum(a.get("eal_inr", 0) for a in assets_risk_data)
+    return {
+        "total_eal_inr": total_eal,
+        "total_eal_lakh": round(total_eal / 100_000, 2),
+        "monte_carlo": mc_results
     }
