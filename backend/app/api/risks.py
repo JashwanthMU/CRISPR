@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import json
-from pathlib import Path
+from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode
 
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_loss_magnitude, calculate_eal
@@ -11,15 +10,8 @@ from ml.incident_prediction.model import predict_from_risk_row
 
 router = APIRouter()
 
-BASE_DIR = Path(__file__).resolve().parents[3]
-ASSETS_PATH = BASE_DIR / "data" / "demo" / "assets.json"
-VULNS_PATH = BASE_DIR / "data" / "demo" / "vulnerabilities.json"
-
-
 def _load_assets() -> list[dict]:
-    if not ASSETS_PATH.exists():
-        raise HTTPException(status_code=500, detail=f"assets.json not found at {ASSETS_PATH}")
-    return json.load(open(ASSETS_PATH))
+    return load_assets()
 
 
 def _load_risk_inputs() -> list[dict]:
@@ -27,9 +19,7 @@ def _load_risk_inputs() -> list[dict]:
     Risk cases are derived from real scanner findings (data/demo/vulnerabilities.json),
     not hand-typed numbers. One risk case per CVE/vulnerability finding.
     """
-    if not VULNS_PATH.exists():
-        return []
-    findings = json.load(open(VULNS_PATH))
+    findings = load_findings("VULNERABILITY_SCANNER")
     inputs = []
     for f in findings:
         # days_since_published is derived from the real NVD published_date
@@ -86,6 +76,19 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
     if asset is None:
         raise HTTPException(status_code=404, detail=f"Asset {inp['asset_id']} not found")
 
+    required_live_model_fields = (
+        "cvss", "epss_score", "epss_percentile", "days_since_published",
+        "attack_vector", "attack_complexity", "privileges_required",
+        "user_interaction", "scope", "exploitability_score", "impact_score",
+    )
+    missing_model_fields = [
+        field for field in required_live_model_fields if inp.get(field) is None
+    ]
+    if missing_model_fields and not demo_mode_enabled():
+        raise LiveDataUnavailable(
+            f"Finding {inp.get('finding_id')} lacks model inputs: {', '.join(missing_model_fields)}"
+        )
+
     controls = get_controls_for_asset(inp["asset_id"])
     ce = calculate_control_effectiveness(controls)
 
@@ -127,13 +130,26 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
     used_model_probability = (
         model_result is not None
         and model_result.get("probability") is not None
-        and model_result.get("model") not in (None, "error_fallback")
+        and model_result.get("model") == "xgb_v4_calibrated (Platt)"
     )
 
     if used_model_probability:
-        likelihood = model_result["probability"]
+        lh_dict = calculate_likelihood(
+            cvss=inp["cvss"],
+            exploit_in_wild=inp["exploit_in_wild"],
+            patch_age_days=inp["patch_age_days"],
+            internet_facing=asset.get("internet_facing", False),
+            control_effectiveness=ce,
+            threat_intel_active=inp["threat_intel"],
+            model_features=inp,
+        )
+        likelihood = lh_dict["incident_probability"]
         model_used = model_result["model"]
     else:
+        if not demo_mode_enabled():
+            raise LiveDataUnavailable(
+                f"A calibrated ML prediction is unavailable for finding {inp.get('finding_id')}"
+            )
         lh_dict = calculate_likelihood(
             cvss=inp["cvss"],
             exploit_in_wild=inp["exploit_in_wild"],
@@ -167,6 +183,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
         "model_used": model_used,
         "model_tier": model_result.get("tier") if used_model_probability else None,
         "model_contributions": model_result.get("contributions") if used_model_probability else None,
+        "likelihood_calculation": lh_dict,
         **eal,
         "loss_breakdown": loss_magnitude,
         "risk_drivers": drivers,
@@ -181,14 +198,50 @@ def _all_risks() -> list[dict]:
     return risks
 
 
+def _aggregate_asset_risks(risks: list[dict]) -> list[dict]:
+    """Avoid charging the same asset loss once for every vulnerability.
+
+    Finding probabilities are combined as a disclosed independent union. This
+    is still an assumption, but it is materially safer than summing a complete
+    asset loss for each finding and hiding the resulting double count.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for risk in risks:
+        grouped.setdefault(risk["asset_id"], []).append(risk)
+
+    asset_risks = []
+    for asset_id, rows in grouped.items():
+        probability_no_event = 1.0
+        for row in rows:
+            probability_no_event *= 1.0 - row["likelihood"]
+        probability = 1.0 - probability_no_event
+        loss_magnitude = max(row["loss_magnitude_inr"] for row in rows)
+        eal = calculate_eal(probability, {"total_inr": loss_magnitude})
+        asset_risks.append({
+            "asset_id": asset_id,
+            "asset_name": rows[0]["asset_name"],
+            "finding_count": len(rows),
+            **eal,
+            "aggregation": {
+                "probability_formula": "1 - product(1 - finding_probability)",
+                "dependence_assumption": "finding exploit events are independent",
+                "loss_counting": "one asset loss magnitude per simulated asset incident",
+            },
+        })
+    asset_risks.sort(key=lambda row: row["eal_inr"], reverse=True)
+    return asset_risks
+
+
 @router.get("")
 def get_all_risks():
     risks = _all_risks()
-    total_eal = sum(r["eal_inr"] for r in risks)
+    asset_risks = _aggregate_asset_risks(risks)
+    total_eal = sum(r["eal_inr"] for r in asset_risks)
     return {
         "total_eal_inr": total_eal,
         "total_eal_lakh": round(total_eal / 100_000, 2),
         "risks": risks,
+        "asset_risk_aggregation": asset_risks,
     }
 
 
@@ -197,12 +250,19 @@ def get_enterprise_summary():
     from backend.financial_engine.monte_carlo import run_monte_carlo
     
     risks = _all_risks()
-    total_eal = sum(r["eal_inr"] for r in risks)
+    asset_risks = _aggregate_asset_risks(risks)
+    total_eal = sum(r["eal_inr"] for r in asset_risks)
     avg_score = sum(r["risk_score"] for r in risks) / len(risks) if risks else 0
     top_score = risks[0]["risk_score"] if risks else 0
     enterprise_risk_score = round((2 * top_score + avg_score) / 3)
 
-    mc_data = [{"incident_probability": r["likelihood"], "loss_magnitude_inr": r["loss_magnitude_inr"]} for r in risks]
+    mc_data = [
+        {
+            "incident_probability": row["likelihood"],
+            "loss_magnitude_inr": row["loss_magnitude_inr"],
+        }
+        for row in asset_risks
+    ]
     mc = run_monte_carlo(mc_data)
 
     return {
@@ -216,6 +276,7 @@ def get_enterprise_summary():
         "mean_annual_loss_inr": mc["mean_annual_loss"],
         "tail_value_at_risk_95_inr": mc["tail_value_at_risk_95"],
         "top_risk": risks[0] if risks else None,
+        "asset_risk_aggregation": asset_risks,
     }
 
 
@@ -236,6 +297,7 @@ def get_risk_by_asset(asset_id: str, explain: bool = False):
     return computed[0] if len(computed) == 1 else {"asset_id": asset_id, "risk_cases": computed}
 @router.get("/{asset_id}/telemetry-model")
 def get_telemetry_model(asset_id: str, version: str = "v1"):
+    require_demo_mode("Telemetry risk model")
     assets = _load_assets()
     asset = next((a for a in assets if a["asset_id"] == asset_id), None)
     if not asset:

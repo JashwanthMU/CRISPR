@@ -95,7 +95,8 @@ PostgreSQL assets + findings
 Refreshes are idempotent: existing IDs are updated and new IDs are inserted.
 The backend performs a refresh during startup. Security-team users can request
 an immediate refresh from the application with **Sync sources** or through the
-API. JSON is used only as connector fallback if PostgreSQL is unavailable.
+API. JSON fallback is available only when `CRISPR_DATA_MODE=demo`; live mode
+returns an error rather than substituting fixture records.
 
 ## Current demo volume
 

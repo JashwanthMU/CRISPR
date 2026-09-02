@@ -11,6 +11,7 @@ services:
       - DB_NAME=${POSTGRES_DB:?Set POSTGRES_DB in .env}
       - DB_USER=${POSTGRES_USER:?Set POSTGRES_USER in .env}
       - DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - DB_CONNECT_TIMEOUT_SECONDS=${DB_CONNECT_TIMEOUT_SECONDS:-3}
       - AUTH_SECRET=${AUTH_SECRET:?Set AUTH_SECRET in .env (openssl rand -hex 32)}
       - SECURITY_ADMIN_EMAIL=${SECURITY_ADMIN_EMAIL:?Set SECURITY_ADMIN_EMAIL in .env}
       - SECURITY_ADMIN_PASSWORD=${SECURITY_ADMIN_PASSWORD:?Set SECURITY_ADMIN_PASSWORD in .env}
@@ -19,6 +20,7 @@ services:
       - LLM_BASE_URL=${LLM_BASE_URL:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_ENABLED=${LLM_ENABLED:-false}
+      - CRISPR_DATA_MODE=${CRISPR_DATA_MODE:-live}
     depends_on:
       db:
         condition: service_healthy

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 from pathlib import Path
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
@@ -160,6 +161,7 @@ def _summary(items: list[dict]) -> dict:
 
 @router.get("")
 def list_remediation():
+    require_demo_mode("Remediation")
     items = list(_state.values())
     return {
         "summary": _summary(items),
@@ -185,6 +187,7 @@ def remediation_summary():
 
 @router.get("/stats/summary")
 def remediation_summary():
+    require_demo_mode("Remediation")
     items = list(_state.values())
     by_priority = {}
     for item in items:
@@ -210,6 +213,7 @@ def remediation_summary():
 
 @router.get("/{item_id}")
 def get_remediation_item(item_id: str):
+    require_demo_mode("Remediation")
     item = _state.get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Remediation item '{item_id}' not found")
@@ -218,6 +222,7 @@ def get_remediation_item(item_id: str):
 
 @router.patch("/{item_id}")
 def update_status(item_id: str, body: StatusUpdate):
+    require_demo_mode("Remediation")
     valid = {"NOT_STARTED", "IN_PROGRESS", "PR_OPENED", "RESOLVED"}
     if body.status not in valid:
         raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {valid}")
@@ -230,6 +235,7 @@ def update_status(item_id: str, body: StatusUpdate):
 
 @router.post("/{item_id}/assign")
 def assign_item(item_id: str, body: AssignRequest):
+    require_demo_mode("Remediation")
     item = _state.get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Remediation item '{item_id}' not found")
@@ -241,5 +247,4 @@ def assign_item(item_id: str, body: AssignRequest):
     if _state[item_id]["status"] == "NOT_STARTED":
         _state[item_id]["status"] = "IN_PROGRESS"
     return _state[item_id]
-
 

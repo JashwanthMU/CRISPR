@@ -5,7 +5,9 @@ def run_monte_carlo(assets_risk_data: list, num_simulations=10000, seed=42) -> d
     10,000 deterministic seeded simulations for enterprise VaR.
     assets_risk_data: list of dicts with 'incident_probability' and 'loss_magnitude_inr'
     """
-    np.random.seed(seed)
+    if num_simulations <= 0:
+        raise ValueError("num_simulations must be positive")
+    rng = np.random.default_rng(seed)
     
     # We will simulate the total loss for the enterprise
     # For each asset, an incident occurs with Bernoulli(p)
@@ -16,6 +18,10 @@ def run_monte_carlo(assets_risk_data: list, num_simulations=10000, seed=42) -> d
     for asset in assets_risk_data:
         p = asset.get("incident_probability", asset.get("likelihood", 0.0))
         mean_loss = asset.get("loss_magnitude_inr", 0.0)
+        if not 0.0 <= p <= 1.0:
+            raise ValueError("incident_probability must be between 0 and 1")
+        if mean_loss < 0:
+            raise ValueError("loss_magnitude_inr cannot be negative")
         
         if p > 0 and mean_loss > 0:
             # Simple assumption: lognormal loss where mean=mean_loss, std_dev = mean_loss * 0.5
@@ -25,8 +31,8 @@ def run_monte_carlo(assets_risk_data: list, num_simulations=10000, seed=42) -> d
             mu = np.log(mean_loss**2 / np.sqrt(var_loss + mean_loss**2))
             sigma = np.sqrt(np.log(var_loss / (mean_loss**2) + 1))
             
-            occurrences = np.random.binomial(1, p, num_simulations)
-            losses = np.random.lognormal(mu, sigma, num_simulations)
+            occurrences = rng.binomial(1, p, num_simulations)
+            losses = rng.lognormal(mu, sigma, num_simulations)
             total_losses += occurrences * losses
 
     mean_annual_loss = np.mean(total_losses)
@@ -42,4 +48,12 @@ def run_monte_carlo(assets_risk_data: list, num_simulations=10000, seed=42) -> d
         "var_95": round(var_95),
         "var_99": round(var_99),
         "tail_value_at_risk_95": round(tvar_95)
+        ,"simulation": {
+            "iterations": num_simulations,
+            "seed": seed,
+            "occurrence_distribution": "Bernoulli per risk row",
+            "loss_distribution": "Lognormal",
+            "loss_standard_deviation_ratio": 0.5,
+            "independence_assumption": True,
+        }
     }

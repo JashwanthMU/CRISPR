@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ CAMPAIGNS = [
 
 @router.get("")
 def list_threat_intel():
+    require_demo_mode("Threat intelligence catalogue")
     return {
         "actors":    THREAT_ACTORS,
         "campaigns": CAMPAIGNS,
@@ -33,14 +35,17 @@ def list_threat_intel():
 
 @router.get("/actors")
 def list_actors():
+    require_demo_mode("Threat actors")
     return {"actors": THREAT_ACTORS, "count": len(THREAT_ACTORS)}
 
 @router.get("/campaigns")
 def list_campaigns():
+    require_demo_mode("Threat campaigns")
     return {"campaigns": CAMPAIGNS, "count": len(CAMPAIGNS)}
 
 @router.get("/actors/{actor_id}")
 def get_actor(actor_id: str):
+    require_demo_mode("Threat actors")
     from fastapi import HTTPException
     actor = next((a for a in THREAT_ACTORS if a["id"] == actor_id), None)
     if not actor:

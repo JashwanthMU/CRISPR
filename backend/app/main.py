@@ -1,6 +1,7 @@
 import os
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg import Error as PsycopgError
 
@@ -26,6 +27,7 @@ from backend.app.api import (
 )
 from backend.database.connection import init_database
 from backend.ingestion.store import refresh_demo_sources
+from backend.data_access import LiveDataUnavailable, demo_mode_enabled
 
 docs_enabled = os.getenv("API_DOCS_ENABLED", "false").lower() == "true"
 app = FastAPI(
@@ -49,6 +51,18 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.exception_handler(LiveDataUnavailable)
+def live_data_unavailable(_: Request, error: LiveDataUnavailable) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": str(error),
+            "data_mode": "live",
+            "fallback_used": False,
+        },
+    )
 
 security_only = [Depends(require_security)]
 app.include_router(findings.router,     prefix="/api/findings",    tags=["Findings"], dependencies=security_only)
@@ -77,14 +91,16 @@ def startup() -> None:
     try:
         init_database()
         ensure_default_security_user()
-        refresh_demo_sources()
+        if demo_mode_enabled():
+            refresh_demo_sources()
         app.state.database_ready = True
-    except PsycopgError:
-        pass
+    except (PsycopgError, RuntimeError):
+        if not demo_mode_enabled():
+            raise
 
 @app.get("/api/health")
 def health():
-    db_status = "demo_json_fallback"
+    db_status = "demo_json_fallback" if demo_mode_enabled() else "unavailable"
     if getattr(app.state, "database_ready", False):
         db_status = "connected"
     else:
@@ -96,4 +112,10 @@ def health():
             app.state.database_ready = True
         except Exception:
             pass
-    return {"status": "ok", "service": "CRISPR", "database": db_status}
+    return {
+        "status": "ok",
+        "service": "CRISPR",
+        "database": db_status,
+        "data_mode": "demo" if demo_mode_enabled() else "live",
+        "fixture_fallback_enabled": demo_mode_enabled(),
+    }

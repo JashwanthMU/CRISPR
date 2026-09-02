@@ -20,4 +20,3 @@ generate_ml_pipeline.py
 bandit_report.json
 test_ml_interactive.py
 test_ml_technical_jury.py
-sih_jury_audit.py

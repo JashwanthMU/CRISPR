@@ -29,4 +29,6 @@ DEFAULT_CONTROLS = {
 
 
 def get_controls_for_asset(asset_id: str) -> dict:
-    return DEMO_CONTROLS.get(asset_id, DEFAULT_CONTROLS)
+    from backend.data_access import load_control_posture
+
+    return load_control_posture(asset_id)

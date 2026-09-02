@@ -1,22 +1,34 @@
-from backend.constants import INDIA_PENALTIES, DOWNTIME_COST_PER_HOUR
+from backend.constants import DOWNTIME_COST_PER_HOUR
+from backend.data_access import LiveDataUnavailable, demo_mode_enabled
 from backend.financial_engine.monte_carlo import run_monte_carlo
 
 def calculate_loss_magnitude(asset: dict) -> dict:
+    required_live_fields = {
+        "type", "criticality", "data_sensitivity", "value_inr",
+        "downtime_cost_per_hour_inr", "regulatory_exposure_inr",
+    }
+    missing = sorted(field for field in required_live_fields if asset.get(field) is None)
+    if missing and not demo_mode_enabled():
+        raise LiveDataUnavailable(
+            f"Asset {asset.get('asset_id', '<unknown>')} lacks financial inputs: {', '.join(missing)}"
+        )
     asset_type = asset.get("type", "web_app")
     criticality = asset.get("criticality", 1) / 5
     is_regulated = asset.get("is_regulated", False)
     value_inr = asset.get("value_inr", 1_000_000)
     downtime_hours = round(4 + (criticality * 8))
-    hourly_rate = DOWNTIME_COST_PER_HOUR.get(asset_type, 200_000)
+    hourly_rate = asset.get(
+        "downtime_cost_per_hour_inr",
+        DOWNTIME_COST_PER_HOUR.get(asset_type, 200_000),
+    )
     downtime_loss = downtime_hours * hourly_rate * criticality
     ir_cost = 300_000 + (criticality * 500_000)
     recovery_cost = 200_000 + (criticality * 600_000)
     data_breach = value_inr * 0.15 if asset.get("data_sensitivity", 1) >= 4 else 0
-    regulatory = 0
-    if is_regulated:
-        regulatory = INDIA_PENALTIES["cert_in_non_reporting"] + INDIA_PENALTIES["rbi_non_reporting"]
-        if asset.get("data_sensitivity", 1) >= 4:
-            regulatory += INDIA_PENALTIES["dpdp_breach"] * 0.05
+    # A statutory maximum is not an expected fine. Live calculations require
+    # an organization-approved expected exposure rather than inventing one
+    # from legal penalty caps.
+    regulatory = asset.get("regulatory_exposure_inr", 0) if is_regulated else 0
     reputation = value_inr * 0.08 * criticality
     total = downtime_loss + ir_cost + recovery_cost + data_breach + regulatory + reputation
     return {
@@ -24,6 +36,20 @@ def calculate_loss_magnitude(asset: dict) -> dict:
         "recovery_cost": round(recovery_cost), "data_breach_cost": round(data_breach),
         "regulatory_cost": round(regulatory), "reputation_cost": round(reputation),
         "total_inr": round(total),
+        "calculation": {
+            "criticality_fraction": criticality,
+            "downtime_hours": downtime_hours,
+            "downtime_cost_per_hour_inr": hourly_rate,
+            "asset_value_inr": value_inr,
+            "data_breach_rate_of_asset_value": 0.15 if asset.get("data_sensitivity", 1) >= 4 else 0.0,
+            "reputation_rate_of_asset_value_times_criticality": 0.08,
+            "regulatory_exposure_source": (
+                "asset.regulatory_exposure_inr"
+                if asset.get("regulatory_exposure_inr") is not None
+                else "demo assumption: zero"
+            ),
+            "data_mode": "demo" if demo_mode_enabled() else "live",
+        },
     }
 
 def calculate_eal(likelihood: float, loss_magnitude: dict) -> dict:

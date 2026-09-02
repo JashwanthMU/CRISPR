@@ -5,6 +5,7 @@ GET /api/reports/{id}      → get report detail + data
 """
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
@@ -112,6 +113,7 @@ def _generate_report_data(report_id: str) -> dict:
 
 @router.get("")
 def list_reports():
+    require_demo_mode("Reports")
     return {
         "reports": REPORTS,
         "count":   len(REPORTS),
@@ -120,6 +122,7 @@ def list_reports():
 
 @router.get("/{report_id}")
 def get_report(report_id: str):
+    require_demo_mode("Reports")
     report = next((r for r in REPORTS if r["id"] == report_id), None)
     if not report:
         raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found")

@@ -15,6 +15,7 @@ from backend.app.auth import (
     hash_password,
 )
 from backend.database.connection import get_connection
+from backend.data_access import demo_mode_enabled
 
 
 router = APIRouter()
@@ -62,13 +63,17 @@ DEMO_PASSWORD = _os.getenv("SECURITY_ADMIN_PASSWORD", "")
 def login(payload: LoginRequest) -> dict:
     try:
         user = authenticate_user(str(payload.email), payload.password)
-    except OperationalError:
-        # DB unavailable — allow demo credentials so local dev still works
-        if str(payload.email).lower() == DEMO_EMAIL.lower() and payload.password == DEMO_PASSWORD:
+    except OperationalError as error:
+        # The fallback identity is permitted only in explicitly selected demo mode.
+        if (
+            demo_mode_enabled()
+            and str(payload.email).lower() == DEMO_EMAIL.lower()
+            and payload.password == DEMO_PASSWORD
+        ):
             demo_user = {"user_id": "00000000-0000-0000-0000-000000000001",
                          "name": "Security Admin", "email": DEMO_EMAIL, "role": "SECURITY"}
             return auth_response(demo_user)
-        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable — use demo credentials")
+        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable") from error
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     return auth_response(user)

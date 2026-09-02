@@ -15,6 +15,7 @@ from ml.incident_prediction.model import (
     predict_from_risk_row,
     assign_tier,
     _load_models,
+    get_model_info,
 )
 
 
@@ -25,6 +26,11 @@ def load_models():
 
 
 class TestModelLoading:
+    def test_artifact_checksums_match(self):
+        integrity = get_model_info()["artifact_integrity"]
+        assert integrity["verified"] is True
+        assert all(row["matches"] for row in integrity["files"].values())
+
     def test_calibrated_model_loads_from_portable_artifacts(self):
         """
         Regression test for the pickle cross-platform corruption bug:
@@ -72,10 +78,8 @@ class TestCalibrationFloor:
 
 class TestTierCalibrationSeparation:
     """
-    Regression tests for the tier/calibration mismatch bug: tier must be
-    computed from the raw score's validated range, not the calibrated
-    score's - otherwise every finding reads as LOW regardless of actual
-    relative risk (this happened in production during development).
+    Regression tests for the tier/calibration mismatch bug: displayed tier
+    and probability must use the same calibrated scale.
     """
 
     def test_high_eal_finding_does_not_show_low_tier(self):
@@ -99,8 +103,43 @@ class TestTierCalibrationSeparation:
             tier_info = assign_tier(float(p))
             assert tier_info["tier"] in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
 
+    @pytest.mark.parametrize(
+        ("probability", "expected"),
+        [
+            (0.001, "LOW"),
+            (0.0499, "LOW"),
+            (0.05, "MEDIUM"),
+            (0.1999, "MEDIUM"),
+            (0.20, "HIGH"),
+            (0.30, "HIGH"),
+            (0.40, "CRITICAL"),
+            (1.0, "CRITICAL"),
+        ],
+    )
+    def test_calibrated_probability_boundaries(self, probability, expected):
+        assert assign_tier(probability)["tier"] == expected
+
+    @pytest.mark.parametrize("probability", [-0.1, 1.1, float("nan"), float("inf")])
+    def test_invalid_probability_is_rejected(self, probability):
+        with pytest.raises(ValueError):
+            assign_tier(probability)
+
 
 class TestPredictFromRiskRow:
+    def test_numeric_categorical_encodings_from_enrichment_are_preserved(self):
+        result = predict_from_risk_row({
+            "cvss": 9.8,
+            "epss_score": 0.99,
+            "epss_percentile": 0.99,
+            "attack_vector": 0,
+            "attack_complexity": 0,
+            "privileges_required": 2,
+            "user_interaction": 0,
+            "scope": 1,
+        })
+        assert result["model"] == "xgb_v4_calibrated (Platt)"
+        assert result["probability"] is not None
+
     def test_handles_missing_optional_fields_gracefully(self):
         """
         None values for enrichment fields (EPSS, CVSS vector, CWE flags)
@@ -119,13 +158,54 @@ class TestPredictFromRiskRow:
             "flag_rce": None,
         })
         assert result is not None
-        assert result["model"] != "error_fallback"
+        assert result["model"] == "xgb_v4_calibrated (Platt)"
 
     def test_error_fallback_on_malformed_input(self):
-        """Genuinely malformed input should fail safely, not crash the API."""
+        """Malformed input is explicit and never manufactures probability."""
         result = predict_from_risk_row({"cvss": "not-a-number"})
-        assert result["model"] == "error_fallback"
-        assert 0.0 <= result["probability"] <= 1.0
+        assert result["model"] == "invalid_input"
+        assert result["probability"] is None
+
+    def test_out_of_range_input_is_rejected(self):
+        result = predict_from_risk_row({"cvss": 999.0})
+        assert result["model"] == "invalid_input"
+        assert result["probability"] is None
+
+    def test_invalid_encoded_category_is_rejected(self):
+        with pytest.raises(ValueError):
+            predict_incident(
+                cvss=7.0,
+                exploit_in_wild=False,
+                patch_age_days=10,
+                internet_facing=False,
+                control_effectiveness=0.5,
+                attack_vector=99,
+            )
+
+
+class TestNoSyntheticInputs:
+    def test_exploit_flag_does_not_invent_epss(self):
+        result = predict_incident(
+            cvss=9.8,
+            exploit_in_wild=True,
+            patch_age_days=21,
+            internet_facing=True,
+            control_effectiveness=0.5,
+        )
+        assert result["epss_score"] == 0.0
+        assert result["input_provenance"]["epss"].startswith("missing")
+
+    def test_probability_semantics_do_not_claim_annual_incident_rate(self):
+        result = predict_incident(
+            cvss=9.8,
+            exploit_in_wild=True,
+            patch_age_days=21,
+            internet_facing=True,
+            control_effectiveness=0.5,
+            epss_score=0.99,
+            epss_percentile=0.99,
+        )
+        assert "not an annual incident probability" in result["probability_semantics"]
 
 
 class TestExplainability:
@@ -148,3 +228,4 @@ class TestExplainability:
         assert len(contributions["top_contributors"]) == 5
         for c in contributions["top_contributors"]:
             assert "feature" in c and "shap_value" in c
+        assert "raw XGBoost ranking score" in contributions["note"]

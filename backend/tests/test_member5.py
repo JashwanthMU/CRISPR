@@ -241,8 +241,8 @@ class TestScenarioAPI:
 
     def test_scenario_by_id_invalid(self, client):
         r = client.get("/api/scenarios/invalid_id")
-        assert r.status_code == 200
-        assert "error" in r.json()
+        assert r.status_code == 404
+        assert "error" in r.json()["detail"]
 
 
 class TestOptimizeAPI:

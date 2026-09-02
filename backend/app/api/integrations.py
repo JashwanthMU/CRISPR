@@ -6,6 +6,8 @@ POST /api/integrations/{id}/disable   → disable integration
 """
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
+from backend.data_access import demo_mode_enabled
+from backend.ingestion.store import ingestion_status
 
 router = APIRouter()
 
@@ -27,7 +29,14 @@ _state: dict[str, dict] = {i["id"]: dict(i) for i in INTEGRATIONS}
 
 @router.get("")
 def list_integrations():
-    items = list(_state.values())
+    items = [dict(item) for item in _state.values()]
+    if not demo_mode_enabled():
+        source_rows = {row["source_type"].lower(): row for row in ingestion_status()}
+        for item in items:
+            row = source_rows.get(item["key"])
+            item["status"] = "connected" if row else "disconnected"
+            item["last_sync"] = row["last_ingested_at"] if row else None
+            item["items_ingested"] = row["count"] if row else 0
     connected    = [i for i in items if i["status"] == "connected"]
     disconnected = [i for i in items if i["status"] == "disconnected"]
     return {
@@ -52,6 +61,11 @@ def reconnect_integration(integration_id: str):
     item = _state.get(integration_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Integration '{integration_id}' not found")
+    if not demo_mode_enabled():
+        raise HTTPException(
+            status_code=501,
+            detail="A real connector credential and sync implementation is required; no simulated reconnect was performed",
+        )
     _state[integration_id]["status"]        = "connected"
     _state[integration_id]["last_sync"]     = datetime.now(timezone.utc).isoformat()
     _state[integration_id]["items_ingested"] = max(1, _state[integration_id]["items_ingested"])
@@ -68,6 +82,11 @@ def disable_integration(integration_id: str):
     item = _state.get(integration_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Integration '{integration_id}' not found")
+    if not demo_mode_enabled():
+        raise HTTPException(
+            status_code=501,
+            detail="Persistent integration configuration is required; no in-memory disable was performed",
+        )
     _state[integration_id]["status"] = "disconnected"
     return {
         "id":      integration_id,

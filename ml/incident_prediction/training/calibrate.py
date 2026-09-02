@@ -6,7 +6,7 @@ def main():
     X_train = pd.read_csv("ml/incident_prediction/training/X_train.csv")
     y_train = pd.read_csv("ml/incident_prediction/training/y_train.csv")
     model = joblib.load("ml/incident_prediction/training/model.pkl")
-    calibrated = CalibratedClassifierCV(model, method='isotonic', cv="prefit")
+    calibrated = CalibratedClassifierCV(model, method='sigmoid', cv="prefit")
     calibrated.fit(X_train, y_train)
     joblib.dump(calibrated, "ml/incident_prediction/training/calibrated_model.pkl")
     print("Model calibrated.")

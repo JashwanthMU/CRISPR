@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException
-import json
-from pathlib import Path
+from backend.data_access import load_assets
 
 from backend.asset_intelligence.criticality import (
     enrich_asset,
@@ -8,18 +7,13 @@ from backend.asset_intelligence.criticality import (
 )
 from backend.controls.effectiveness import (
     calculate_control_effectiveness,
-    DEMO_CONTROLS,
+    get_controls_for_asset,
 )
 from backend.correlation.correlator import correlate_findings
 from backend.normalization.normalizer import normalize_all
 from backend.app.api.findings import get_findings_by_asset
 
 router = APIRouter()
-ASSETS_PATH = Path(__file__).resolve().parents[3] / "data" / "demo" / "assets.json"
-
-
-def load_assets():
-    return json.load(open(ASSETS_PATH)) if ASSETS_PATH.exists() else []
 
 
 def _asset_name_lookup(assets: list[dict]) -> dict:
@@ -31,7 +25,7 @@ def get_assets():
     assets = []
     for asset in load_assets():
         enriched = enrich_asset(asset)
-        controls = DEMO_CONTROLS.get(asset["asset_id"], {})
+        controls = get_controls_for_asset(asset["asset_id"])
         enriched["control_effectiveness"] = calculate_control_effectiveness(controls)
         enriched["control_effectiveness_pct"] = round(enriched["control_effectiveness"] * 100, 1)
         enriched["controls"] = controls
@@ -41,9 +35,7 @@ def get_assets():
 
 @router.get("/{asset_id}/controls")
 def get_asset_controls(asset_id: str):
-    controls = DEMO_CONTROLS.get(asset_id)
-    if controls is None:
-        raise HTTPException(status_code=404, detail="no controls data for this asset")
+    controls = get_controls_for_asset(asset_id)
     return {"asset_id": asset_id, "controls": controls}
 
 
@@ -55,7 +47,7 @@ def get_asset(asset_id: str):
         raise HTTPException(status_code=404, detail="asset not found")
 
     enriched = enrich_asset(asset)
-    controls = DEMO_CONTROLS.get(asset_id, {})
+    controls = get_controls_for_asset(asset_id)
     enriched["control_effectiveness"] = calculate_control_effectiveness(controls)
     enriched["controls"] = controls
 

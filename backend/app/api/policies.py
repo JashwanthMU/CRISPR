@@ -7,6 +7,7 @@ POST  /api/policies              → create a new policy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
@@ -119,6 +120,7 @@ class PolicyCreate(BaseModel):
 
 @router.get("")
 def list_policies():
+    require_demo_mode("Policies")
     policies = list(_state.values())
     enabled  = [p for p in policies if p["enabled"]]
     violations = sum(p["violations"] for p in policies if p["enabled"])
@@ -133,6 +135,7 @@ def list_policies():
 
 @router.get("/{policy_id}")
 def get_policy(policy_id: str):
+    require_demo_mode("Policies")
     policy = _state.get(policy_id)
     if not policy:
         raise HTTPException(status_code=404, detail=f"Policy '{policy_id}' not found")
@@ -141,6 +144,7 @@ def get_policy(policy_id: str):
 
 @router.patch("/{policy_id}/toggle")
 def toggle_policy(policy_id: str):
+    require_demo_mode("Policies")
     policy = _state.get(policy_id)
     if not policy:
         raise HTTPException(status_code=404, detail=f"Policy '{policy_id}' not found")
@@ -154,6 +158,7 @@ def toggle_policy(policy_id: str):
 
 @router.post("", status_code=201)
 def create_policy(body: PolicyCreate):
+    require_demo_mode("Policies")
     import uuid, datetime
     new_id = f"pol-{str(uuid.uuid4())[:8]}"
     new_policy = {

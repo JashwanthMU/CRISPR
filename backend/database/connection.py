@@ -9,6 +9,7 @@ from psycopg.rows import dict_row
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+CONNECT_TIMEOUT_SECONDS = int(os.getenv("DB_CONNECT_TIMEOUT_SECONDS", "3"))
 
 
 def _connection_settings() -> str | dict[str, str | int]:
@@ -32,9 +33,17 @@ def _connection_settings() -> str | dict[str, str | int]:
 def get_connection() -> Iterator[psycopg.Connection]:
     settings = _connection_settings()
     connection = (
-        psycopg.connect(settings, row_factory=dict_row)
+        psycopg.connect(
+            settings,
+            row_factory=dict_row,
+            connect_timeout=CONNECT_TIMEOUT_SECONDS,
+        )
         if isinstance(settings, str)
-        else psycopg.connect(**settings, row_factory=dict_row)
+        else psycopg.connect(
+            **settings,
+            row_factory=dict_row,
+            connect_timeout=CONNECT_TIMEOUT_SECONDS,
+        )
     )
     with connection:
         yield connection
@@ -96,6 +105,7 @@ def init_database() -> None:
             CREATE TABLE IF NOT EXISTS assets (
                 asset_id VARCHAR(32) PRIMARY KEY,
                 payload JSONB NOT NULL,
+                data_origin VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN',
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
             """
@@ -108,10 +118,17 @@ def init_database() -> None:
                 source_name VARCHAR(120) NOT NULL,
                 asset_id VARCHAR(32) NOT NULL,
                 payload JSONB NOT NULL,
+                data_origin VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN',
                 first_seen DATE,
                 ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
             """
+        )
+        connection.execute(
+            "ALTER TABLE assets ADD COLUMN IF NOT EXISTS data_origin VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN'"
+        )
+        connection.execute(
+            "ALTER TABLE findings ADD COLUMN IF NOT EXISTS data_origin VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN'"
         )
         connection.execute(
             """
@@ -123,5 +140,29 @@ def init_database() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_findings_asset_id
             ON findings (asset_id)
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS control_postures (
+                asset_id VARCHAR(32) PRIMARY KEY REFERENCES assets(asset_id),
+                payload JSONB NOT NULL,
+                observed_at TIMESTAMPTZ NOT NULL,
+                source_name VARCHAR(120) NOT NULL,
+                data_origin VARCHAR(16) NOT NULL DEFAULT 'LIVE',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS control_catalog (
+                control_id VARCHAR(64) PRIMARY KEY,
+                payload JSONB NOT NULL,
+                source_name VARCHAR(120) NOT NULL,
+                observed_at TIMESTAMPTZ NOT NULL,
+                data_origin VARCHAR(16) NOT NULL DEFAULT 'LIVE',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
             """
         )

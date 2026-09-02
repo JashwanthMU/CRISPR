@@ -1,11 +1,13 @@
 """Compliance mapping API. Member 5."""
 from fastapi import APIRouter
 from backend.compliance.mapper import get_compliance_summary, get_gaps, COMPLIANCE_SCORES
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
 @router.get("")
 def compliance_summary():
+    require_demo_mode("Compliance scores")
     summary = get_compliance_summary()
     avg = round(sum(s["score"] for s in summary) / len(summary), 1) if summary else 0
     return {
@@ -17,6 +19,7 @@ def compliance_summary():
 
 @router.get("/gaps")
 def compliance_gaps():
+    require_demo_mode("Compliance gaps")
     gaps = get_gaps()
     total_impact = sum(g["impact_inr"] for g in gaps)
     return {
@@ -28,4 +31,5 @@ def compliance_gaps():
 
 @router.get("/scores")
 def raw_scores():
+    require_demo_mode("Compliance scores")
     return COMPLIANCE_SCORES

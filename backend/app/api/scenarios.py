@@ -1,27 +1,19 @@
 """Scenario simulation API. Member 5."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
-import json
-from pathlib import Path
-from backend.scenario_engine.simulator import align_enterprise_baseline, simulate_enterprise, PRESET_SCENARIOS
-from backend.app.api.risks import get_enterprise_summary
+from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
+from backend.data_access import load_assets
 
 router = APIRouter()
 
 
 def _load_assets() -> list:
-    path = Path("data/demo/assets.json")
-    if not path.exists():
-        path = Path(__file__).resolve().parents[3] / "data" / "demo" / "assets.json"
-    with open(path) as f:
-        return json.load(f)
+    return load_assets()
 
 
 def _simulate(overrides: dict) -> dict:
-    result = simulate_enterprise(_load_assets(), overrides)
-    baseline = get_enterprise_summary()["total_eal_inr"]
-    return align_enterprise_baseline(result, baseline)
+    return simulate_enterprise(_load_assets(), overrides)
 
 
 @router.get("")
@@ -85,7 +77,10 @@ def compare_scenarios(
     if not p1: errors.append(f"Unknown scenario '{s1}'")
     if not p2: errors.append(f"Unknown scenario '{s2}'")
     if errors:
-        return {"error": errors, "available": [p["id"] for p in PRESET_SCENARIOS]}
+        raise HTTPException(
+            status_code=404,
+            detail={"errors": errors, "available": [p["id"] for p in PRESET_SCENARIOS]},
+        )
     assets = _load_assets()
     r1 = simulate_enterprise(assets, p1["params"])
     r2 = simulate_enterprise(assets, p2["params"])
@@ -119,8 +114,12 @@ def compare_scenarios(
 def run_preset(scenario_id: str):
     preset = next((p for p in PRESET_SCENARIOS if p["id"] == scenario_id), None)
     if not preset:
-        return {"error": f"Unknown scenario '{scenario_id}'", "available": [p["id"] for p in PRESET_SCENARIOS]}
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": f"Unknown scenario '{scenario_id}'",
+                "available": [p["id"] for p in PRESET_SCENARIOS],
+            },
+        )
     result = _simulate(preset["params"])
     return {"scenario": preset, **result}
-
-

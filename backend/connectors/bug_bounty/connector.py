@@ -6,7 +6,7 @@ from pathlib import Path
 from psycopg import Error as PsycopgError
 
 from backend.database.connection import get_connection
-from backend.ingestion.store import fetch_findings as fetch_stored
+from backend.data_access import demo_mode_enabled, load_findings
 
 
 DATA_PATH = Path(__file__).resolve().parents[3] / "data/demo/bug_bounty.json"
@@ -14,8 +14,10 @@ DATA_PATH = Path(__file__).resolve().parents[3] / "data/demo/bug_bounty.json"
 
 def fetch_findings() -> list[dict]:
     try:
-        findings = fetch_stored("BUG_BOUNTY")
+        findings = load_findings("BUG_BOUNTY")
     except PsycopgError:
+        if not demo_mode_enabled():
+            raise
         with DATA_PATH.open(encoding="utf-8") as file:
             return json.load(file)
     try:
@@ -32,7 +34,9 @@ def fetch_findings() -> list[dict]:
     except PsycopgError:
         # Keep demo findings available while PostgreSQL is starting or when the
         # API is intentionally run without its database.
-        return findings
+        if demo_mode_enabled():
+            return findings
+        raise
 
     findings.extend(
         {

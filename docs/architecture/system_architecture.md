@@ -320,7 +320,7 @@ graph TD
     subgraph sce["scenario_engine/simulator.py"]
         PRE["PRESET_SCENARIOS:\n  mfa — ₹15L cost, ₹48.6L reduction\n  patch_now — ₹8L cost, ₹31L reduction\n  segment — ₹30L cost, ₹38.7L reduction\n  delay_30 — ₹0 cost, −₹21L (increases risk)"]
 
-        CAL["CALIBRATED_IMPACTS dict\nEnsures demo targets are hit exactly\nDistributes reduction per-asset by EAL share"]
+        CAL["Dynamic scenario recomputation\nNo target reductions\nMissing inputs are disclosed"]
 
         SIM["simulate_enterprise(assets, overrides)\n1. Translate overrides → control_overrides\n2. Compute baseline EAL per asset\n3. Apply calibrated impact (if preset)\n4. Return per_asset + enterprise totals"]
 

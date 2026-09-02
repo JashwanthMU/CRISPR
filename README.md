@@ -336,25 +336,30 @@ Loss magnitude = downtime
                + regulatory
                + reputation
 
-EAL = incident likelihood × loss magnitude
-P95 VaR = EAL × 3.2  # prototype placeholder
+Modeled loss exposure = annualized likelihood proxy × loss magnitude
+Monte Carlo VaR = percentile of simulated annual portfolio loss
 ```
 
-Regulatory constants include prototype values for DPDP, CERT-In, RBI, and SEBI exposure. The five primary demo risk cases are calibrated to preserve the required hackathon story while the underlying formula outputs are also returned as `model_likelihood`.
+Regulatory constants and loss multipliers are assumptions and must be replaced or
+approved for the target organization. The ML artifact predicts calibrated KEV
+membership, not annual incident frequency; APIs disclose the additional CRISPR
+environmental and annualization assumptions used for modeled loss exposure.
 
 ## Scenario and Investment Models
 
-Calibrated enterprise scenario targets:
+Scenario values are recomputed from ingested findings, asset loss inputs, and
+control posture; there are no calibrated target reductions. Missing findings are
+excluded and counted in `calculation_scope`. Patch-delay exposure is compounded
+with the formula returned in each response.
 
-| Scenario | Cost | EAL change |
-|---|---:|---:|
-| Implement MFA | ₹15 lakh | −₹48.6 lakh |
-| Patch immediately | ₹8 lakh | −₹31 lakh |
-| Network segmentation | ₹30 lakh | −₹38.7 lakh |
-| Expand EDR | ₹20 lakh | −₹25 lakh |
-| Delay patching 30 days | ₹0 | +₹21 lakh |
+The optimizer dynamically recomputes marginal loss-exposure reduction after
+each selected control and enforces a configurable minimum marginal ROSI. Control
+costs remain planning assumptions until replaced with approved internal/vendor
+estimates, and the response says so explicitly.
 
-The optimizer maximizes total `risk_reduction_inr` under the supplied budget using binary PuLP variables. If PuLP or CBC fails, it selects controls greedily by risk reduction per rupee.
+Production defaults to `CRISPR_DATA_MODE=live`, which reads only rows marked
+`data_origin=LIVE` and returns HTTP 503 when required data is missing. Set
+`CRISPR_DATA_MODE=demo` only for tests or a clearly labelled presentation.
 
 ## AI Risk Advisor
 

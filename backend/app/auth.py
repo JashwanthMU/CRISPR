@@ -16,6 +16,7 @@ from pydantic import BaseModel, EmailStr, Field
 from psycopg import IntegrityError, OperationalError
 
 from backend.database.connection import get_connection
+from backend.data_access import demo_mode_enabled
 
 
 TOKEN_SECRET = os.getenv("AUTH_SECRET", "")
@@ -140,19 +141,23 @@ def get_current_user(
         user_id = UUID(payload["sub"])
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as error:
         raise unauthorized from error
-    import os as _os
     try:
         with get_connection() as connection:
             user = connection.execute(
                 "SELECT user_id, name, email, role FROM users WHERE user_id = %s",
                 (user_id,),
             ).fetchone()
-    except OperationalError:
-        # DB unavailable — reconstruct user from JWT payload (demo/local mode)
+    except OperationalError as error:
+        if not demo_mode_enabled():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="PostgreSQL is unavailable; token ownership could not be verified",
+            ) from error
+        # Explicit demo mode may reconstruct the seeded demo identity from the token.
         demo_user = {
             "user_id": str(user_id),
             "name": payload.get("name", "Security Admin"),
-            "email": payload.get("email", _os.getenv("SECURITY_ADMIN_EMAIL", "security@novapay.com")),
+            "email": payload.get("email", os.getenv("SECURITY_ADMIN_EMAIL", "security@novapay.com")),
             "role": payload.get("role", "SECURITY"),
         }
         return AuthUser.model_validate(demo_user)
@@ -171,7 +176,7 @@ def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 def ensure_default_security_user() -> None:
-    """Ensure the configured security administrator exists with current credentials."""
+    """Create the configured security administrator once without rotating its password."""
     from uuid import uuid4
 
     email = os.getenv("SECURITY_ADMIN_EMAIL", "").strip().lower()
@@ -186,10 +191,7 @@ def ensure_default_security_user() -> None:
             """
             INSERT INTO users (user_id, name, email, password_hash, role)
             VALUES (%s, %s, %s, %s, 'SECURITY')
-            ON CONFLICT (email) DO UPDATE SET
-                name = EXCLUDED.name,
-                password_hash = EXCLUDED.password_hash,
-                role = 'SECURITY'
+            ON CONFLICT (email) DO NOTHING
             """,
             (uuid4(), "NovaPay Security Team", email, password_hash),
         )

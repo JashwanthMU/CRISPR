@@ -4,10 +4,8 @@
 // Every page/component should import from here, never call axios/fetch
 // directly. In demo mode (default — see API_MODE in client.ts) every
 // function resolves fixture data after a small simulated delay. In live
-// mode, it calls the real backend and — consistent with the rest of this
-// app's "never crash the UI on a missing backend" philosophy — falls back
-// to the same fixtures if the request fails or the endpoint isn't
-// implemented yet.
+// mode, it calls the real backend and propagates failures. Fixture substitution
+// is allowed only in explicitly configured demo mode.
 //
 // Components never need to know which mode is active: they always get back
 // the same shape (see src/types).
@@ -37,17 +35,18 @@ import { runAnalysis as runDemoAnalysis } from '../../demo/demoStore';
 async function liveOrFallback<T>(
   path: string,
   fallback: T,
-  method: 'get' | 'post' = 'get',
+  method: 'get' | 'post' | 'patch' = 'get',
   body?: unknown,
   select: (payload: any) => T = (payload) => payload as T,
 ): Promise<T> {
   if (API_MODE === 'demo') return simulateLatency(fallback);
-  try {
-    const res = method === 'get' ? await httpClient.get(path) : await httpClient.post(path, body);
-    return res?.data == null ? fallback : select(res.data);
-  } catch {
-    return fallback;
-  }
+  const res = method === 'get'
+    ? await httpClient.get(path)
+    : method === 'patch'
+      ? await httpClient.patch(path, body)
+      : await httpClient.post(path, body);
+  if (res?.data == null) throw new Error(`Backend returned no data for ${method.toUpperCase()} ${path}`);
+  return select(res.data);
 }
 
 // ----------------------------------------------------------------------------
@@ -243,7 +242,7 @@ export function getRemediation() {
 }
 
 export function updateRemediationStatus(id: string, status: string) {
-  return liveOrFallback(`/api/remediation/${id}`, null, "post", { status });
+  return liveOrFallback(`/api/remediation/${id}`, null, "patch", { status });
 }
 
 export function getRemediationStats() {
@@ -255,7 +254,7 @@ export function getPolicies() {
 }
 
 export function togglePolicy(id: string) {
-  return liveOrFallback(`/api/policies/${id}/toggle`, null, "post", {});
+  return liveOrFallback(`/api/policies/${id}/toggle`, null, "patch", {});
 }
 
 export function getLiveIntegrations() {
@@ -291,7 +290,7 @@ export function getSettings() {
 }
 
 export function updateSettings(data: Record<string, any>) {
-  return liveOrFallback("/api/settings", null, "post", data);
+  return liveOrFallback("/api/settings", null, "patch", data);
 }
 
 export function getReport(id: string) {
