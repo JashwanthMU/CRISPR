@@ -73,6 +73,16 @@ def simulate_enterprise(assets: list, overrides: dict) -> dict:
         control_overrides["patch_compliance"] = 0.95
     if overrides.get("edr_expand") is True:
         control_overrides["edr_coverage"] = 1.0
+    if overrides.get("cloud_hardening") is True:
+        control_overrides["waf_enabled"] = True
+        control_overrides["segmentation"] = min(1.0, control_overrides.get("segmentation", 0) + 0.20)
+    if overrides.get("immutable_backup") is True:
+        # Backup reduces recovery cost but not likelihood directly
+        # Model it as improved logging coverage reducing detection time
+        control_overrides["logging_coverage"] = 1.0
+    if overrides.get("training") is True:
+        # Security training improves MFA adoption and reduces phishing risk
+        control_overrides["mfa_coverage"] = min(1.0, control_overrides.get("mfa_coverage", 0.6) + 0.15)
     # patch_delay goes into finding_overrides (not control_overrides)
     # so it reaches finding_after in simulate_scenario
     patch_delay_days = 0
