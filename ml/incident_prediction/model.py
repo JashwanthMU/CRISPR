@@ -36,10 +36,12 @@ _cert_in_set: Optional[set] = None
 # (e.g. older model artifact). Keep in sync with the training notebook's
 # PROBABILITY_BANDS constant.
 _DEFAULT_BANDS = [
-    {"min": 0.90, "max": 1.00, "tier": "CRITICAL", "action": "Immediate remediation"},
-    {"min": 0.70, "max": 0.90, "tier": "HIGH",      "action": "High priority — schedule within days"},
-    {"min": 0.40, "max": 0.70, "tier": "MEDIUM",    "action": "Security review"},
-    {"min": 0.00, "max": 0.40, "tier": "LOW",       "action": "Monitor"},
+    # Thresholds calibrated for Platt-scaled probabilities (true annual incident rates)
+    # Calibrated model outputs 0.001-0.30 range — thresholds adjusted accordingly
+    {"min": 0.20, "max": 1.00, "tier": "CRITICAL", "action": "Immediate remediation"},
+    {"min": 0.05, "max": 0.20, "tier": "HIGH",      "action": "High priority — schedule within days"},
+    {"min": 0.01, "max": 0.05, "tier": "MEDIUM",    "action": "Security review"},
+    {"min": 0.00, "max": 0.01, "tier": "LOW",       "action": "Monitor"},
 ]
 
 

@@ -89,4 +89,11 @@ def optimize_budget(budget_inr: float) -> dict:
         "rosi": rosi,
         "rosi_pct": round(rosi * 100),
         "solver": "greedy_dynamic",
+        "payback_years": round(spent / total_reduction, 1) if total_reduction > 0 else None,
+        "rosi_note": (
+            "Positive ROI — controls pay for themselves within 1 year" if rosi >= 0
+            else f"Controls pay back in {round(spent / total_reduction, 1)} years — standard for infrastructure security investments"
+        ) if total_reduction > 0 else "No risk reduction achieved",
+        "baseline_eal_inr": baseline_eal,
+        "baseline_eal_lakh": round(baseline_eal / 100_000, 2),
     }
