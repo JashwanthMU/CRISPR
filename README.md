@@ -188,6 +188,17 @@ Both Nginx containers proxy `/api/*` to the backend, so browser deployments can 
 
 ## Quick Start with Docker
 
+For a guided, idempotent installation that prompts for required and optional
+credentials, run:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+See [the complete installation walkthrough](docs/SETUP_WALKTHROUGH.md) for
+live-data prerequisites, backup behavior, verification, and troubleshooting.
+
 ### Prerequisites
 
 - Docker Engine or Docker Desktop
