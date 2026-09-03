@@ -30,7 +30,10 @@ def calculate_loss_magnitude(asset: dict) -> dict:
         "downtime_cost_per_hour_inr",
         DOWNTIME_COST_PER_HOUR.get(asset_type, 200_000),
     )
-    downtime_loss = downtime_hours * hourly_rate * criticality
+    downtime_loss = (
+        downtime_hours * hourly_rate * criticality if demo_mode_enabled()
+        else downtime_hours * hourly_rate
+    )
     ir_cost = (
         300_000 + (criticality * 500_000) if demo_mode_enabled()
         else asset["incident_response_cost_inr"]
@@ -60,6 +63,10 @@ def calculate_loss_magnitude(asset: dict) -> dict:
             "criticality_fraction": criticality,
             "downtime_hours": downtime_hours,
             "downtime_cost_per_hour_inr": hourly_rate,
+            "downtime_formula": (
+                "derived_demo_hours * hourly_rate * criticality_fraction"
+                if demo_mode_enabled() else "expected_downtime_hours * downtime_cost_per_hour_inr"
+            ),
             "asset_value_inr": value_inr,
             "incident_response_cost_source": "demo formula" if demo_mode_enabled() else "asset.incident_response_cost_inr",
             "recovery_cost_source": "demo formula" if demo_mode_enabled() else "asset.recovery_cost_inr",

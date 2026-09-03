@@ -61,3 +61,19 @@ def test_eal_rejects_invalid_probability_and_exposes_formula():
     result = calculate_eal(0.25, {"total_inr": 400})
     assert result["eal_inr"] == 100
     assert result["eal_calculation"]["formula"] == "annual_incident_probability * loss_magnitude_inr"
+
+
+def test_live_downtime_uses_supplied_hours_without_criticality_discount(monkeypatch):
+    from backend.financial_engine import loss_calculator
+
+    monkeypatch.setattr(loss_calculator, "demo_mode_enabled", lambda: False)
+    loss = loss_calculator.calculate_loss_magnitude({
+        "asset_id": "A1", "type": "SERVER", "criticality": 2,
+        "data_sensitivity": 2, "value_inr": 500_000,
+        "downtime_cost_per_hour_inr": 25_000, "expected_downtime_hours": 4,
+        "incident_response_cost_inr": 0, "recovery_cost_inr": 0,
+        "data_breach_exposure_inr": 0, "reputation_exposure_inr": 0,
+        "regulatory_exposure_inr": 0,
+    })
+    assert loss["downtime_loss"] == 100_000
+    assert loss["total_inr"] == 100_000
