@@ -1,250 +1,100 @@
-"""
-Remediation Queue API — Member 5 / feat/platform-connections
-GET  /api/remediation          → list all remediation items
-PATCH /api/remediation/{id}    → update status
-POST /api/remediation/{id}/assign → assign to owner
-"""
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional
-import json
-from pathlib import Path
-from backend.data_access import require_demo_mode
+"""Durable remediation workflow with optimistic concurrency and event history."""
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from backend.app.auth import AuthUser, require_security
+from backend.database.connection import get_connection
+from backend.repositories import platform
+from backend.services.audit import record_audit_event
 
 router = APIRouter()
+VALID_STATUSES = {"NOT_STARTED", "IN_PROGRESS", "PR_OPENED", "RESOLVED"}
 
-# ── Demo data derived from findings + risk engine ────────────────────────────
-REMEDIATION_ITEMS = [
-    {
-        "id": "rem-001",
-        "title": "Patch CVE-2024-21887 on Authentication API",
-        "finding": "Remote code execution vulnerability actively exploited in the wild",
-        "affectedResource": "A003 — Authentication API",
-        "recommendedFix": "Apply vendor patch immediately. Pin Ivanti Connect Secure to patched version.",
-        "priority": "CRITICAL",
-        "estimatedEffort": "2 hours",
-        "riskReductionInr": 3100000,
-        "riskReductionLakh": 31.0,
-        "owner": {"name": "Rahul Verma", "initials": "RV", "team": "Platform Infra"},
-        "status": "NOT_STARTED",
-        "repository": None,
-        "branch": None,
-        "source": "VULNERABILITY_SCANNER",
-        "cve": "CVE-2024-21887",
-        "sla_days": 1,
-        "created_at": "2026-08-01",
-    },
-    {
-        "id": "rem-002",
-        "title": "Enable MFA on all privileged accounts",
-        "finding": "12 privileged accounts without multi-factor authentication on Payment API",
-        "affectedResource": "A003 — Authentication API (Okta)",
-        "recommendedFix": "Enforce MFA policy on all privileged and admin roles across IAM.",
-        "priority": "HIGH",
-        "estimatedEffort": "1 day",
-        "riskReductionInr": 4860000,
-        "riskReductionLakh": 48.6,
-        "owner": {"name": "Sara Kapoor", "initials": "SK", "team": "Identity"},
-        "status": "IN_PROGRESS",
-        "repository": None,
-        "branch": None,
-        "source": "IAM",
-        "cve": None,
-        "sla_days": 7,
-        "created_at": "2026-08-01",
-    },
-    {
-        "id": "rem-003",
-        "title": "Patch CVE-2024-3400 on Payment Database",
-        "finding": "SQL injection vulnerability with CVSS 10.0 on payment database",
-        "affectedResource": "A002 — Payment Database",
-        "recommendedFix": "Apply PAN-OS patch. Temporary workaround: disable GlobalProtect gateway.",
-        "priority": "CRITICAL",
-        "estimatedEffort": "4 hours",
-        "riskReductionInr": 3100000,
-        "riskReductionLakh": 31.0,
-        "owner": {"name": "Arjun Mehta", "initials": "AM", "team": "Payments"},
-        "status": "NOT_STARTED",
-        "repository": None,
-        "branch": None,
-        "source": "VULNERABILITY_SCANNER",
-        "cve": "CVE-2024-3400",
-        "sla_days": 1,
-        "created_at": "2026-08-05",
-    },
-    {
-        "id": "rem-004",
-        "title": "Fix authentication bypass on Payment API",
-        "finding": "Authentication bypass allows unauthorized access — validated bug bounty finding",
-        "affectedResource": "A003 — Authentication API",
-        "recommendedFix": "Fix JWT validation logic. Rotate all active tokens post-fix.",
-        "priority": "CRITICAL",
-        "estimatedEffort": "1 day",
-        "riskReductionInr": 4860000,
-        "riskReductionLakh": 48.6,
-        "owner": {"name": "Priya Nair", "initials": "PN", "team": "Security"},
-        "status": "NOT_STARTED",
-        "repository": "codesmiths/payments-service",
-        "branch": "main",
-        "source": "BUG_BOUNTY",
-        "cve": None,
-        "sla_days": 2,
-        "created_at": "2026-08-10",
-    },
-    {
-        "id": "rem-005",
-        "title": "Implement network micro-segmentation",
-        "finding": "Payment environment not fully segmented — lateral movement possible",
-        "affectedResource": "A001, A002, A003 — Payment Environment",
-        "recommendedFix": "Deploy network policies isolating payment services from rest of infrastructure.",
-        "priority": "HIGH",
-        "estimatedEffort": "1 week",
-        "riskReductionInr": 3870000,
-        "riskReductionLakh": 38.7,
-        "owner": {"name": "Rahul Verma", "initials": "RV", "team": "Platform Infra"},
-        "status": "NOT_STARTED",
-        "repository": None,
-        "branch": None,
-        "source": "CSPM",
-        "cve": None,
-        "sla_days": 30,
-        "created_at": "2026-08-01",
-    },
-    {
-        "id": "rem-006",
-        "title": "Remove admin rights from 8 service accounts",
-        "finding": "8 service accounts with admin rights on Payment Gateway",
-        "affectedResource": "A001 — Payment Gateway (Okta)",
-        "recommendedFix": "Apply least-privilege principle. Replace admin roles with scoped service roles.",
-        "priority": "MEDIUM",
-        "estimatedEffort": "2 days",
-        "riskReductionInr": 900000,
-        "riskReductionLakh": 9.0,
-        "owner": {"name": "Sara Kapoor", "initials": "SK", "team": "Identity"},
-        "status": "IN_PROGRESS",
-        "repository": None,
-        "branch": None,
-        "source": "IAM",
-        "cve": None,
-        "sla_days": 14,
-        "created_at": "2026-08-01",
-    },
-]
 
-# In-memory state (persists within server session)
-_state: dict[str, dict] = {item["id"]: dict(item) for item in REMEDIATION_ITEMS}
+class RemediationCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=240)
+    finding_id: str | None = Field(default=None, max_length=64)
+    asset_id: str | None = Field(default=None, max_length=32)
+    priority: str = Field(pattern="^(CRITICAL|HIGH|MEDIUM|LOW)$")
+    recommended_fix: str | None = Field(default=None, max_length=10000)
+    risk_reduction_inr: float | None = Field(default=None, ge=0)
+    metadata: dict = Field(default_factory=dict)
 
 
 class StatusUpdate(BaseModel):
     status: str
+    expected_version: int = Field(ge=1)
+
 
 class AssignRequest(BaseModel):
-    owner_name: str
-    owner_initials: str
-    owner_team: str
+    owner_name: str = Field(min_length=1, max_length=120)
+    owner_initials: str = Field(min_length=1, max_length=8)
+    owner_team: str = Field(min_length=1, max_length=120)
+    expected_version: int = Field(ge=1)
 
 
 def _summary(items: list[dict]) -> dict:
-    open_items   = [i for i in items if i["status"] != "RESOLVED"]
-    in_progress  = [i for i in items if i["status"] == "IN_PROGRESS"]
-    resolved     = [i for i in items if i["status"] == "RESOLVED"]
-    pending_risk = sum(i["riskReductionInr"] for i in open_items)
+    open_items = [item for item in items if item["status"] != "RESOLVED"]
+    pending = sum(float(item.get("riskReductionInr") or 0) for item in open_items)
     return {
-        "total":            len(items),
-        "open":             len(open_items),
-        "in_progress":      len(in_progress),
-        "resolved":         len(resolved),
-        "pending_risk_inr": pending_risk,
-        "pending_risk_lakh": round(pending_risk / 100_000, 2),
+        "total": len(items), "open": len(open_items),
+        "in_progress": sum(item["status"] == "IN_PROGRESS" for item in items),
+        "resolved": sum(item["status"] == "RESOLVED" for item in items),
+        "pending_risk_inr": pending, "pending_risk_lakh": round(pending / 100_000, 2),
     }
 
 
 @router.get("")
-def list_remediation():
-    require_demo_mode("Remediation")
-    items = list(_state.values())
-    return {
-        "summary": _summary(items),
-        "items":   items,
-        "count":   len(items),
-    }
+def list_remediation(
+    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    user: AuthUser = Depends(require_security),
+) -> dict:
+    items = platform.list_remediation(user.organization_id, limit, offset)
+    return {"summary": _summary(items), "items": items, "count": len(items), "limit": limit, "offset": offset}
 
-
-def remediation_summary():
-    items = list(_state.values())
-    by_priority = {}
-    for item in items:
-        p = item["priority"]
-        by_priority.setdefault(p, {"total": 0, "resolved": 0, "risk_inr": 0})
-        by_priority[p]["total"] += 1
-        by_priority[p]["risk_inr"] += item["riskReductionInr"]
-        if item["status"] == "RESOLVED":
-            by_priority[p]["resolved"] += 1
-    return {
-        **_summary(items),
-        "by_priority": by_priority,
-    }
 
 @router.get("/stats/summary")
-def remediation_summary():
-    require_demo_mode("Remediation")
-    items = list(_state.values())
-    by_priority = {}
-    for item in items:
-        p = item["priority"]
-        by_priority.setdefault(p, {"total": 0, "resolved": 0, "risk_inr": 0})
-        by_priority[p]["total"] += 1
-        by_priority[p]["risk_inr"] += item["riskReductionInr"]
-        if item["status"] == "RESOLVED":
-            by_priority[p]["resolved"] += 1
-    open_items  = [i for i in items if i["status"] != "RESOLVED"]
-    in_progress = [i for i in items if i["status"] == "IN_PROGRESS"]
-    resolved    = [i for i in items if i["status"] == "RESOLVED"]
-    pending     = sum(i["riskReductionInr"] for i in open_items)
-    return {
-        "total":             len(items),
-        "open":              len(open_items),
-        "in_progress":       len(in_progress),
-        "resolved":          len(resolved),
-        "pending_risk_inr":  pending,
-        "pending_risk_lakh": round(pending / 100_000, 2),
-        "by_priority":       by_priority,
-    }
+def remediation_summary(user: AuthUser = Depends(require_security)) -> dict:
+    return _summary(platform.list_remediation(user.organization_id, 200, 0))
 
-@router.get("/{item_id}")
-def get_remediation_item(item_id: str):
-    require_demo_mode("Remediation")
-    item = _state.get(item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"Remediation item '{item_id}' not found")
-    return item
+
+@router.post("", status_code=201)
+def create_remediation(body: RemediationCreate, user: AuthUser = Depends(require_security)) -> dict:
+    row = platform.create_remediation(user.organization_id, user.user_id, body.model_dump())
+    record_audit_event(user.organization_id, user.user_id, "remediation.create", "remediation", str(row["id"]))
+    return row
+
+
+def _apply_update(item_id: UUID, expected: int, user: AuthUser, *, status: str | None = None, owner: dict | None = None) -> dict:
+    previous, current = platform.update_remediation(user.organization_id, item_id, expected, status, owner)
+    if not previous:
+        raise HTTPException(status_code=404, detail="Remediation item not found")
+    if not current:
+        raise HTTPException(status_code=409, detail={"error": "Version conflict", "current_version": previous["version"]})
+    event_type = "STATUS_CHANGED" if status else "ASSIGNED"
+    with get_connection() as db:
+        from psycopg.types.json import Jsonb
+        from uuid import uuid4
+        db.execute(
+            """INSERT INTO remediation_events(event_id,remediation_id,organization_id,event_type,actor_id,previous,current)
+               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+            (uuid4(), item_id, user.organization_id, event_type, user.user_id, Jsonb(previous), Jsonb(current)),
+        )
+    record_audit_event(user.organization_id, user.user_id, f"remediation.{event_type.lower()}", "remediation", str(item_id))
+    return current
 
 
 @router.patch("/{item_id}")
-def update_status(item_id: str, body: StatusUpdate):
-    require_demo_mode("Remediation")
-    valid = {"NOT_STARTED", "IN_PROGRESS", "PR_OPENED", "RESOLVED"}
-    if body.status not in valid:
-        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {valid}")
-    item = _state.get(item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"Remediation item '{item_id}' not found")
-    _state[item_id]["status"] = body.status
-    return _state[item_id]
+def update_status(item_id: UUID, body: StatusUpdate, user: AuthUser = Depends(require_security)) -> dict:
+    if body.status not in VALID_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Invalid status; expected one of {sorted(VALID_STATUSES)}")
+    return _apply_update(item_id, body.expected_version, user, status=body.status)
 
 
 @router.post("/{item_id}/assign")
-def assign_item(item_id: str, body: AssignRequest):
-    require_demo_mode("Remediation")
-    item = _state.get(item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"Remediation item '{item_id}' not found")
-    _state[item_id]["owner"] = {
-        "name":     body.owner_name,
-        "initials": body.owner_initials,
-        "team":     body.owner_team,
-    }
-    if _state[item_id]["status"] == "NOT_STARTED":
-        _state[item_id]["status"] = "IN_PROGRESS"
-    return _state[item_id]
-
+def assign_item(item_id: UUID, body: AssignRequest, user: AuthUser = Depends(require_security)) -> dict:
+    owner = {"name": body.owner_name, "initials": body.owner_initials, "team": body.owner_team}
+    return _apply_update(item_id, body.expected_version, user, owner=owner)

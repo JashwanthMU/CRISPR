@@ -304,6 +304,7 @@ export interface RemediationScenario {
   status: ScenarioStatus;
   repository?: string;
   branch?: string;
+  version?: number;
 }
 
 // ----------------------------------------------------------------------------

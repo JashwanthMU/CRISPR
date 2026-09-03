@@ -2,13 +2,24 @@ name: CRISPR CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feat/platform-connections" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: crispr_test
+          POSTGRES_USER: crispr_test
+          POSTGRES_PASSWORD: unit-test-postgres-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U crispr_test -d crispr_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       AUTH_SECRET: unit-test-signing-material-not-for-deployment
       SECURITY_ADMIN_EMAIL: security-test@example.com
@@ -16,6 +27,12 @@ jobs:
       POSTGRES_DB: crispr_test
       POSTGRES_USER: crispr_test
       POSTGRES_PASSWORD: unit-test-postgres-password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: crispr_test
+      DB_USER: crispr_test
+      DB_PASSWORD: unit-test-postgres-password
+      INTEGRATION_ENCRYPTION_KEY: 5B8xVnHYr-SYNYcvlqrRk6zjIn8NF0Xw8A3Nj3T7C30=
       CRISPR_DATA_MODE: demo
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
@@ -37,6 +54,9 @@ jobs:
 
     - name: Run Tests
       run: |
+        alembic upgrade head
+        test "$(alembic current | awk '{print $1}')" = "0001_platform_schema"
+        python -c "from backend.ingestion.store import refresh_demo_sources; print(refresh_demo_sources())"
         pytest backend/ -q
 
     - name: Build frontend
@@ -48,3 +68,5 @@ jobs:
     - name: Docker build
       run: |
         docker compose build
+        docker compose up -d db backend worker
+        docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready')"

@@ -1,15 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../lib/toastStore';
+import api from '../lib/api';
 
 export default function Settings() {
   const [orgName, setOrgName] = useState('NovaPay Financial Services');
-  const [apiMode, setApiMode] = useState<'demo' | 'live'>((import.meta as any).env?.VITE_API_MODE === 'live' ? 'live' : 'demo');
+  const apiMode: 'demo' | 'live' = (import.meta as any).env?.VITE_API_MODE === 'demo' ? 'demo' : 'live';
   const [notifyCritical, setNotifyCritical] = useState(true);
   const [notifyWeekly, setNotifyWeekly] = useState(true);
+  const [version, setVersion] = useState(0);
 
-  const save = () => {
-    toast.success('Settings saved', 'Your workspace preferences have been updated.');
+  useEffect(() => {
+    if (apiMode === 'demo') return;
+    api.get('/api/settings').then(({ data }) => {
+      if (data.org_name) setOrgName(data.org_name);
+      if (typeof data.notify_critical === 'boolean') setNotifyCritical(data.notify_critical);
+      if (typeof data.notify_weekly === 'boolean') setNotifyWeekly(data.notify_weekly);
+      setVersion(data.version ?? 0);
+    }).catch(() => toast.error('Settings unavailable', 'The backend could not load settings.'));
+  }, [apiMode]);
+
+  const save = async () => {
+    if (apiMode === 'demo') {
+      toast.success('Demo settings updated', 'Demo preferences are not persisted.');
+      return;
+    }
+    try {
+      const { data } = await api.patch('/api/settings', {
+        expected_version: version, org_name: orgName, notify_critical: notifyCritical, notify_weekly: notifyWeekly,
+      });
+      setVersion(data.version);
+      toast.success('Settings saved', 'Your workspace preferences have been persisted.');
+    } catch {
+      toast.error('Save failed', 'Reload settings and retry; another update may have won the version check.');
+    }
   };
 
   return (
@@ -30,20 +54,11 @@ export default function Settings() {
 
         <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Data source mode</label>
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-          {(['demo', 'live'] as const).map((m) => (
-            <button
-              key={m}
-              className={m === apiMode ? 'btn-primary' : 'btn-secondary'}
-              style={{ textTransform: 'capitalize' }}
-              onClick={() => setApiMode(m)}
-            >
-              {m}
-            </button>
-          ))}
+          <span className="btn-primary" style={{ textTransform: 'capitalize' }}>{apiMode}</span>
         </div>
         <p style={{ fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
           Demo mode uses the deterministic fixture dataset. Live mode calls the NovaPay backend at the configured API URL
-          and falls back to fixtures automatically if it is unreachable.
+          with errors shown explicitly. Data mode is selected at build/deployment time and cannot be changed in the browser.
         </p>
       </div>
 

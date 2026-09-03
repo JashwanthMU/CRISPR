@@ -9,7 +9,8 @@ interface ReportItem {
   name: string;
   generated: string;
   format: string;
-  description: string;
+  description?: string;
+  status?: string;
 }
 
 export default function Reports() {
@@ -21,19 +22,21 @@ export default function Reports() {
     });
   }, []);
 
-  const generateNew = () => {
+  const loadReports = () => api.get('/api/reports').then((res) => setReports(res.data.reports));
+
+  const generateNew = async () => {
     toast.info('Generating report…');
-    setTimeout(() => {
-      const newReport: ReportItem = {
-        id: `rep-${Date.now()}`,
-        name: 'Ad-hoc Security Posture Snapshot',
-        description: 'Manual snapshot generated from live risk data',
-        generated: new Date().toISOString().slice(0, 10),
+    try {
+      await api.post('/api/reports', {
+        report_type: 'FINDINGS_DIGEST',
+        name: `Findings Digest — ${new Date().toISOString().slice(0, 10)}`,
         format: 'JSON',
-      };
-      setReports((prev) => [newReport, ...(prev ?? [])]);
-      toast.success('Report generated', newReport.name);
-    }, 1200);
+      });
+      await loadReports();
+      toast.success('Report queued', 'The worker is generating the report from persisted findings.');
+    } catch (error: any) {
+      toast.error('Report generation failed', error?.response?.data?.detail ?? error.message);
+    }
   };
 
   const downloadReport = async (reportId: string, name: string) => {
@@ -91,7 +94,7 @@ export default function Reports() {
                 <tr key={r.id}>
                   <td style={{ maxWidth: 300 }}>
                     <div style={{ fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
                   </td>
                   <td style={{ color: 'var(--text-muted)' }}>{r.generated}</td>
                   <td>{r.format}</td>

@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
 from backend.connectors.cmdb.connector import get_source_info as get_cmdb_info
@@ -45,9 +45,17 @@ def load_all_findings() -> list[dict]:
     return findings
 
 @router.get("")
-def get_all_findings() -> dict:
+def get_all_findings(
+    limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0),
+    severity: str | None = None, source_type: str | None = None,
+) -> dict:
     findings = load_all_findings()
-    return {"total": len(findings), "findings": findings}
+    if severity:
+        findings = [row for row in findings if row.get("severity") == severity.upper()]
+    if source_type:
+        findings = [row for row in findings if row.get("source_type") == source_type.upper()]
+    total = len(findings)
+    return {"total": total, "limit": limit, "offset": offset, "findings": findings[offset:offset + limit]}
 
 @router.get("/sources")
 def get_sources() -> list[dict]:

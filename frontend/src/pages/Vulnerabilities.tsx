@@ -4,7 +4,7 @@ import DataTable, { ColumnDef } from '../components/common/DataTable';
 import FilterBar from '../components/common/FilterBar';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
-import { getVulnerabilities, httpClient } from '../lib/api';
+import { API_MODE, getVulnerabilities, httpClient } from '../lib/api';
 import type { Vulnerability } from '../types';
 import { TOKENS } from '../utils/format';
 import { SkeletonTable } from '../components/common/Skeleton';
@@ -106,9 +106,25 @@ export default function Vulnerabilities() {
         <button
           className="btn-secondary"
           style={{ padding: '4px 10px', fontSize: '0.6875rem' }}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            toast.success('Remediation queued', `${v.cve} added to the remediation queue.`);
+            if (API_MODE === 'demo') {
+              toast.info('Demo mode', 'Remediation mutations are not persisted in demo mode.');
+              return;
+            }
+            try {
+              await httpClient.post('/api/remediation', {
+                title: `Remediate ${v.cve}`,
+                finding_id: v.id,
+                asset_id: v.component,
+                priority: v.severity,
+                recommended_fix: `Review vendor guidance and remediate ${v.cve} on ${v.component}.`,
+                metadata: { cve: v.cve, source: 'vulnerability_inventory' },
+              });
+              toast.success('Remediation queued', `${v.cve} was persisted in the remediation queue.`);
+            } catch (error: any) {
+              toast.error('Queue failed', error?.response?.data?.detail ?? error.message);
+            }
           }}
         >
           Queue Fix

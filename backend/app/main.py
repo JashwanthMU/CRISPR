@@ -1,9 +1,9 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from psycopg import Error as PsycopgError
 
 from backend.app.auth import ensure_default_security_user, require_security, validate_auth_configuration
 from backend.app.api import (
@@ -24,18 +24,39 @@ from backend.app.api import (
     threat_intel,
     attack_paths,
     settings,
+    projects,
+    repositories,
+    sca,
+    audit,
+    analysis,
 )
-from backend.database.connection import init_database
+from backend.database.connection import database_ready, schema_revision
 from backend.ingestion.store import refresh_demo_sources
 from backend.data_access import LiveDataUnavailable, demo_mode_enabled
 
 docs_enabled = os.getenv("API_DOCS_ENABLED", "false").lower() == "true"
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    validate_auth_configuration()
+    ready, reason = database_ready()
+    if not ready:
+        raise RuntimeError(f"Database is not ready: {reason}. Run 'alembic upgrade head'.")
+    ensure_default_security_user()
+    if demo_mode_enabled() and os.getenv("DEMO_AUTO_SEED", "false").lower() == "true":
+        refresh_demo_sources()
+    application.state.database_ready = True
+    yield
+
+
 app = FastAPI(
     title="CRISPR",
     version="1.0.0",
     docs_url="/docs" if docs_enabled else None,
     redoc_url="/redoc" if docs_enabled else None,
     openapi_url="/openapi.json" if docs_enabled else None,
+    lifespan=lifespan,
 )
 allowed_origins = [
     origin.strip()
@@ -82,40 +103,73 @@ app.include_router(integrations.router, prefix="/api/integrations",   tags=["Int
 app.include_router(threat_intel.router, prefix="/api/threat-intel",   tags=["Threat Intel"], dependencies=security_only)
 app.include_router(attack_paths.router, prefix="/api/attack-paths",   tags=["Attack Paths"], dependencies=security_only)
 app.include_router(settings.router,     prefix="/api/settings",       tags=["Settings"], dependencies=security_only)
+app.include_router(projects.router,     prefix="/api/projects",       tags=["Projects"], dependencies=security_only)
+app.include_router(repositories.router, prefix="/api/repositories",   tags=["Repositories"], dependencies=security_only)
+app.include_router(sca.router,          prefix="/api/sca",            tags=["SCA"], dependencies=security_only)
+app.include_router(audit.router,        prefix="/api/audit-events",   tags=["Audit"], dependencies=security_only)
+app.include_router(analysis.router,     prefix="/api/analysis",       tags=["Analysis"], dependencies=security_only)
+
+# Versioned aliases allow clients to migrate without breaking the existing UI.
+for api_router, path, tag, dependencies in (
+    (findings.router, "/findings", "Findings", security_only),
+    (assets.router, "/assets", "Assets", security_only),
+    (risks.router, "/risks", "Risks", security_only),
+    (scenarios.router, "/scenarios", "Scenarios", security_only),
+    (optimization.router, "/optimize", "Optimization", security_only),
+    (compliance.router, "/compliance", "Compliance", security_only),
+    (assistant.router, "/assistant", "AI", security_only),
+    (auth.router, "/auth", "Authentication", []),
+    (ingestion.router, "/ingestion", "Ingestion", []),
+    (bug_bounty.router, "/bug-bounty", "Bug Bounty", []),
+    (remediation.router, "/remediation", "Remediation", security_only),
+    (policies.router, "/policies", "Policies", security_only),
+    (reports.router, "/reports", "Reports", security_only),
+    (integrations.router, "/integrations", "Integrations", security_only),
+    (threat_intel.router, "/threat-intel", "Threat Intel", security_only),
+    (attack_paths.router, "/attack-paths", "Attack Paths", security_only),
+    (settings.router, "/settings", "Settings", security_only),
+    (projects.router, "/projects", "Projects", security_only),
+    (repositories.router, "/repositories", "Repositories", security_only),
+    (sca.router, "/sca", "SCA", security_only),
+    (audit.router, "/audit-events", "Audit", security_only),
+    (analysis.router, "/analysis", "Analysis", security_only),
+):
+    app.include_router(
+        api_router, prefix=f"/api/v1{path}", tags=[f"v1 {tag}"], dependencies=dependencies
+    )
 
 
-@app.on_event("startup")
-def startup() -> None:
-    validate_auth_configuration()
-    app.state.database_ready = False
-    try:
-        init_database()
-        ensure_default_security_user()
-        if demo_mode_enabled():
-            refresh_demo_sources()
-        app.state.database_ready = True
-    except (PsycopgError, RuntimeError):
-        if not demo_mode_enabled():
-            raise
+@app.get("/api/health/live")
+@app.get("/api/v1/health/live")
+def health_live():
+    return {"status": "ok", "service": "CRISPR"}
+
+
+@app.get("/api/health/ready")
+@app.get("/api/v1/health/ready")
+def health_ready():
+    ready, reason = database_ready()
+    content = {
+        "status": "ready" if ready else "not_ready",
+        "service": "CRISPR",
+        "database": "connected" if ready else "unavailable",
+        "schema_revision": schema_revision() if ready else None,
+        "reason": reason,
+        "data_mode": "demo" if demo_mode_enabled() else "live",
+        "fixture_fallback_enabled": demo_mode_enabled(),
+    }
+    return JSONResponse(status_code=200 if ready else 503, content=content)
+
 
 @app.get("/api/health")
 def health():
-    db_status = "demo_json_fallback" if demo_mode_enabled() else "unavailable"
-    if getattr(app.state, "database_ready", False):
-        db_status = "connected"
-    else:
-        try:
-            from backend.database.connection import get_connection
-            with get_connection() as conn:
-                conn.execute("SELECT 1")
-            db_status = "connected"
-            app.state.database_ready = True
-        except Exception:
-            pass
+    ready, reason = database_ready()
     return {
-        "status": "ok",
+        "status": "ok" if ready else "not_ready",
         "service": "CRISPR",
-        "database": db_status,
+        "database": "connected" if ready else "unavailable",
+        "schema_revision": schema_revision() if ready else None,
+        "reason": reason,
         "data_mode": "demo" if demo_mode_enabled() else "live",
         "fixture_fallback_enabled": demo_mode_enabled(),
     }

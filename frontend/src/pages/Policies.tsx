@@ -10,6 +10,7 @@ interface Policy {
   framework: string;
   enabled: boolean;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+  version: number;
 }
 
 export default function Policies() {
@@ -21,10 +22,10 @@ export default function Policies() {
     });
   }, []);
 
-  const toggle = async (id: string) => {
+  const toggle = async (policy: Policy) => {
     try {
-      const res = await api.patch(`/api/policies/${id}/toggle`);
-      setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: res.data.enabled } : p)));
+      const res = await api.patch(`/api/policies/${policy.id}/toggle`, { expected_version: policy.version });
+      setPolicies((prev) => prev.map((p) => (p.id === policy.id ? res.data : p)));
       toast.success(res.data.message);
     } catch (e) {
       toast.error('Failed to toggle policy');
@@ -73,7 +74,7 @@ export default function Policies() {
                 </td>
                 <td>
                   <button
-                    onClick={() => toggle(p.id)}
+                    onClick={() => toggle(p)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.enabled ? 'var(--sev-low)' : 'var(--text-subtle)', display: 'flex', alignItems: 'center', gap: 6 }}
                     aria-pressed={p.enabled}
                   >

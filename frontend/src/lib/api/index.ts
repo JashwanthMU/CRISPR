@@ -81,9 +81,11 @@ export function getFinding(id: string): Promise<Finding | undefined> {
 }
 
 export function getSources() {
-  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.sources) ? payload.sources : MOCK_SOURCES,
-  );
+  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.sources)) return payload.sources;
+    throw new Error('Backend returned an invalid sources payload');
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -133,7 +135,20 @@ export function getScaFindings(repositoryName?: string) {
 // Integrations
 // ----------------------------------------------------------------------------
 export function getIntegrations(): Promise<Integration[]> {
-  return liveOrFallback('/api/integrations', INTEGRATIONS);
+  return liveOrFallback('/api/integrations', INTEGRATIONS, 'get', undefined, (payload) => {
+    if (!Array.isArray(payload?.integrations)) throw new Error('Backend returned an invalid integrations payload');
+    return payload.integrations.map((item: any) => ({
+      id: item.id,
+      key: item.provider,
+      name: item.name,
+      category: item.provider === 'github' ? 'sca' : 'vulnerability_scanner',
+      status: ['connected', 'error', 'syncing'].includes(item.status) ? item.status : 'disconnected',
+      lastSync: item.last_sync_at,
+      itemsIngested: item.items_ingested ?? 0,
+      errors: item.last_error ? 1 : 0,
+      description: item.config?.organization ? `GitHub organization: ${item.config.organization}` : 'External platform connection',
+    }));
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -178,14 +193,9 @@ export async function runAnalysis(): Promise<{ started: boolean }> {
     await runDemoAnalysis();
     return { started: true };
   }
-  try {
-    // /api/analysis/run not implemented — drive demo engine only
-    return { started: true };
-  } catch {
-    // Even in live mode, still drive the visual demo engine so the UI isn't dead.
-    await runDemoAnalysis();
-    return { started: true };
-  }
+  const response = await httpClient.post('/api/analysis/run');
+  if (response?.data?.started !== true) throw new Error('Backend did not accept the analysis job');
+  return response.data;
 }
 
 // ----------------------------------------------------------------------------
@@ -234,7 +244,7 @@ export function getForecast() {
   );
 }
 export default httpClient;
-export { httpClient };
+export { httpClient, API_MODE };
 
 // ----------------------------------------------------------------------------
 // Platform Connections — Phase 1 live endpoints

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from backend.data_access import load_assets
 
 from backend.asset_intelligence.criticality import (
@@ -21,7 +21,7 @@ def _asset_name_lookup(assets: list[dict]) -> dict:
 
 
 @router.get("")
-def get_assets():
+def get_assets(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)):
     assets = []
     for asset in load_assets():
         enriched = enrich_asset(asset)
@@ -30,7 +30,7 @@ def get_assets():
         enriched["control_effectiveness_pct"] = round(enriched["control_effectiveness"] * 100, 1)
         enriched["controls"] = controls
         assets.append(enriched)
-    return {"total": len(assets), "assets": assets}
+    return {"total": len(assets), "limit": limit, "offset": offset, "assets": assets[offset:offset + limit]}
 
 
 @router.get("/{asset_id}/controls")

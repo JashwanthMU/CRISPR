@@ -1,130 +1,63 @@
-"""
-Reports API — feat/platform-connections
-GET /api/reports           → list available reports
-GET /api/reports/{id}      → get report detail + data
-"""
-from fastapi import APIRouter, HTTPException
-from datetime import datetime
-from backend.data_access import require_demo_mode
+"""Durable reports derived only from persisted platform data."""
+
+from typing import Literal
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from psycopg.types.json import Jsonb
+
+from backend.app.auth import AuthUser, require_security
+from backend.database.connection import get_connection
+from backend.services.audit import record_audit_event
 
 router = APIRouter()
 
-REPORTS = [
-    {
-        "id":          "rep-001",
-        "name":        "Enterprise Risk Summary — August 2026",
-        "description": "Full EAL breakdown, top risk cases, and remediation status.",
-        "type":        "RISK_SUMMARY",
-        "format":      "JSON",
-        "generated":   "2026-08-31",
-        "size_kb":     48,
-        "frameworks":  ["ISO_27001", "RBI_CSF"],
-    },
-    {
-        "id":          "rep-002",
-        "name":        "RBI CSF Compliance Report — Q3 2026",
-        "description": "Compliance posture against RBI Cyber Security Framework controls.",
-        "type":        "COMPLIANCE",
-        "format":      "JSON",
-        "generated":   "2026-08-15",
-        "size_kb":     32,
-        "frameworks":  ["RBI_CSF"],
-    },
-    {
-        "id":          "rep-003",
-        "name":        "Weekly Findings Digest — Week 34",
-        "description": "New findings, severity distribution, and source breakdown.",
-        "type":        "FINDINGS_DIGEST",
-        "format":      "JSON",
-        "generated":   "2026-08-22",
-        "size_kb":     18,
-        "frameworks":  [],
-    },
-    {
-        "id":          "rep-004",
-        "name":        "Investment Optimization Report",
-        "description": "Top control recommendations with ROSI and EAL reduction estimates.",
-        "type":        "OPTIMIZATION",
-        "format":      "JSON",
-        "generated":   "2026-08-31",
-        "size_kb":     24,
-        "frameworks":  ["NIST_CSF", "CIS_CONTROLS"],
-    },
-    {
-        "id":          "rep-005",
-        "name":        "Board Risk Report — Q3 2026",
-        "description": "Executive summary of cyber risk posture for board presentation.",
-        "type":        "BOARD_SUMMARY",
-        "format":      "JSON",
-        "generated":   "2026-08-01",
-        "size_kb":     56,
-        "frameworks":  ["ISO_27001", "NIST_CSF", "RBI_CSF"],
-    },
-]
 
-
-def _generate_report_data(report_id: str) -> dict:
-    """Generate live report data by calling internal modules."""
-    if report_id == "rep-001":
-        from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
-        import json
-        from pathlib import Path
-        assets = json.load(open(Path(__file__).resolve().parents[3] / "data/demo/assets.json"))
-        mfa = simulate_enterprise(assets, {"implement_mfa": True})
-        return {
-            "enterprise_risk_score": 78,
-            "total_eal_lakh":        mfa["before_total_eal_lakh"],
-            "top_risks":             ["A003 — Auth API", "A002 — Payment DB", "A001 — Payment GW"],
-            "mfa_reduction_lakh":    mfa["reduction_lakh"],
-            "generated_at":          datetime.utcnow().isoformat(),
-        }
-    elif report_id == "rep-002":
-        from backend.compliance.mapper import get_compliance_summary, get_gaps
-        return {
-            "frameworks":    get_compliance_summary(),
-            "gaps":          get_gaps(),
-            "generated_at":  datetime.utcnow().isoformat(),
-        }
-    elif report_id == "rep-003":
-        return {
-            "note":         "Connect to live findings DB for digest",
-            "generated_at": datetime.utcnow().isoformat(),
-        }
-    elif report_id == "rep-004":
-        from backend.optimizer.knapsack import optimize_budget
-        result = optimize_budget(10_000_000)
-        return {
-            "budget_lakh":       result["budget_lakh"],
-            "reduction_lakh":    result["risk_reduced_lakh"],
-            "rosi":              result["rosi"],
-            "controls":          result["selected_controls"],
-            "generated_at":      datetime.utcnow().isoformat(),
-        }
-    elif report_id == "rep-005":
-        return {
-            "enterprise_risk_score": 78,
-            "var_95_lakh":           247.7,
-            "top_concern":           "Authentication API — multi-source confirmed exploit",
-            "recommendation":        "Implement MFA and patch CVE-2024-21887 immediately",
-            "generated_at":          datetime.utcnow().isoformat(),
-        }
-    return {"generated_at": datetime.utcnow().isoformat()}
+class ReportRequest(BaseModel):
+    report_type: Literal["RISK_SUMMARY", "FINDINGS_DIGEST"]
+    name: str = Field(min_length=2, max_length=240)
+    format: Literal["JSON"] = "JSON"
 
 
 @router.get("")
-def list_reports():
-    require_demo_mode("Reports")
-    return {
-        "reports": REPORTS,
-        "count":   len(REPORTS),
-    }
+def list_reports(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+                 user: AuthUser = Depends(require_security)):
+    with get_connection() as db:
+        rows = db.execute(
+            """SELECT report_id AS id,name,report_type AS type,format,status,created_at AS generated
+               FROM generated_reports WHERE organization_id=%s ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+            (user.organization_id, limit, offset),
+        ).fetchall()
+    return {"reports": rows, "count": len(rows), "limit": limit, "offset": offset}
+
+
+@router.post("", status_code=status.HTTP_202_ACCEPTED)
+def generate(body: ReportRequest, user: AuthUser = Depends(require_security)):
+    report_id, job_id = uuid4(), uuid4()
+    with get_connection() as db:
+        db.execute(
+            """INSERT INTO generated_reports(report_id,organization_id,report_type,name,format,status,generated_by)
+               VALUES (%s,%s,%s,%s,%s,'QUEUED',%s)""",
+            (report_id, user.organization_id, body.report_type, body.name, body.format, user.user_id),
+        )
+        db.execute(
+            """INSERT INTO jobs(job_id,organization_id,job_type,payload)
+               VALUES (%s,%s,'report.generate',%s)""",
+            (job_id, user.organization_id, Jsonb({"report_id": str(report_id), "report_type": body.report_type})),
+        )
+    record_audit_event(user.organization_id, user.user_id, "report.requested", "report", str(report_id))
+    return {"id": report_id, "job_id": job_id, "status": "QUEUED"}
 
 
 @router.get("/{report_id}")
-def get_report(report_id: str):
-    require_demo_mode("Reports")
-    report = next((r for r in REPORTS if r["id"] == report_id), None)
-    if not report:
-        raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found")
-    data = _generate_report_data(report_id)
-    return {**report, "data": data}
+def get_report(report_id: UUID, user: AuthUser = Depends(require_security)):
+    with get_connection() as db:
+        row = db.execute(
+            """SELECT report_id AS id,name,report_type AS type,format,status,content,created_at AS generated
+               FROM generated_reports WHERE organization_id=%s AND report_id=%s""",
+            (user.organization_id, report_id),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return row
