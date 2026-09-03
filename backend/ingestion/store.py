@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from psycopg.types.json import Jsonb
 
@@ -116,6 +116,27 @@ def upsert_control_postures(
                 (posture["asset_id"], Jsonb(posture), observed_at, source_name, data_origin, organization_id),
             )
     return len(postures)
+
+
+def insert_frequency_assessments(
+    assessments: list[dict], source_name: str, organization_id: UUID,
+    created_by: UUID | None = None,
+) -> int:
+    """Append evidence rather than overwriting history; latest valid record wins."""
+    with get_connection() as connection:
+        for assessment in assessments:
+            connection.execute(
+                """INSERT INTO incident_frequency_assessments(
+                     assessment_id,organization_id,finding_id,annual_incident_probability,
+                     methodology,evidence_reference,source_name,confidence,observed_at,
+                     valid_until,created_by)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (uuid4(), organization_id, assessment["finding_id"],
+                 assessment["annual_incident_probability"], assessment["methodology"],
+                 assessment["evidence_reference"], source_name, assessment["confidence"],
+                 assessment["observed_at"], assessment["valid_until"], created_by),
+            )
+    return len(assessments)
 
 
 def upsert_control_catalog(

@@ -7,6 +7,12 @@ def calculate_loss_magnitude(asset: dict) -> dict:
         "type", "criticality", "data_sensitivity", "value_inr",
         "downtime_cost_per_hour_inr", "regulatory_exposure_inr",
     }
+    if not demo_mode_enabled():
+        required_live_fields.update({
+            "expected_downtime_hours", "incident_response_cost_inr",
+            "recovery_cost_inr", "data_breach_exposure_inr",
+            "reputation_exposure_inr",
+        })
     missing = sorted(field for field in required_live_fields if asset.get(field) is None)
     if missing and not demo_mode_enabled():
         raise LiveDataUnavailable(
@@ -16,20 +22,34 @@ def calculate_loss_magnitude(asset: dict) -> dict:
     criticality = asset.get("criticality", 1) / 5
     is_regulated = asset.get("is_regulated", False)
     value_inr = asset.get("value_inr", 1_000_000)
-    downtime_hours = round(4 + (criticality * 8))
+    downtime_hours = (
+        round(4 + (criticality * 8)) if demo_mode_enabled()
+        else asset["expected_downtime_hours"]
+    )
     hourly_rate = asset.get(
         "downtime_cost_per_hour_inr",
         DOWNTIME_COST_PER_HOUR.get(asset_type, 200_000),
     )
     downtime_loss = downtime_hours * hourly_rate * criticality
-    ir_cost = 300_000 + (criticality * 500_000)
-    recovery_cost = 200_000 + (criticality * 600_000)
-    data_breach = value_inr * 0.15 if asset.get("data_sensitivity", 1) >= 4 else 0
+    ir_cost = (
+        300_000 + (criticality * 500_000) if demo_mode_enabled()
+        else asset["incident_response_cost_inr"]
+    )
+    recovery_cost = (
+        200_000 + (criticality * 600_000) if demo_mode_enabled()
+        else asset["recovery_cost_inr"]
+    )
+    data_breach = (
+        value_inr * 0.15 if asset.get("data_sensitivity", 1) >= 4 else 0
+    ) if demo_mode_enabled() else asset["data_breach_exposure_inr"]
     # A statutory maximum is not an expected fine. Live calculations require
     # an organization-approved expected exposure rather than inventing one
     # from legal penalty caps.
     regulatory = asset.get("regulatory_exposure_inr", 0) if is_regulated else 0
-    reputation = value_inr * 0.08 * criticality
+    reputation = (
+        value_inr * 0.08 * criticality if demo_mode_enabled()
+        else asset["reputation_exposure_inr"]
+    )
     total = downtime_loss + ir_cost + recovery_cost + data_breach + regulatory + reputation
     return {
         "downtime_loss": round(downtime_loss), "ir_cost": round(ir_cost),
@@ -41,8 +61,10 @@ def calculate_loss_magnitude(asset: dict) -> dict:
             "downtime_hours": downtime_hours,
             "downtime_cost_per_hour_inr": hourly_rate,
             "asset_value_inr": value_inr,
-            "data_breach_rate_of_asset_value": 0.15 if asset.get("data_sensitivity", 1) >= 4 else 0.0,
-            "reputation_rate_of_asset_value_times_criticality": 0.08,
+            "incident_response_cost_source": "demo formula" if demo_mode_enabled() else "asset.incident_response_cost_inr",
+            "recovery_cost_source": "demo formula" if demo_mode_enabled() else "asset.recovery_cost_inr",
+            "data_breach_cost_source": "demo formula" if demo_mode_enabled() else "asset.data_breach_exposure_inr",
+            "reputation_cost_source": "demo formula" if demo_mode_enabled() else "asset.reputation_exposure_inr",
             "regulatory_exposure_source": (
                 "asset.regulatory_exposure_inr"
                 if asset.get("regulatory_exposure_inr") is not None
@@ -53,7 +75,11 @@ def calculate_loss_magnitude(asset: dict) -> dict:
     }
 
 def calculate_eal(likelihood: float, loss_magnitude: dict) -> dict:
+    if not 0 <= likelihood <= 1:
+        raise ValueError("annual incident probability must be between 0 and 1")
     total_loss = loss_magnitude["total_inr"]
+    if total_loss < 0:
+        raise ValueError("loss magnitude cannot be negative")
     eal = likelihood * total_loss
     return {
         "likelihood": likelihood,
@@ -61,6 +87,12 @@ def calculate_eal(likelihood: float, loss_magnitude: dict) -> dict:
         "eal_inr": round(eal),
         "eal_lakh": round(eal / 100_000, 2),
         "risk_score": min(int(likelihood * 100 + (total_loss / 1_000_000)), 100),
+        "eal_calculation": {
+            "formula": "annual_incident_probability * loss_magnitude_inr",
+            "annual_incident_probability": likelihood,
+            "loss_magnitude_inr": total_loss,
+            "unrounded_eal_inr": eal,
+        },
     }
 
 def calculate_enterprise_risk(assets_risk_data: list) -> dict:

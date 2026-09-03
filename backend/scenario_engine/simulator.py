@@ -8,10 +8,24 @@ from backend.controls.effectiveness import calculate_control_effectiveness, get_
 from backend.data_access import demo_mode_enabled, load_findings
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_eal, calculate_loss_magnitude
+from backend.database.connection import get_connection
 
 def load_scenario_findings(organization_id=None) -> dict[str, list[dict]]:
     """Load enriched scanner findings; never invent a finding for an asset."""
     rows = load_findings("VULNERABILITY_SCANNER", organization_id=organization_id)
+    frequencies = {}
+    if organization_id is not None and not demo_mode_enabled():
+        with get_connection() as db:
+            frequency_rows = db.execute(
+                """SELECT DISTINCT ON (finding_id) finding_id,assessment_id,
+                          annual_incident_probability,methodology,evidence_reference,
+                          source_name,confidence,observed_at,valid_until
+                   FROM incident_frequency_assessments
+                   WHERE organization_id=%s AND observed_at <= NOW() AND valid_until > NOW()
+                   ORDER BY finding_id,observed_at DESC,created_at DESC""",
+                (organization_id,),
+            ).fetchall()
+        frequencies = {item["finding_id"]: item for item in frequency_rows}
     findings: dict[str, list[dict]] = {}
     for row in rows:
         if not row.get("asset_id") or row.get("cvss") is None:
@@ -19,6 +33,11 @@ def load_scenario_findings(organization_id=None) -> dict[str, list[dict]]:
         finding = dict(row)
         finding["exploit_in_wild"] = bool(row.get("exploited_in_wild", False))
         finding["threat_intel_active"] = bool(row.get("exploited_in_wild", False))
+        frequency = frequencies.get(row.get("finding_id"))
+        finding["annual_incident_probability"] = (
+            frequency["annual_incident_probability"] if frequency else None
+        )
+        finding["frequency_evidence"] = frequency
         if row.get("published_date"):
             try:
                 finding["days_since_published"] = (date.today() - date.fromisoformat(row["published_date"])).days
@@ -28,6 +47,7 @@ def load_scenario_findings(organization_id=None) -> dict[str, list[dict]]:
     return findings
 
 def simulate_scenario(base_controls: dict, overrides: dict, asset: dict, finding: dict) -> dict:
+    ce_before = calculate_control_effectiveness(base_controls)
     before = calculate_baseline(asset, finding, base_controls)
     updated_controls = {**base_controls, **{k: v for k, v in overrides.items() if k != "patch_delay_days"}}
     finding_after = dict(finding)
@@ -39,9 +59,9 @@ def simulate_scenario(base_controls: dict, overrides: dict, asset: dict, finding
         finding_after,
         updated_controls,
         patch_delay_days=patch_delay_days,
+        reference_control_effectiveness=ce_before,
     )
     reduction = before["eal_inr"] - after["eal_inr"]
-    ce_before = calculate_control_effectiveness(base_controls)
     ce_after = calculate_control_effectiveness(updated_controls)
     return {
         "asset_id": asset.get("asset_id"),

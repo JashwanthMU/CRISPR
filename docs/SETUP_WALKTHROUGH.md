@@ -159,17 +159,25 @@ verified asset inventory
 → verified scanner/SBOM asset-to-CVE mapping
 → NVD and FIRST EPSS enrichment
 → measured control posture
-→ ML likelihood and FAIR loss calculation
+→ approved annual incident-frequency evidence
+→ ML prioritization and FAIR loss calculation
 → immutable risk snapshot
 ```
 
-Live analysis requires all three organizational inputs:
+Live analysis requires all four organizational inputs:
 
 1. Asset inventory through `POST /api/ingestion/assets`.
 2. CVE mappings through `POST /api/ingestion/nvd/sync`.
 3. Control posture through `POST /api/ingestion/control-postures`.
+4. Annual frequency evidence through `POST /api/ingestion/incident-frequencies`.
 
-The asset record must contain verified financial fields such as asset value, downtime cost, and expected regulatory exposure. A statutory maximum must not be entered as an expected fine.
+The asset record must contain verified asset value, hourly downtime cost,
+expected downtime hours, incident-response cost, recovery cost, data-breach
+exposure, reputation exposure, and expected regulatory exposure. A statutory
+maximum must not be entered as an expected fine. The frequency assessment must
+come from an approved FAIR exercise, incident-history calibration, actuarial
+source, or insurer model; NVD CVSS and KEV membership are not annual frequency.
+See `docs/PHASE5_FINANCIAL_GOVERNANCE.md` for the request format.
 
 After inputs are available:
 

@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from backend.app.auth import AuthUser, require_security
 from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode
+from backend.database.connection import get_connection
 
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_loss_magnitude, calculate_eal
@@ -23,6 +24,19 @@ def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
     not hand-typed numbers. One risk case per CVE/vulnerability finding.
     """
     findings = load_findings("VULNERABILITY_SCANNER", organization_id=organization_id)
+    frequencies = {}
+    if organization_id is not None and not demo_mode_enabled():
+        with get_connection() as db:
+            rows = db.execute(
+                """SELECT DISTINCT ON (finding_id) finding_id,assessment_id,
+                          annual_incident_probability,methodology,evidence_reference,
+                          source_name,confidence,observed_at,valid_until
+                   FROM incident_frequency_assessments
+                   WHERE organization_id=%s AND observed_at <= NOW() AND valid_until > NOW()
+                   ORDER BY finding_id,observed_at DESC,created_at DESC""",
+                (organization_id,),
+            ).fetchall()
+        frequencies = {row["finding_id"]: row for row in rows}
     inputs = []
     for f in findings:
         # days_since_published is derived from the real NVD published_date
@@ -39,6 +53,7 @@ def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
             except (ValueError, TypeError):
                 pass
 
+        frequency = frequencies.get(f.get("finding_id"), {})
         inputs.append({
             "asset_id": f["asset_id"],
             "cve_id": f.get("cve"),
@@ -70,6 +85,8 @@ def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
             "flag_priv_escalation": f.get("flag_priv_escalation"),
             "flag_dos": f.get("flag_dos"),
             "flag_dir_traversal": f.get("flag_dir_traversal"),
+            "annual_incident_probability": frequency.get("annual_incident_probability"),
+            "frequency_evidence": frequency or None,
         })
     return inputs
 
@@ -136,7 +153,36 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
         and model_result.get("model") == "xgb_v4_calibrated (Platt)"
     )
 
-    if used_model_probability:
+    if not demo_mode_enabled():
+        if not used_model_probability:
+            raise LiveDataUnavailable(
+                f"A calibrated ML ranking is unavailable for finding {inp.get('finding_id')}"
+            )
+        frequency = inp.get("frequency_evidence")
+        if not frequency:
+            raise LiveDataUnavailable(
+                f"Finding {inp.get('finding_id')} lacks a current annual incident-frequency assessment"
+            )
+        likelihood = float(frequency["annual_incident_probability"])
+        lh_dict = {
+            "ranking_score": model_result.get("ranking_score"),
+            "incident_probability": likelihood,
+            "frequency_evidence_available": True,
+            "likelihood_semantics": "organization-supplied annual incident probability",
+            "calculation": {
+                "assessment_id": str(frequency["assessment_id"]),
+                "methodology": frequency["methodology"],
+                "evidence_reference": frequency["evidence_reference"],
+                "source_name": frequency["source_name"],
+                "confidence": frequency["confidence"],
+                "observed_at": frequency["observed_at"],
+                "valid_until": frequency["valid_until"],
+                "kev_probability": model_result.get("probability"),
+                "kev_probability_use": "prioritization only; excluded from EAL",
+            },
+        }
+        model_used = model_result["model"]
+    elif used_model_probability:
         lh_dict = calculate_likelihood(
             cvss=inp["cvss"],
             exploit_in_wild=inp["exploit_in_wild"],
@@ -184,6 +230,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
         "business_criticality": enriched["business_criticality"],
         "control_effectiveness_pct": round(ce * 100, 1),
         "model_used": model_used,
+        "ranking_score": model_result.get("ranking_score") if used_model_probability else None,
         "model_tier": model_result.get("tier") if used_model_probability else None,
         "model_contributions": model_result.get("contributions") if used_model_probability else None,
         "likelihood_calculation": lh_dict,
@@ -246,6 +293,11 @@ def get_all_risks(user: AuthUser = Depends(require_security)):
         "total_eal_lakh": round(total_eal / 100_000, 2),
         "risks": risks,
         "asset_risk_aggregation": asset_risks,
+        "financial_methodology": {
+            "formula": "EAL = sourced annual incident probability × loss magnitude",
+            "kev_model_use": "prioritization only; excluded from EAL",
+            "frequency_source": "latest unexpired organization assessment per finding",
+        },
     }
 
 
@@ -278,6 +330,12 @@ def calculate_enterprise_summary(organization_id: UUID | None = None):
         "var_99_lakh": round(mc["var_99"] / 100_000, 2),
         "mean_annual_loss_inr": mc["mean_annual_loss"],
         "tail_value_at_risk_95_inr": mc["tail_value_at_risk_95"],
+        "monte_carlo_methodology": mc["simulation"],
+        "financial_methodology": {
+            "formula": "EAL = sourced annual incident probability × loss magnitude",
+            "kev_model_use": "prioritization only; excluded from EAL",
+            "frequency_source": "latest unexpired organization assessment per finding",
+        },
         "top_risk": risks[0] if risks else None,
         "asset_risk_aggregation": asset_risks,
     }

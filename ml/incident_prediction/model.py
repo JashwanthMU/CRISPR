@@ -4,7 +4,7 @@ Replaces rule-based V1 (ml/incident_prediction/model.py)
 
 Two models:
   final_model      - uncalibrated XGBoost (for CVE ranking)
-  calibrated_model - Platt-scaled (for ₹ EAL calculation)
+  calibrated_model - Platt-scaled KEV-membership score for prioritization
 
 Authors: Jashwanth M U (@JashwanthMU) and Christ Michael Jeniston S (@Kira-007)
 """
@@ -359,7 +359,7 @@ def predict_incident(
     privileges_required:   int   = -1,
     user_interaction:      int   = -1,
     scope:                 int   = -1,
-    use_calibrated:        bool  = True,  # True for ₹ EAL; False for ranking
+    use_calibrated:        bool  = True,  # Calibrated KEV score; never direct EAL frequency
     explain:               bool  = False,  # True to compute per-prediction SHAP (slower)
 ) -> dict:
     """
@@ -460,9 +460,8 @@ def predict_incident(
             prob  = float(model_to_use.predict_proba(X_arr)[0][1])
 
             if use_calibrated:
-                # Calibrated probability feeds directly into EAL (rupees), so
-                # a 0.02 floor would inflate a genuinely near-zero-risk
-                # finding's dollar exposure by up to ~33x (0.0006 -> 0.02).
+                # Preserve calibrated KEV membership without a fabricated
+                # floor. Financial EAL uses separate frequency evidence.
                 # Preserve genuine zero/one probabilities. A non-zero floor
                 # manufactures financial exposure and is not statistically
                 # justified by the trained artifact.

@@ -19,6 +19,8 @@ ASSUMPTIONS = {
     "finding_dependence": "independent",
     "loss_counting": "one loss magnitude per asset incident",
     "monte_carlo_seed": 42,
+    "frequency_semantics": "latest unexpired organization-supplied annual incident probability",
+    "kev_model_use": "prioritization only; excluded from EAL",
 }
 
 
@@ -42,7 +44,15 @@ def _canonical_inputs(organization_id: UUID) -> dict:
                WHERE organization_id=%s AND data_origin=%s ORDER BY asset_id""",
             (organization_id, origin),
         ).fetchall()
-    return {"assets": assets, "findings": findings, "control_postures": postures}
+        frequencies = db.execute(
+            """SELECT assessment_id,finding_id,annual_incident_probability,methodology,
+                      evidence_reference,source_name,confidence,observed_at,valid_until,created_at
+               FROM incident_frequency_assessments WHERE organization_id=%s
+               ORDER BY finding_id,observed_at,created_at""",
+            (organization_id,),
+        ).fetchall()
+    return {"assets": assets, "findings": findings, "control_postures": postures,
+            "incident_frequency_assessments": frequencies}
 
 
 def _hash_inputs(inputs: dict) -> str:
@@ -62,6 +72,7 @@ def run_and_persist_analysis(organization_id: UUID, requested_by: UUID | None = 
         "asset_ids": [row["asset_id"] for row in inputs["assets"]],
         "finding_ids": [row["finding_id"] for row in inputs["findings"]],
         "control_posture_asset_ids": [row["asset_id"] for row in inputs["control_postures"]],
+        "frequency_assessment_ids": [str(row["assessment_id"]) for row in inputs["incident_frequency_assessments"]],
         "input_hash_algorithm": "SHA-256 over canonical persisted input records",
     }
     result = {

@@ -10,9 +10,11 @@ from pydantic import BaseModel, Field, ValidationError
 from backend.app.auth import AuthUser, require_security
 from backend.connectors.nvd import ExternalVulnerabilityDataError, NVDClient
 from backend.data_access import demo_mode_enabled, load_assets, load_findings
+from backend.database.connection import get_connection
+from backend.services.audit import record_audit_event
 from backend.ingestion.store import (
     ingestion_status, refresh_demo_sources, upsert_assets,
-    upsert_control_postures, upsert_findings,
+    upsert_control_postures, upsert_findings, insert_frequency_assessments,
 )
 
 
@@ -52,6 +54,11 @@ class LiveAsset(BaseModel):
     is_regulated: bool
     value_inr: float = Field(ge=0)
     downtime_cost_per_hour_inr: float = Field(ge=0)
+    expected_downtime_hours: float = Field(ge=0)
+    incident_response_cost_inr: float = Field(ge=0)
+    recovery_cost_inr: float = Field(ge=0)
+    data_breach_exposure_inr: float = Field(ge=0)
+    reputation_exposure_inr: float = Field(ge=0)
     regulatory_exposure_inr: float = Field(ge=0)
 
 
@@ -75,6 +82,24 @@ class ControlPostureIngestionRequest(BaseModel):
     source_name: str = Field(min_length=2, max_length=120)
     observed_at: datetime
     postures: list[ControlPosture] = Field(min_length=1, max_length=10000)
+
+
+class IncidentFrequencyAssessment(BaseModel):
+    finding_id: str = Field(min_length=1, max_length=64)
+    annual_incident_probability: float = Field(ge=0, le=1)
+    methodology: str = Field(min_length=3, max_length=160)
+    evidence_reference: str = Field(
+        min_length=3, max_length=1000,
+        description="Audit reference, report ID, or URL supporting the estimate",
+    )
+    confidence: float = Field(ge=0, le=1)
+    observed_at: datetime
+    valid_until: datetime
+
+
+class FrequencyIngestionRequest(BaseModel):
+    source_name: str = Field(min_length=2, max_length=120)
+    assessments: list[IncidentFrequencyAssessment] = Field(min_length=1, max_length=10000)
 
 
 @router.get("/status")
@@ -146,6 +171,59 @@ def ingest_live_control_postures(
         "data_origin": "LIVE",
         "source_name": body.source_name,
     }
+
+
+@router.post("/incident-frequencies", status_code=201)
+def ingest_incident_frequencies(
+    body: FrequencyIngestionRequest,
+    user: AuthUser = Depends(require_security),
+) -> dict:
+    """Ingest auditable annual probabilities; KEV scores are never accepted here."""
+    if demo_mode_enabled():
+        raise HTTPException(status_code=409, detail="Frequency ingestion requires CRISPR_DATA_MODE=live")
+    for row in body.assessments:
+        if row.valid_until <= row.observed_at:
+            raise HTTPException(status_code=422, detail=f"valid_until must follow observed_at for {row.finding_id}")
+    known = {
+        finding["finding_id"]
+        for finding in load_findings("VULNERABILITY_SCANNER", organization_id=user.organization_id)
+    }
+    unknown = sorted({row.finding_id for row in body.assessments} - known)
+    if unknown:
+        raise HTTPException(status_code=422, detail={"error": "Unknown LIVE findings", "finding_ids": unknown})
+    records = [row.model_dump() for row in body.assessments]
+    ingested = insert_frequency_assessments(
+        records, body.source_name, user.organization_id, user.user_id
+    )
+    record_audit_event(
+        user.organization_id, user.user_id, "incident_frequency.ingested",
+        "incident_frequency_assessment", body.source_name,
+        {"finding_ids": [row.finding_id for row in body.assessments], "count": ingested},
+    )
+    return {
+        "ingested": ingested,
+        "data_origin": "LIVE",
+        "source_name": body.source_name,
+        "probability_semantics": "annual incident probability supplied by organization evidence",
+    }
+
+
+@router.get("/incident-frequencies")
+def list_incident_frequencies(
+    current_only: bool = Query(True),
+    user: AuthUser = Depends(require_security),
+) -> dict:
+    condition = "AND observed_at <= NOW() AND valid_until > NOW()" if current_only else ""
+    with get_connection() as db:
+        rows = db.execute(
+            f"""SELECT assessment_id,finding_id,annual_incident_probability,methodology,
+                       evidence_reference,source_name,confidence,observed_at,valid_until,created_at
+                FROM incident_frequency_assessments
+                WHERE organization_id=%s {condition}
+                ORDER BY observed_at DESC,created_at DESC""",
+            (user.organization_id,),
+        ).fetchall()
+    return {"assessments": rows, "count": len(rows), "current_only": current_only}
 
 
 @router.post("/refresh")
