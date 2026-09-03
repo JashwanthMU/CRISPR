@@ -21,6 +21,9 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_ENABLED=${LLM_ENABLED:-false}
       - CRISPR_DATA_MODE=${CRISPR_DATA_MODE:-live}
+      - NVD_API_KEY=${NVD_API_KEY:-}
+      - NVD_USER_AGENT=${NVD_USER_AGENT:-CRISPR-risk-platform/1.0}
+      - NVD_REQUEST_INTERVAL_SECONDS=${NVD_REQUEST_INTERVAL_SECONDS:-}
     depends_on:
       db:
         condition: service_healthy

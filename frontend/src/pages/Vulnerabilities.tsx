@@ -30,23 +30,25 @@ export default function Vulnerabilities() {
 
   const critical = vulns?.filter((v) => v.severity === 'CRITICAL').length ?? 0;
   const exploitable = vulns?.filter((v) => v.exploitAvailable).length ?? 0;
+  const patchDataKnown = vulns?.filter((v) => v.patchAvailable != null).length ?? 0;
+  const patchDataPct = vulns?.length ? Math.round((patchDataKnown / vulns.length) * 100) : 0;
 
   const columns: ColumnDef<Vulnerability>[] = [
     { key: 'severity', header: 'Severity', sortValue: (v) => v.severity, render: (v) => <SeverityBadge severity={v.severity} /> },
     { key: 'cve', header: 'CVE', sortValue: (v) => v.cve, render: (v) => <span style={{ fontFamily: 'monospace' }}>{v.cve}</span> },
-    { key: 'cvss', header: 'CVSS', sortValue: (v) => v.cvss, render: (v) => v.cvss.toFixed(1) },
+    { key: 'cvss', header: 'CVSS', sortValue: (v) => v.cvss ?? -1, render: (v) => v.cvss == null ? 'Unknown' : v.cvss.toFixed(1) },
     { key: 'component', header: 'Affected Asset', sortValue: (v) => v.component, render: (v) => v.component },
     {
       key: 'exploit',
-      header: 'Exploit Available',
-      sortValue: (v) => (v.exploitAvailable ? 1 : 0),
-      render: (v) => (v.exploitAvailable ? <span style={{ color: 'var(--sev-critical)', fontWeight: 700 }}>Yes</span> : <span style={{ color: 'var(--text-muted)' }}>No</span>),
+      header: 'Exploited in Wild',
+      sortValue: (v) => v.exploitAvailable == null ? -1 : (v.exploitAvailable ? 1 : 0),
+      render: (v) => v.exploitAvailable == null ? <span style={{ color: 'var(--text-muted)' }}>Unknown</span> : (v.exploitAvailable ? <span style={{ color: 'var(--sev-critical)', fontWeight: 700 }}>Yes</span> : <span style={{ color: 'var(--text-muted)' }}>No</span>),
     },
     {
       key: 'patch',
       header: 'Patch Available',
-      sortValue: (v) => (v.patchAvailable ? 1 : 0),
-      render: (v) => (v.patchAvailable ? <span style={{ color: 'var(--sev-low)', fontWeight: 700 }}>Yes</span> : <span style={{ color: 'var(--text-muted)' }}>No</span>),
+      sortValue: (v) => v.patchAvailable == null ? -1 : (v.patchAvailable ? 1 : 0),
+      render: (v) => v.patchAvailable == null ? <span style={{ color: 'var(--text-muted)' }}>Unknown</span> : (v.patchAvailable ? <span style={{ color: 'var(--sev-low)', fontWeight: 700 }}>Yes</span> : <span style={{ color: 'var(--text-muted)' }}>No</span>),
     },
     { key: 'status', header: 'Status', sortValue: (v) => v.status, render: (v) => v.status },
     {
@@ -82,7 +84,7 @@ export default function Vulnerabilities() {
         <KPICard title="Total Vulnerabilities" value={String(vulns?.length ?? 0)} icon={<Bug size={16} />} accentColor={TOKENS.critical} />
         <KPICard title="Critical" value={String(critical)} subtitle="Require immediate action" accentColor={TOKENS.critical} icon={<Bug size={16} />} />
         <KPICard title="Exploited in the Wild" value={String(exploitable)} subtitle="Active exploitation observed" accentColor={TOKENS.sevHigh} icon={<Bug size={16} />} />
-        <KPICard title="Patch Coverage" value="100%" subtitle="All CVEs have a vendor patch" accentColor={TOKENS.success} icon={<Bug size={16} />} />
+        <KPICard title="Patch Data Known" value={`${patchDataPct}%`} subtitle={`${patchDataKnown}/${vulns?.length ?? 0} findings assessed`} accentColor={TOKENS.success} icon={<Bug size={16} />} />
       </div>
 
       <div className="card">

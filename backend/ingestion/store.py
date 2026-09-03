@@ -30,6 +30,8 @@ def load_json(filename: str) -> list[dict]:
 
 
 def upsert_assets(assets: list[dict], data_origin: str = "LIVE") -> int:
+    if data_origin not in {"LIVE", "DEMO"}:
+        raise ValueError("data_origin must be LIVE or DEMO")
     with get_connection() as connection:
         for asset in assets:
             connection.execute(
@@ -47,6 +49,8 @@ def upsert_assets(assets: list[dict], data_origin: str = "LIVE") -> int:
 
 
 def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
+    if data_origin not in {"LIVE", "DEMO"}:
+        raise ValueError("data_origin must be LIVE or DEMO")
     with get_connection() as connection:
         for finding in findings:
             connection.execute(
@@ -75,6 +79,31 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
                 ),
             )
     return len(findings)
+
+
+def upsert_control_postures(
+    postures: list[dict], source_name: str, observed_at: datetime,
+    data_origin: str = "LIVE",
+) -> int:
+    if data_origin not in {"LIVE", "DEMO"}:
+        raise ValueError("data_origin must be LIVE or DEMO")
+    with get_connection() as connection:
+        for posture in postures:
+            connection.execute(
+                """
+                INSERT INTO control_postures (
+                    asset_id, payload, observed_at, source_name, data_origin
+                ) VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (asset_id) DO UPDATE SET
+                    payload = EXCLUDED.payload,
+                    observed_at = EXCLUDED.observed_at,
+                    source_name = EXCLUDED.source_name,
+                    data_origin = EXCLUDED.data_origin,
+                    updated_at = NOW()
+                """,
+                (posture["asset_id"], Jsonb(posture), observed_at, source_name, data_origin),
+            )
+    return len(postures)
 
 
 def upsert_control_catalog(

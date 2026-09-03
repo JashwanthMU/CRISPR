@@ -69,9 +69,11 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
-  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.findings) ? payload.findings : MOCK_FINDINGS,
-  );
+  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.findings)) return payload.findings;
+    throw new Error('Backend returned an invalid findings payload');
+  });
 }
 
 export function getFinding(id: string): Promise<Finding | undefined> {
@@ -159,11 +161,11 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
       id: finding.finding_id,
       cve: finding.cve!,
       severity: finding.severity,
-      cvss: finding.severity === 'CRITICAL' ? 9.6 : finding.severity === 'HIGH' ? 7.8 : 5.4,
+      cvss: finding.cvss ?? null,
       component: finding.asset_id,
       affectedAssets: [finding.asset_id],
-      exploitAvailable: finding.finding_type === 'ACTIVE_EXPLOITATION' || finding.status === 'VALIDATED',
-      patchAvailable: true,
+      exploitAvailable: finding.exploited_in_wild ?? null,
+      patchAvailable: finding.patch_available ?? null,
       status: finding.status,
     })));
 }
