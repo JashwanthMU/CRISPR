@@ -9,6 +9,16 @@ def test_generic_job_status_is_not_limited_to_risk_analysis_jobs():
     assert "job_type,status,result" in source
 
 
+def test_governance_summary_reads_nested_artifact_integrity_evidence():
+    from backend.app.api.model_governance import _artifact_integrity_passed
+
+    validation = {
+        "evidence": {"checks": {"artifact_integrity": {"status": "PASS"}}}
+    }
+    assert _artifact_integrity_passed(validation) is True
+    assert _artifact_integrity_passed(None) is None
+
+
 def test_shipped_model_artifacts_match_governance_manifest():
     result = verify_artifacts()
     assert result["status"] == "PASS"

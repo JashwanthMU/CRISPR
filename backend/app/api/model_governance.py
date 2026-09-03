@@ -13,6 +13,13 @@ from ml.incident_prediction.model import get_model_info
 router = APIRouter()
 
 
+def _artifact_integrity_passed(validation: dict | None) -> bool | None:
+    if not validation:
+        return None
+    integrity = validation.get("evidence", {}).get("checks", {}).get("artifact_integrity", {})
+    return integrity.get("status") == "PASS"
+
+
 def _enqueue(job_type: str, user: AuthUser) -> dict:
     job_id = uuid4()
     with get_connection() as db:
@@ -42,10 +49,7 @@ def governance_status(user: AuthUser = Depends(require_security)):
     return {
         "summary": {
             "validation_status": validation["status"] if validation else None,
-            "artifact_integrity": (
-                validation["evidence"].get("artifact_integrity", {}).get("status") == "PASS"
-                if validation else None
-            ),
+            "artifact_integrity": _artifact_integrity_passed(validation),
             "prioritization_use": prioritization,
             "direct_eal_use": "NOT_APPROVED",
             "drift_status": drift["status"] if drift else None,
