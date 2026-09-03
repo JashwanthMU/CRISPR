@@ -55,7 +55,7 @@ jobs:
     - name: Run Tests
       run: |
         alembic upgrade head
-        test "$(alembic current | awk '{print $1}')" = "0001_platform_schema"
+        test "$(alembic current | awk '{print $1}')" = "0002_canonical_risk_snapshots"
         python -c "from backend.ingestion.store import refresh_demo_sources; print(refresh_demo_sources())"
         pytest backend/ -q
 

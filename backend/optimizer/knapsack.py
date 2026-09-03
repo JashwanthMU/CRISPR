@@ -15,21 +15,22 @@ DEMO_CONTROLS = [
 # catalogue loader, which requires approved persisted costs in live mode.
 CONTROLS = DEMO_CONTROLS
 
-def get_demo_assets():
-    return load_assets()
+def get_demo_assets(organization_id=None):
+    return load_assets(organization_id=organization_id)
 
 def _greedy_select_with_overlap(
     budget_inr: float,
     assets: list,
     controls: list[dict],
     minimum_marginal_rosi: float = 0.0,
+    organization_id=None,
 ) -> list[dict]:
     remaining_budget = budget_inr
     selected_controls = []
     current_overrides = {}
     
     # Calculate baseline
-    baseline_result = simulate_enterprise(assets, {})
+    baseline_result = simulate_enterprise(assets, {}, organization_id=organization_id)
     current_eal = baseline_result["after_total_eal_inr"]
     
     available = list(controls)
@@ -42,7 +43,7 @@ def _greedy_select_with_overlap(
         for control in available:
             if control["cost_inr"] <= remaining_budget:
                 test_overrides = {**current_overrides, **control["overrides"]}
-                res = simulate_enterprise(assets, test_overrides)
+                res = simulate_enterprise(assets, test_overrides, organization_id=organization_id)
                 new_eal = res["after_total_eal_inr"]
                 reduction = current_eal - new_eal
                 cost = control["cost_inr"]
@@ -70,23 +71,24 @@ def _greedy_select_with_overlap(
             
     return selected_controls
 
-def optimize_budget(budget_inr: float, minimum_marginal_rosi: float = 0.0) -> dict:
+def optimize_budget(budget_inr: float, minimum_marginal_rosi: float = 0.0, organization_id=None) -> dict:
     if budget_inr < 0:
         raise ValueError("budget_inr cannot be negative")
-    assets = get_demo_assets()
-    controls = load_control_catalog()
+    assets = get_demo_assets(organization_id)
+    controls = load_control_catalog(organization_id=organization_id)
     selected = _greedy_select_with_overlap(
         budget_inr,
         assets,
         controls,
         minimum_marginal_rosi=minimum_marginal_rosi,
+        organization_id=organization_id,
     )
     
     spent = sum(c["cost_inr"] for c in selected)
     total_reduction = sum(c.get("risk_reduction_inr", 0) for c in selected)
     rosi = round((total_reduction - spent) / spent, 2) if spent > 0 else 0
     
-    baseline_result = simulate_enterprise(assets, {})
+    baseline_result = simulate_enterprise(assets, {}, organization_id=organization_id)
     baseline_eal = baseline_result["after_total_eal_inr"]
     
     reduction_pct = round(total_reduction / baseline_eal * 100, 1) if baseline_eal else 0

@@ -9,9 +9,9 @@ from backend.data_access import demo_mode_enabled, load_findings
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_eal, calculate_loss_magnitude
 
-def load_scenario_findings() -> dict[str, list[dict]]:
+def load_scenario_findings(organization_id=None) -> dict[str, list[dict]]:
     """Load enriched scanner findings; never invent a finding for an asset."""
-    rows = load_findings("VULNERABILITY_SCANNER")
+    rows = load_findings("VULNERABILITY_SCANNER", organization_id=organization_id)
     findings: dict[str, list[dict]] = {}
     for row in rows:
         if not row.get("asset_id") or row.get("cvss") is None:
@@ -62,7 +62,7 @@ def simulate_scenario(base_controls: dict, overrides: dict, asset: dict, finding
     }
 
 
-def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict | None = None) -> dict:
+def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict | None = None, organization_id=None) -> dict:
     control_overrides = {}
     if overrides.get("implement_mfa") is True or overrides.get("mfa_coverage") is not None:
         control_overrides["mfa_coverage"] = float(overrides.get("mfa_coverage", 1.0))
@@ -88,14 +88,14 @@ def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict |
     if "patch_delay" in overrides or "patch_delay_days" in overrides:
         patch_delay_days = int(overrides.get("patch_delay") or overrides.get("patch_delay_days") or 0)
 
-    findings_by_asset = findings_by_asset if findings_by_asset is not None else load_scenario_findings()
+    findings_by_asset = findings_by_asset if findings_by_asset is not None else load_scenario_findings(organization_id)
     per_asset = []
     before_total = 0
     after_total = 0
     
     for asset in assets:
         aid = asset["asset_id"]
-        base_controls = get_controls_for_asset(aid)
+        base_controls = get_controls_for_asset(aid, organization_id=organization_id)
         asset_findings = findings_by_asset.get(aid)
         if asset_findings is None:
             # Missing telemetry means "not calculated", not a fabricated

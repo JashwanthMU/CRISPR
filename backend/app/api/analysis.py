@@ -1,11 +1,12 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg.types.json import Jsonb
 
 from backend.app.auth import AuthUser, require_security
 from backend.database.connection import get_connection
 from backend.services.audit import record_audit_event
+from backend.services.risk_pipeline import latest_snapshot, list_snapshots
 
 router = APIRouter()
 
@@ -23,7 +24,7 @@ def run_analysis(user: AuthUser = Depends(require_security)):
     return {**row, "started": True}
 
 
-@router.get("/{job_id}")
+@router.get("/jobs/{job_id}")
 def job_status(job_id: str, user: AuthUser = Depends(require_security)):
     with get_connection() as db:
         row = db.execute(
@@ -31,4 +32,24 @@ def job_status(job_id: str, user: AuthUser = Depends(require_security)):
                FROM jobs WHERE organization_id=%s AND job_id=%s AND job_type='risk.analysis'""",
             (user.organization_id, job_id),
         ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
     return row
+
+
+@router.get("/snapshots/latest")
+def current_snapshot(user: AuthUser = Depends(require_security)):
+    row = latest_snapshot(user.organization_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="No completed risk snapshot exists")
+    return row
+
+
+@router.get("/snapshots")
+def snapshot_history(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: AuthUser = Depends(require_security),
+):
+    rows = list_snapshots(user.organization_id, limit, offset)
+    return {"snapshots": rows, "limit": limit, "offset": offset}

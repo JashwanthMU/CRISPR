@@ -138,22 +138,13 @@ def process(job: dict) -> dict:
     if job["job_type"] == "integration.sync":
         return sync_github(job)
     if job["job_type"] == "risk.analysis":
-        from backend.app.api.risks import get_enterprise_summary
-        from ml.incident_prediction.model import get_model_info
+        from backend.services.risk_pipeline import run_and_persist_analysis
 
-        result = get_enterprise_summary()
-        model = get_model_info()
-        snapshot_id = uuid4()
-        with get_connection() as db:
-            db.execute(
-                """INSERT INTO risk_snapshots(snapshot_id,organization_id,model_version,input_version,assumptions,result)
-                   VALUES (%s,%s,%s,%s,%s,%s)""",
-                (snapshot_id, job["organization_id"], model.get("model_version", "unknown"),
-                 datetime.now(timezone.utc).isoformat(),
-                 Jsonb({"aggregation": "independent union per asset", "currency": "INR", "source": "persisted live inputs"}),
-                 Jsonb(result)),
-            )
-        return {"snapshot_id": str(snapshot_id), "summary": result}
+        requested_by = job["payload"].get("requested_by")
+        result = run_and_persist_analysis(
+            job["organization_id"], UUID(requested_by) if requested_by else None
+        )
+        return {"snapshot_id": result["snapshot_id"], "summary": result["enterprise"]}
     if job["job_type"] == "report.generate":
         report_id, report_type = UUID(job["payload"]["report_id"]), job["payload"]["report_type"]
         with get_connection() as db:

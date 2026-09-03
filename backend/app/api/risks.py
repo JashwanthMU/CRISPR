@@ -1,4 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from backend.app.auth import AuthUser, require_security
 from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode
 
 from backend.risk_engine.likelihood import calculate_likelihood
@@ -10,16 +13,16 @@ from ml.incident_prediction.model import predict_from_risk_row
 
 router = APIRouter()
 
-def _load_assets() -> list[dict]:
-    return load_assets()
+def _load_assets(organization_id: UUID | None = None) -> list[dict]:
+    return load_assets(organization_id=organization_id)
 
 
-def _load_risk_inputs() -> list[dict]:
+def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
     """
     Risk cases are derived from real scanner findings (data/demo/vulnerabilities.json),
     not hand-typed numbers. One risk case per CVE/vulnerability finding.
     """
-    findings = load_findings("VULNERABILITY_SCANNER")
+    findings = load_findings("VULNERABILITY_SCANNER", organization_id=organization_id)
     inputs = []
     for f in findings:
         # days_since_published is derived from the real NVD published_date
@@ -71,7 +74,7 @@ def _load_risk_inputs() -> list[dict]:
     return inputs
 
 
-def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
+def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organization_id: UUID | None = None) -> dict:
     asset = next((a for a in assets if a["asset_id"] == inp["asset_id"]), None)
     if asset is None:
         raise HTTPException(status_code=404, detail=f"Asset {inp['asset_id']} not found")
@@ -89,7 +92,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
             f"Finding {inp.get('finding_id')} lacks model inputs: {', '.join(missing_model_fields)}"
         )
 
-    controls = get_controls_for_asset(inp["asset_id"])
+    controls = get_controls_for_asset(inp["asset_id"], organization_id=organization_id)
     ce = calculate_control_effectiveness(controls)
 
     # ── Likelihood: ML model first, rule-based FAIR formula as fallback ──
@@ -190,10 +193,10 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False) -> dict:
     }
 
 
-def _all_risks() -> list[dict]:
-    assets = _load_assets()
-    risk_inputs = _load_risk_inputs()
-    risks = [compute_risk(inp, assets) for inp in risk_inputs]
+def _all_risks(organization_id: UUID | None = None) -> list[dict]:
+    assets = _load_assets(organization_id)
+    risk_inputs = _load_risk_inputs(organization_id)
+    risks = [compute_risk(inp, assets, organization_id=organization_id) for inp in risk_inputs]
     risks.sort(key=lambda x: x["eal_inr"], reverse=True)
     return risks
 
@@ -233,8 +236,9 @@ def _aggregate_asset_risks(risks: list[dict]) -> list[dict]:
 
 
 @router.get("")
-def get_all_risks():
-    risks = _all_risks()
+def get_all_risks(user: AuthUser = Depends(require_security)):
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    risks = _all_risks(organization_id)
     asset_risks = _aggregate_asset_risks(risks)
     total_eal = sum(r["eal_inr"] for r in asset_risks)
     return {
@@ -245,11 +249,10 @@ def get_all_risks():
     }
 
 
-@router.get("/enterprise")
-def get_enterprise_summary():
+def calculate_enterprise_summary(organization_id: UUID | None = None):
     from backend.financial_engine.monte_carlo import run_monte_carlo
     
-    risks = _all_risks()
+    risks = _all_risks(organization_id)
     asset_risks = _aggregate_asset_risks(risks)
     total_eal = sum(r["eal_inr"] for r in asset_risks)
     avg_score = sum(r["risk_score"] for r in risks) / len(risks) if risks else 0
@@ -280,33 +283,42 @@ def get_enterprise_summary():
     }
 
 
+@router.get("/enterprise")
+def get_enterprise_summary(user: AuthUser = Depends(require_security)):
+    # Direct calls are retained for engine unit tests; HTTP calls always
+    # receive an authenticated AuthUser from FastAPI.
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    return calculate_enterprise_summary(organization_id)
+
+
 @router.get("/{asset_id}")
-def get_risk_by_asset(asset_id: str, explain: bool = False):
+def get_risk_by_asset(asset_id: str, explain: bool = False, user: AuthUser = Depends(require_security)):
     """
     explain=true computes per-finding SHAP contributions (slower - only
     used on this single-asset detail view, never on the list endpoint,
     to avoid slowing down /api/risks for every asset on every request).
     """
-    risk_inputs = _load_risk_inputs()
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    risk_inputs = _load_risk_inputs(organization_id)
     matches = [i for i in risk_inputs if i["asset_id"] == asset_id]
     if not matches:
         raise HTTPException(status_code=404, detail=f"No risk case modeled for asset {asset_id}")
-    assets = _load_assets()
-    computed = [compute_risk(inp, assets, explain=explain) for inp in matches]
+    assets = _load_assets(organization_id)
+    computed = [compute_risk(inp, assets, explain=explain, organization_id=organization_id) for inp in matches]
     computed.sort(key=lambda x: x["eal_inr"], reverse=True)
     return computed[0] if len(computed) == 1 else {"asset_id": asset_id, "risk_cases": computed}
 @router.get("/{asset_id}/telemetry-model")
-def get_telemetry_model(asset_id: str, version: str = "v1"):
+def get_telemetry_model(asset_id: str, version: str = "v1", user: AuthUser = Depends(require_security)):
     require_demo_mode("Telemetry risk model")
-    assets = _load_assets()
+    assets = _load_assets(user.organization_id)
     asset = next((a for a in assets if a["asset_id"] == asset_id), None)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
         
-    inputs = _load_risk_inputs()
+    inputs = _load_risk_inputs(user.organization_id)
     findings = [inp for inp in inputs if inp["asset_id"] == asset_id]
     
-    controls = get_controls_for_asset(asset_id)
+    controls = get_controls_for_asset(asset_id, organization_id=user.organization_id)
     
     # Mock telemetry for now, since it's a demo
     telemetry = {

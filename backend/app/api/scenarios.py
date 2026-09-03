@@ -1,6 +1,7 @@
 """Scenario simulation API. Member 5."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.app.auth import AuthUser, require_security
 from typing import Optional
 from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
 from backend.data_access import load_assets
@@ -8,12 +9,12 @@ from backend.data_access import load_assets
 router = APIRouter()
 
 
-def _load_assets() -> list:
-    return load_assets()
+def _load_assets(organization_id=None) -> list:
+    return load_assets(organization_id=organization_id)
 
 
-def _simulate(overrides: dict) -> dict:
-    return simulate_enterprise(_load_assets(), overrides)
+def _simulate(overrides: dict, organization_id=None) -> dict:
+    return simulate_enterprise(_load_assets(organization_id), overrides, organization_id=organization_id)
 
 
 @router.get("")
@@ -24,6 +25,7 @@ def run_scenario(
     edr_expand: Optional[bool] = Query(None),
     patch_delay: Optional[int] = Query(None),
     mfa_coverage: Optional[float] = Query(None),
+    user: AuthUser = Depends(require_security),
 ):
     overrides = {}
     if implement_mfa is not None: overrides["implement_mfa"] = implement_mfa
@@ -32,17 +34,17 @@ def run_scenario(
     if edr_expand is not None: overrides["edr_expand"] = edr_expand
     if patch_delay is not None: overrides["patch_delay"] = patch_delay
     if mfa_coverage is not None: overrides["mfa_coverage"] = mfa_coverage
-    result = _simulate(overrides)
+    result = _simulate(overrides, user.organization_id)
     result["total_eal_inr"] = result["after_total_eal_inr"]
     result["total_eal_lakh"] = result["after_total_eal_lakh"]
     return result
 
 
 @router.get("/presets")
-def list_presets():
+def list_presets(user: AuthUser = Depends(require_security)):
     enriched = []
     for preset in PRESET_SCENARIOS:
-        sim = _simulate(preset["params"])
+        sim = _simulate(preset["params"], user.organization_id)
         cost, reduction = preset["cost_inr"], sim["reduction_inr"]
         if cost > 0 and reduction > 0:
             rosi = round((reduction - cost) / cost, 2)
@@ -69,6 +71,7 @@ def list_presets():
 def compare_scenarios(
     s1: str = Query(..., description='First scenario id: mfa | patch_now | segment | delay_30'),
     s2: str = Query(..., description='Second scenario id: mfa | patch_now | segment | delay_30'),
+    user: AuthUser = Depends(require_security),
 ):
     """Compare two scenarios side by side."""
     p1 = next((p for p in PRESET_SCENARIOS if p["id"] == s1), None)
@@ -81,9 +84,9 @@ def compare_scenarios(
             status_code=404,
             detail={"errors": errors, "available": [p["id"] for p in PRESET_SCENARIOS]},
         )
-    assets = _load_assets()
-    r1 = simulate_enterprise(assets, p1["params"])
-    r2 = simulate_enterprise(assets, p2["params"])
+    assets = _load_assets(user.organization_id)
+    r1 = simulate_enterprise(assets, p1["params"], organization_id=user.organization_id)
+    r2 = simulate_enterprise(assets, p2["params"], organization_id=user.organization_id)
     winner = s1 if r1["reduction_inr"] >= r2["reduction_inr"] else s2
     return {
         "scenario_1": {
@@ -111,7 +114,7 @@ def compare_scenarios(
     }
 
 @router.get("/{scenario_id}")
-def run_preset(scenario_id: str):
+def run_preset(scenario_id: str, user: AuthUser = Depends(require_security)):
     preset = next((p for p in PRESET_SCENARIOS if p["id"] == scenario_id), None)
     if not preset:
         raise HTTPException(
@@ -121,5 +124,5 @@ def run_preset(scenario_id: str):
                 "available": [p["id"] for p in PRESET_SCENARIOS],
             },
         )
-    result = _simulate(preset["params"])
+    result = _simulate(preset["params"], user.organization_id)
     return {"scenario": preset, **result}

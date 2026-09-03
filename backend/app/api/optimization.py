@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from backend.app.auth import AuthUser, require_security
 from pydantic import BaseModel, Field
 from typing import Optional
 from backend.optimizer.knapsack import optimize_budget
@@ -36,21 +37,21 @@ class ControlCatalogueInput(BaseModel):
 
 
 @router.post("")
-def optimize(body: OptimizeRequest):
+def optimize(body: OptimizeRequest, user: AuthUser = Depends(require_security)):
     budget = body.budget_inr or body.budget or 10_000_000
-    return optimize_budget(float(budget), body.minimum_marginal_rosi)
+    return optimize_budget(float(budget), body.minimum_marginal_rosi, user.organization_id)
 
 
 @router.get("")
-def optimize_get(budget: float = Query(10_000_000)):
-    return optimize_budget(float(budget))
+def optimize_get(budget: float = Query(10_000_000), user: AuthUser = Depends(require_security)):
+    return optimize_budget(float(budget), organization_id=user.organization_id)
 
 
-def _get_controls_with_reduction():
-    assets = _load_assets()
+def _get_controls_with_reduction(organization_id=None):
+    assets = _load_assets(organization_id)
     controls_with_reduction = []
-    for c in load_control_catalog():
-        res = simulate_enterprise(assets, c.get("overrides", {}))
+    for c in load_control_catalog(organization_id=organization_id):
+        res = simulate_enterprise(assets, c.get("overrides", {}), organization_id=organization_id)
         c_copy = dict(c)
         c_copy["risk_reduction_inr"] = res["reduction_inr"]
         controls_with_reduction.append(c_copy)
@@ -58,8 +59,8 @@ def _get_controls_with_reduction():
 
 
 @router.get("/controls")
-def list_controls():
-    controls_with_reduction = _get_controls_with_reduction()
+def list_controls(user: AuthUser = Depends(require_security)):
+    controls_with_reduction = _get_controls_with_reduction(user.organization_id)
     return {
         "controls": controls_with_reduction,
         "count": len(controls_with_reduction),
@@ -69,13 +70,14 @@ def list_controls():
 
 
 @router.post("/controls", status_code=201)
-def replace_controls(body: ControlCatalogueInput):
+def replace_controls(body: ControlCatalogueInput, user: AuthUser = Depends(require_security)):
     controls = [control.model_dump() for control in body.controls]
     count = upsert_control_catalog(
         controls,
         source_name=body.source_name,
         observed_at=body.observed_at,
         data_origin="LIVE",
+        organization_id=user.organization_id,
     )
     return {
         "ingested": count,
@@ -86,9 +88,9 @@ def replace_controls(body: ControlCatalogueInput):
 
 
 @router.get('/recommend')
-def recommend_quick_wins():
+def recommend_quick_wins(user: AuthUser = Depends(require_security)):
     """Top 3 quick wins under 50L budget — for dashboard cards."""
-    controls_with_reduction = _get_controls_with_reduction()
+    controls_with_reduction = _get_controls_with_reduction(user.organization_id)
     quick_wins = [c for c in controls_with_reduction if c['cost_inr'] <= 5_000_000]
     ranked = sorted(quick_wins, key=lambda c: c['risk_reduction_inr'] / c['cost_inr'], reverse=True)[:3]
     return {

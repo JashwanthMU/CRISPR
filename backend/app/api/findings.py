@@ -2,7 +2,8 @@
 
 from collections import Counter, defaultdict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.app.auth import AuthUser, require_security
 
 from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
 from backend.connectors.cmdb.connector import get_source_info as get_cmdb_info
@@ -14,7 +15,7 @@ from backend.connectors.siem.connector import fetch_findings as fetch_siem
 from backend.connectors.threat_intel.connector import fetch_findings as fetch_threat_intel
 from backend.connectors.vulnerability_scanner.connector import fetch_findings as fetch_vulns
 from backend.connectors.xdr.connector import fetch_findings as fetch_xdr
-from backend.data_access import LiveDataUnavailable
+from backend.data_access import LiveDataUnavailable, load_findings
 
 
 router = APIRouter()
@@ -29,7 +30,9 @@ CONNECTORS = (
     fetch_cspm,
 )
 
-def load_all_findings() -> list[dict]:
+def load_all_findings(organization_id=None) -> list[dict]:
+    if organization_id is not None:
+        return load_findings(organization_id=organization_id)
     findings: list[dict] = []
     unavailable: list[str] = []
     for fetch in CONNECTORS:
@@ -48,8 +51,9 @@ def load_all_findings() -> list[dict]:
 def get_all_findings(
     limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0),
     severity: str | None = None, source_type: str | None = None,
+    user: AuthUser = Depends(require_security),
 ) -> dict:
-    findings = load_all_findings()
+    findings = load_all_findings(user.organization_id)
     if severity:
         findings = [row for row in findings if row.get("severity") == severity.upper()]
     if source_type:
@@ -58,8 +62,8 @@ def get_all_findings(
     return {"total": total, "limit": limit, "offset": offset, "findings": findings[offset:offset + limit]}
 
 @router.get("/sources")
-def get_sources() -> list[dict]:
-    counts = Counter(finding["source_type"] for finding in load_all_findings())
+def get_sources(user: AuthUser = Depends(require_security)) -> list[dict]:
+    counts = Counter(finding["source_type"] for finding in load_all_findings(user.organization_id))
     source_info = {
         source: {"source": source, "count": count, "status": "connected"}
         for source, count in counts.items()
@@ -69,9 +73,9 @@ def get_sources() -> list[dict]:
     return [source_info[source] for source in sorted(source_info)]
 
 @router.get("/correlate")
-def group_findings_by_asset() -> dict:
+def group_findings_by_asset(user: AuthUser = Depends(require_security)) -> dict:
     grouped: dict[str, list[dict]] = defaultdict(list)
-    for finding in load_all_findings():
+    for finding in load_all_findings(user.organization_id):
         grouped[finding["asset_id"]].append(finding)
     correlations = []
     for asset_id, findings in sorted(grouped.items()):
@@ -86,17 +90,17 @@ def group_findings_by_asset() -> dict:
     return {"total_assets": len(correlations), "correlations": correlations}
 
 @router.get("/asset/{asset_id}")
-def get_findings_by_asset(asset_id: str) -> list[dict]:
+def get_findings_by_asset(asset_id: str, user: AuthUser = Depends(require_security)) -> list[dict]:
     return [
         finding
-        for finding in load_all_findings()
+        for finding in load_all_findings(user.organization_id)
         if finding.get("asset_id") == asset_id
     ]
 
 
 @router.get("/{finding_id}")
-def get_finding(finding_id: str) -> dict:
-    finding = next((row for row in load_all_findings() if row.get("finding_id") == finding_id), None)
+def get_finding(finding_id: str, user: AuthUser = Depends(require_security)) -> dict:
+    finding = next((row for row in load_all_findings(user.organization_id) if row.get("finding_id") == finding_id), None)
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
     return finding

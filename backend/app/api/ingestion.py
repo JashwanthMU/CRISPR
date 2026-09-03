@@ -79,9 +79,9 @@ class ControlPostureIngestionRequest(BaseModel):
 
 @router.get("/status")
 def get_ingestion_status(
-    _: AuthUser = Depends(require_security),
+    user: AuthUser = Depends(require_security),
 ) -> dict:
-    sources = ingestion_status()
+    sources = ingestion_status(user.organization_id)
     return {"total_sources": len(sources), "sources": sources}
 
 
@@ -106,7 +106,7 @@ def global_nvd_feed(
 @router.post("/assets", status_code=201)
 def ingest_live_assets(
     body: AssetIngestionRequest,
-    _: AuthUser = Depends(require_security),
+    user: AuthUser = Depends(require_security),
 ) -> dict:
     if demo_mode_enabled():
         raise HTTPException(status_code=409, detail="Live asset ingestion requires CRISPR_DATA_MODE=live")
@@ -120,7 +120,7 @@ def ingest_live_assets(
         }
         records.append(record)
     return {
-        "ingested": upsert_assets(records, data_origin="LIVE"),
+        "ingested": upsert_assets(records, data_origin="LIVE", organization_id=user.organization_id),
         "data_origin": "LIVE",
         "source_name": body.source_name,
     }
@@ -129,18 +129,19 @@ def ingest_live_assets(
 @router.post("/control-postures", status_code=201)
 def ingest_live_control_postures(
     body: ControlPostureIngestionRequest,
-    _: AuthUser = Depends(require_security),
+    user: AuthUser = Depends(require_security),
 ) -> dict:
     if demo_mode_enabled():
         raise HTTPException(status_code=409, detail="Live control-posture ingestion requires CRISPR_DATA_MODE=live")
-    known_assets = {asset["asset_id"] for asset in load_assets()}
+    known_assets = {asset["asset_id"] for asset in load_assets(user.organization_id)}
     unknown = sorted({row.asset_id for row in body.postures} - known_assets)
     if unknown:
         raise HTTPException(status_code=422, detail={"error": "Unknown LIVE assets", "asset_ids": unknown})
     records = [row.model_dump() for row in body.postures]
     return {
         "ingested": upsert_control_postures(
-            records, body.source_name, body.observed_at, data_origin="LIVE"
+            records, body.source_name, body.observed_at, data_origin="LIVE",
+            organization_id=user.organization_id,
         ),
         "data_origin": "LIVE",
         "source_name": body.source_name,
@@ -164,7 +165,7 @@ def refresh_sources(
 @router.post("/nvd/sync")
 def sync_nvd(
     body: NvdSyncRequest,
-    _: AuthUser = Depends(require_security),
+    user: AuthUser = Depends(require_security),
 ) -> dict:
     """Enrich explicit asset/CVE mappings using current NVD and EPSS data."""
     if demo_mode_enabled():
@@ -172,7 +173,10 @@ def sync_nvd(
             status_code=409,
             detail="NVD sync writes LIVE records; set CRISPR_DATA_MODE=live",
         )
-    assets = {asset["asset_id"] for asset in load_assets()}
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    assets = {asset["asset_id"] for asset in (
+        load_assets(organization_id) if organization_id is not None else load_assets()
+    )}
     unknown_assets = sorted({row.asset_id for row in body.mappings} - assets)
     if unknown_assets:
         raise HTTPException(
@@ -234,7 +238,10 @@ def sync_nvd(
             },
         })
     if findings:
-        upsert_findings(findings, data_origin="LIVE")
+        if organization_id is None:  # compatibility for direct engine tests
+            upsert_findings(findings, data_origin="LIVE")
+        else:
+            upsert_findings(findings, data_origin="LIVE", organization_id=organization_id)
     return {
         "requested_mappings": len(body.mappings),
         "ingested": len(findings),
@@ -258,7 +265,7 @@ def refresh_nvd(
         )
     mappings = []
     mapping_errors = []
-    for finding in load_findings("VULNERABILITY_SCANNER"):
+    for finding in load_findings("VULNERABILITY_SCANNER", organization_id=user.organization_id):
         if not finding.get("cve"):
             continue
         provenance = finding.get("provenance", {})

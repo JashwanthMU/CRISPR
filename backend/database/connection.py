@@ -9,7 +9,7 @@ from urllib.parse import quote_plus
 import psycopg
 from psycopg.rows import dict_row
 
-EXPECTED_SCHEMA_REVISION = "0001_platform_schema"
+EXPECTED_SCHEMA_REVISION = "0002_canonical_risk_snapshots"
 
 
 def _connection_settings() -> str | dict[str, str | int]:

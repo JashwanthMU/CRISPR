@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
@@ -19,6 +20,7 @@ SOURCE_FILES = {
     "IAM": "iam.json",
     "THREAT_INTEL": "threat_intel.json",
 }
+DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 
 def load_json(filename: str) -> list[dict]:
@@ -29,26 +31,27 @@ def load_json(filename: str) -> list[dict]:
         return json.load(file)
 
 
-def upsert_assets(assets: list[dict], data_origin: str = "LIVE") -> int:
+def upsert_assets(assets: list[dict], data_origin: str = "LIVE", organization_id: UUID = DEFAULT_ORGANIZATION_ID) -> int:
     if data_origin not in {"LIVE", "DEMO"}:
         raise ValueError("data_origin must be LIVE or DEMO")
     with get_connection() as connection:
         for asset in assets:
             connection.execute(
                 """
-                INSERT INTO assets (asset_id, payload, data_origin)
-                VALUES (%s, %s, %s)
+                INSERT INTO assets (asset_id, payload, data_origin, organization_id)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (asset_id) DO UPDATE
                 SET payload = EXCLUDED.payload,
                     data_origin = EXCLUDED.data_origin,
+                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
-                (asset["asset_id"], Jsonb(asset), data_origin),
+                (asset["asset_id"], Jsonb(asset), data_origin, organization_id),
             )
     return len(assets)
 
 
-def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
+def upsert_findings(findings: list[dict], data_origin: str = "LIVE", organization_id: UUID = DEFAULT_ORGANIZATION_ID) -> int:
     if data_origin not in {"LIVE", "DEMO"}:
         raise ValueError("data_origin must be LIVE or DEMO")
     with get_connection() as connection:
@@ -57,8 +60,8 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
                 """
                 INSERT INTO findings (
                     finding_id, source_type, source_name, asset_id,
-                    payload, first_seen, data_origin
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    payload, first_seen, data_origin, organization_id, severity, cve, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (finding_id) DO UPDATE SET
                     source_type = EXCLUDED.source_type,
                     source_name = EXCLUDED.source_name,
@@ -66,6 +69,10 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
                     payload = EXCLUDED.payload,
                     first_seen = EXCLUDED.first_seen,
                     data_origin = EXCLUDED.data_origin,
+                    organization_id = EXCLUDED.organization_id,
+                    severity = EXCLUDED.severity,
+                    cve = EXCLUDED.cve,
+                    status = EXCLUDED.status,
                     ingested_at = NOW()
                 """,
                 (
@@ -76,6 +83,10 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
                     Jsonb(finding),
                     finding.get("first_seen"),
                     data_origin,
+                    organization_id,
+                    finding.get("severity"),
+                    finding.get("cve"),
+                    finding.get("status"),
                 ),
             )
     return len(findings)
@@ -83,7 +94,7 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE") -> int:
 
 def upsert_control_postures(
     postures: list[dict], source_name: str, observed_at: datetime,
-    data_origin: str = "LIVE",
+    data_origin: str = "LIVE", organization_id: UUID = DEFAULT_ORGANIZATION_ID,
 ) -> int:
     if data_origin not in {"LIVE", "DEMO"}:
         raise ValueError("data_origin must be LIVE or DEMO")
@@ -92,16 +103,17 @@ def upsert_control_postures(
             connection.execute(
                 """
                 INSERT INTO control_postures (
-                    asset_id, payload, observed_at, source_name, data_origin
-                ) VALUES (%s, %s, %s, %s, %s)
+                    asset_id, payload, observed_at, source_name, data_origin, organization_id
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (asset_id) DO UPDATE SET
                     payload = EXCLUDED.payload,
                     observed_at = EXCLUDED.observed_at,
                     source_name = EXCLUDED.source_name,
                     data_origin = EXCLUDED.data_origin,
+                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
-                (posture["asset_id"], Jsonb(posture), observed_at, source_name, data_origin),
+                (posture["asset_id"], Jsonb(posture), observed_at, source_name, data_origin, organization_id),
             )
     return len(postures)
 
@@ -111,6 +123,7 @@ def upsert_control_catalog(
     source_name: str,
     observed_at: datetime,
     data_origin: str = "LIVE",
+    organization_id: UUID = DEFAULT_ORGANIZATION_ID,
 ) -> int:
     if data_origin not in {"LIVE", "DEMO"}:
         raise ValueError("data_origin must be LIVE or DEMO")
@@ -119,18 +132,19 @@ def upsert_control_catalog(
             connection.execute(
                 """
                 INSERT INTO control_catalog (
-                    control_id, payload, source_name, observed_at, data_origin
-                ) VALUES (%s, %s, %s, %s, %s)
+                    control_id, payload, source_name, observed_at, data_origin, organization_id
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (control_id) DO UPDATE SET
                     payload = EXCLUDED.payload,
                     source_name = EXCLUDED.source_name,
                     observed_at = EXCLUDED.observed_at,
                     data_origin = EXCLUDED.data_origin,
+                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
                 (
                     control["id"], Jsonb(control), source_name,
-                    observed_at, data_origin,
+                    observed_at, data_origin, organization_id,
                 ),
             )
     return len(controls)
@@ -161,15 +175,16 @@ def fetch_findings(source_type: str | None = None) -> list[dict]:
     return [row["payload"] for row in rows]
 
 
-def ingestion_status() -> list[dict]:
+def ingestion_status(organization_id: UUID = DEFAULT_ORGANIZATION_ID) -> list[dict]:
     from backend.data_access import demo_mode_enabled
 
-    where = "" if demo_mode_enabled() else "WHERE data_origin = 'LIVE'"
+    origin = "DEMO" if demo_mode_enabled() else "LIVE"
     with get_connection() as connection:
         rows = connection.execute(
             f"""
             SELECT source_type, COUNT(*) AS count, MAX(ingested_at) AS last_ingested_at
-            FROM findings {where} GROUP BY source_type ORDER BY source_type
-            """
+            FROM findings WHERE data_origin=%s AND organization_id=%s
+            GROUP BY source_type ORDER BY source_type
+            """, (origin, organization_id)
         ).fetchall()
     return rows

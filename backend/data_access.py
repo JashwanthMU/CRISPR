@@ -36,13 +36,19 @@ def _demo_rows(filename: str) -> list[dict]:
         return json.load(source)
 
 
-def load_assets() -> list[dict]:
+def load_assets(organization_id=None) -> list[dict]:
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM assets"
+            conditions, parameters = [], []
             if not demo_mode_enabled():
-                query += " WHERE data_origin = 'LIVE'"
-            rows = connection.execute(query + " ORDER BY asset_id").fetchall()
+                conditions.append("data_origin = 'LIVE'")
+            if organization_id is not None:
+                conditions.append("organization_id = %s")
+                parameters.append(organization_id)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            rows = connection.execute(query + " ORDER BY asset_id", parameters).fetchall()
         if not rows and not demo_mode_enabled():
             raise LiveDataUnavailable("No LIVE assets have been ingested")
         return [row["payload"] for row in rows]
@@ -54,15 +60,18 @@ def load_assets() -> list[dict]:
         raise LiveDataUnavailable("Live asset inventory is unavailable") from error
 
 
-def load_findings(source_type: str | None = None) -> list[dict]:
+def load_findings(source_type: str | None = None, organization_id=None) -> list[dict]:
     query = "SELECT payload FROM findings"
-    parameters = ()
+    parameters = []
     conditions = []
     if not demo_mode_enabled():
         conditions.append("data_origin = 'LIVE'")
     if source_type:
         conditions.append("source_type = %s")
-        parameters = (source_type,)
+        parameters.append(source_type)
+    if organization_id is not None:
+        conditions.append("organization_id = %s")
+        parameters.append(organization_id)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY first_seen DESC NULLS LAST, finding_id"
@@ -95,13 +104,15 @@ def load_findings(source_type: str | None = None) -> list[dict]:
         return result
 
 
-def load_control_posture(asset_id: str) -> dict:
+def load_control_posture(asset_id: str, organization_id=None) -> dict:
     try:
         with get_connection() as connection:
-            row = connection.execute(
-                "SELECT payload FROM control_postures WHERE asset_id = %s AND data_origin = %s",
-                (asset_id, "DEMO" if demo_mode_enabled() else "LIVE"),
-            ).fetchone()
+            query = "SELECT payload FROM control_postures WHERE asset_id = %s AND data_origin = %s"
+            parameters = [asset_id, "DEMO" if demo_mode_enabled() else "LIVE"]
+            if organization_id is not None:
+                query += " AND organization_id = %s"
+                parameters.append(organization_id)
+            row = connection.execute(query, parameters).fetchone()
     except (PsycopgError, RuntimeError) as error:
         if not demo_mode_enabled():
             raise LiveDataUnavailable(
@@ -117,17 +128,16 @@ def load_control_posture(asset_id: str) -> dict:
     raise LiveDataUnavailable(f"No live control posture exists for asset {asset_id}")
 
 
-def load_control_catalog() -> list[dict]:
+def load_control_catalog(organization_id=None) -> list[dict]:
     """Load approved control costs; live mode never uses the demo cost catalogue."""
     try:
         with get_connection() as connection:
-            rows = connection.execute(
-                """
-                SELECT payload FROM control_catalog
-                WHERE data_origin = %s ORDER BY control_id
-                """,
-                ("DEMO" if demo_mode_enabled() else "LIVE",),
-            ).fetchall()
+            query = "SELECT payload FROM control_catalog WHERE data_origin = %s"
+            parameters = ["DEMO" if demo_mode_enabled() else "LIVE"]
+            if organization_id is not None:
+                query += " AND organization_id = %s"
+                parameters.append(organization_id)
+            rows = connection.execute(query + " ORDER BY control_id", parameters).fetchall()
     except (PsycopgError, RuntimeError) as error:
         if not demo_mode_enabled():
             raise LiveDataUnavailable("Approved live control costs are unavailable") from error
