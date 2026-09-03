@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from backend.connectors.bug_bounty.connector import fetch_findings as fetch_bug_bounty
 from backend.connectors.cmdb.connector import get_source_info as get_cmdb_info
@@ -14,6 +14,7 @@ from backend.connectors.siem.connector import fetch_findings as fetch_siem
 from backend.connectors.threat_intel.connector import fetch_findings as fetch_threat_intel
 from backend.connectors.vulnerability_scanner.connector import fetch_findings as fetch_vulns
 from backend.connectors.xdr.connector import fetch_findings as fetch_xdr
+from backend.data_access import LiveDataUnavailable
 
 
 router = APIRouter()
@@ -30,8 +31,17 @@ CONNECTORS = (
 
 def load_all_findings() -> list[dict]:
     findings: list[dict] = []
+    unavailable: list[str] = []
     for fetch in CONNECTORS:
-        findings.extend(fetch())
+        try:
+            findings.extend(fetch())
+        except LiveDataUnavailable as error:
+            # Live sources are independent: an empty Bug Bounty feed must not
+            # hide valid NVD/scanner findings from another connected source.
+            unavailable.append(str(error))
+    if not findings:
+        detail = "; ".join(unavailable) if unavailable else "No live findings have been ingested"
+        raise LiveDataUnavailable(detail)
     return findings
 
 @router.get("")
@@ -74,3 +84,11 @@ def get_findings_by_asset(asset_id: str) -> list[dict]:
         for finding in load_all_findings()
         if finding.get("asset_id") == asset_id
     ]
+
+
+@router.get("/{finding_id}")
+def get_finding(finding_id: str) -> dict:
+    finding = next((row for row in load_all_findings() if row.get("finding_id") == finding_id), None)
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    return finding
