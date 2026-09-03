@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -91,6 +91,40 @@ class NVDClient:
         if len(vulnerabilities) != 1:
             raise ExternalVulnerabilityDataError(f"NVD returned no unique record for {cve_id}")
         return parse_nvd_cve(vulnerabilities[0]["cve"])
+
+    def fetch_recent_cves(
+        self, *, start_index: int = 0, results_per_page: int = 50, days: int = 7
+    ) -> dict[str, Any]:
+        """Fetch a page of globally published CVEs from NVD.
+
+        These records are intelligence only. They are deliberately not written
+        to organizational findings until a scanner/SBOM proves asset impact.
+        """
+        if start_index < 0 or not 1 <= results_per_page <= 200 or not 1 <= days <= 120:
+            raise ValueError("Invalid NVD feed pagination or date window")
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days)
+        nvd_date = lambda value: value.isoformat(timespec="milliseconds")
+        document = self._get_json(
+            NVD_API_URL,
+            {
+                "pubStartDate": nvd_date(start),
+                "pubEndDate": nvd_date(end),
+                "startIndex": str(start_index),
+                "resultsPerPage": str(results_per_page),
+            },
+            apply_nvd_throttle=True,
+        )
+        records = [parse_nvd_cve(row["cve"]) for row in document.get("vulnerabilities", [])]
+        return {
+            "items": records,
+            "total_results": int(document.get("totalResults", len(records))),
+            "start_index": int(document.get("startIndex", start_index)),
+            "results_per_page": int(document.get("resultsPerPage", results_per_page)),
+            "window_days": days,
+            "source": "NVD CVE API 2.0",
+            "fetched_at": end.isoformat(),
+        }
 
     def fetch_epss(self, cve_ids: list[str]) -> dict[str, dict[str, float]]:
         output: dict[str, dict[str, float]] = {}

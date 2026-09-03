@@ -4,7 +4,7 @@ from datetime import date, datetime
 from hashlib import sha256
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.app.auth import AuthUser, require_security
@@ -83,6 +83,24 @@ def get_ingestion_status(
 ) -> dict:
     sources = ingestion_status()
     return {"total_sources": len(sources), "sources": sources}
+
+
+@router.get("/nvd/feed")
+def global_nvd_feed(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    days: int = Query(7, ge=1, le=120),
+    _: AuthUser = Depends(require_security),
+) -> dict:
+    """Read-only global NVD feed; records are not organizational findings."""
+    try:
+        return NVDClient().fetch_recent_cves(
+            start_index=(page - 1) * page_size,
+            results_per_page=page_size,
+            days=days,
+        )
+    except (ExternalVulnerabilityDataError, ValueError) as error:
+        raise HTTPException(status_code=502, detail=f"NVD feed request failed: {error}") from error
 
 
 @router.post("/assets", status_code=201)

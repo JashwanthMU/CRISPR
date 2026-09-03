@@ -59,6 +59,29 @@ def test_nvd_client_sends_key_as_header(monkeypatch):
     assert seen["api_key"] == "secret-key"
 
 
+def test_recent_global_feed_is_paginated_and_not_asset_mapped(monkeypatch):
+    client = NVDClient()
+    captured = {}
+
+    def fake_get(url, params, *, apply_nvd_throttle=False):
+        captured.update(params)
+        return {
+            "totalResults": 501,
+            "startIndex": 50,
+            "resultsPerPage": 50,
+            "vulnerabilities": [{"cve": SAMPLE_CVE}],
+        }
+
+    monkeypatch.setattr(client, "_get_json", fake_get)
+    result = client.fetch_recent_cves(start_index=50, results_per_page=50, days=7)
+    assert result["total_results"] == 501
+    assert result["items"][0]["cve"] == "CVE-2024-9999"
+    assert "asset_id" not in result["items"][0]
+    assert captured["startIndex"] == "50"
+    assert captured["resultsPerPage"] == "50"
+    assert captured["pubStartDate"] < captured["pubEndDate"]
+
+
 def test_missing_cvss_is_not_fabricated():
     record = {key: value for key, value in SAMPLE_CVE.items() if key != "metrics"}
     row = parse_nvd_cve(record)
