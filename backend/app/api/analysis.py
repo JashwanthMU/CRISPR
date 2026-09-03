@@ -28,12 +28,13 @@ def run_analysis(user: AuthUser = Depends(require_security)):
 def job_status(job_id: str, user: AuthUser = Depends(require_security)):
     with get_connection() as db:
         row = db.execute(
-            """SELECT job_id AS id,status,result,error,attempts,created_at,started_at,completed_at
-               FROM jobs WHERE organization_id=%s AND job_id=%s AND job_type='risk.analysis'""",
+            """SELECT job_id AS id,job_type,status,result,error,attempts,
+                      created_at,started_at,completed_at
+               FROM jobs WHERE organization_id=%s AND job_id=%s""",
             (user.organization_id, job_id),
         ).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Analysis job not found")
+        raise HTTPException(status_code=404, detail="Job not found")
     return row
 
 

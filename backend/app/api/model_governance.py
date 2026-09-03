@@ -38,12 +38,24 @@ def governance_status(user: AuthUser = Depends(require_security)):
                FROM model_drift_reports WHERE organization_id=%s ORDER BY created_at DESC LIMIT 1""",
             (user.organization_id,),
         ).fetchone()
+    prioritization = "APPROVED" if validation and validation["status"] == "PASS" else "PENDING_VALIDATION"
     return {
+        "summary": {
+            "validation_status": validation["status"] if validation else None,
+            "artifact_integrity": (
+                validation["evidence"].get("artifact_integrity", {}).get("status") == "PASS"
+                if validation else None
+            ),
+            "prioritization_use": prioritization,
+            "direct_eal_use": "NOT_APPROVED",
+            "drift_status": drift["status"] if drift else None,
+            "model_version": validation["model_version"] if validation else get_model_info().get("model_version"),
+        },
         "model": get_model_info(),
         "latest_validation": validation,
         "latest_drift_report": drift,
         "approval": {
-            "prioritization": "APPROVED" if validation and validation["status"] == "PASS" else "PENDING_VALIDATION",
+            "prioritization": prioritization,
             "direct_eal_probability": "NOT_APPROVED",
             "reason": "The trained target is CISA KEV membership, not annual incident frequency.",
         },

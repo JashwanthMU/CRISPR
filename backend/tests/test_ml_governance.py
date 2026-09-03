@@ -1,6 +1,14 @@
 from ml.incident_prediction.governance import assess_live_data, validate_runtime, verify_artifacts
 
 
+def test_generic_job_status_is_not_limited_to_risk_analysis_jobs():
+    from pathlib import Path
+
+    source = Path("backend/app/api/analysis.py").read_text()
+    assert "job_type='risk.analysis'" not in source
+    assert "job_type,status,result" in source
+
+
 def test_shipped_model_artifacts_match_governance_manifest():
     result = verify_artifacts()
     assert result["status"] == "PASS"
