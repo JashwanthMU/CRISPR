@@ -29,6 +29,7 @@ from backend.app.api import (
     sca,
     audit,
     analysis,
+    model_governance,
 )
 from backend.database.connection import database_ready, schema_revision
 from backend.ingestion.store import refresh_demo_sources
@@ -108,6 +109,7 @@ app.include_router(repositories.router, prefix="/api/repositories",   tags=["Rep
 app.include_router(sca.router,          prefix="/api/sca",            tags=["SCA"], dependencies=security_only)
 app.include_router(audit.router,        prefix="/api/audit-events",   tags=["Audit"], dependencies=security_only)
 app.include_router(analysis.router,     prefix="/api/analysis",       tags=["Analysis"], dependencies=security_only)
+app.include_router(model_governance.router, prefix="/api/model-governance", tags=["Model Governance"], dependencies=security_only)
 
 # Versioned aliases allow clients to migrate without breaking the existing UI.
 for api_router, path, tag, dependencies in (
@@ -133,6 +135,7 @@ for api_router, path, tag, dependencies in (
     (sca.router, "/sca", "SCA", security_only),
     (audit.router, "/audit-events", "Audit", security_only),
     (analysis.router, "/analysis", "Analysis", security_only),
+    (model_governance.router, "/model-governance", "Model Governance", security_only),
 ):
     app.include_router(
         api_router, prefix=f"/api/v1{path}", tags=[f"v1 {tag}"], dependencies=dependencies

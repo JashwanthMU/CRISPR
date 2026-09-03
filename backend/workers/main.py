@@ -145,6 +145,40 @@ def process(job: dict) -> dict:
             job["organization_id"], UUID(requested_by) if requested_by else None
         )
         return {"snapshot_id": result["snapshot_id"], "summary": result["enterprise"]}
+    if job["job_type"] == "model.validation":
+        from ml.incident_prediction.governance import validate_runtime
+
+        evidence = validate_runtime()
+        validation_id = uuid4()
+        requested_by = job["payload"].get("requested_by")
+        with get_connection() as db:
+            db.execute(
+                """INSERT INTO model_validation_runs(
+                     validation_id,organization_id,job_id,model_version,validation_type,status,evidence,requested_by)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (validation_id, job["organization_id"], job["job_id"], evidence["model_version"],
+                 evidence["validation_type"], evidence["status"], Jsonb(evidence),
+                 UUID(requested_by) if requested_by else None),
+            )
+        return {"validation_id": str(validation_id), "status": evidence["status"]}
+    if job["job_type"] == "model.drift":
+        from backend.app.api.risks import _load_risk_inputs
+        from ml.incident_prediction.governance import assess_live_data
+        from ml.incident_prediction.model import get_model_info
+
+        model_version = get_model_info().get("model_version", "unknown")
+        evidence = assess_live_data(_load_risk_inputs(job["organization_id"]), model_version)
+        report_id = uuid4()
+        requested_by = job["payload"].get("requested_by")
+        with get_connection() as db:
+            db.execute(
+                """INSERT INTO model_drift_reports(
+                     drift_report_id,organization_id,job_id,model_version,status,evidence,requested_by)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (report_id, job["organization_id"], job["job_id"], model_version,
+                 evidence["status"], Jsonb(evidence), UUID(requested_by) if requested_by else None),
+            )
+        return {"drift_report_id": str(report_id), "status": evidence["status"]}
     if job["job_type"] == "report.generate":
         report_id, report_type = UUID(job["payload"]["report_id"]), job["payload"]["report_type"]
         with get_connection() as db:

@@ -1,6 +1,8 @@
 {
   "algorithm": "sha256",
   "files": {
+    "model_config.json": "2190a3be6be5f01ec21f27cdbe25b77628f15c2ac00dbf8c81a1291a31608aa5",
+    "feature_importance.json": "7945eb90df04bc3ffea0d16d9c4b5d42b74dff21a8b844bf7c33526e0185228b",
     "crispr_xgb_model.json": "cb264f97e3325484c5e2c80b531586d3d4dd6c33929b34e575810141ebaac2c7",
     "crispr_xgb_calibrated.pkl": "f600bf9e91eafbc033f3f272d16a3fa8367889ee68cdd7ff9544588b01749f3c",
     "portable/manifest.json": "dd55306f50f4a2bb486e7e0da6a698d1546f37289e7a99e303636df4ed91ca0c",

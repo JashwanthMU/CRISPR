@@ -18,6 +18,10 @@ still require source data.
 - Optimizer benefits are recomputed after each selected control, and controls
   below the configured marginal ROSI hurdle are not recommended.
 - Monte Carlo ordering and seeded reproducibility invariants.
+- Runtime validation evidence is now persisted by the background worker and
+  available through `/api/model-governance/status`.
+- Model files are checksum-verified before the runtime loads JSON boosters or
+  the legacy pickle.
 
 ## Not independently reproducible yet
 
@@ -30,6 +34,10 @@ still require source data.
 Consequently, no audit should report “79/79” merely because metadata fields or
 files exist. Model-quality metrics become verified only after running evaluation
 against a hash-identified holdout dataset.
+
+The current artifact is approved for CVE prioritization only. Direct EAL use is
+not approved because CISA KEV membership is not an annual incident-frequency
+target. See [MODEL_CARD.md](MODEL_CARD.md).
 
 ## Data-mode guarantee
 

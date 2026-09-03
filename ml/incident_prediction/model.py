@@ -125,7 +125,21 @@ def _load_models():
     manifest_path = portable_dir / "manifest.json"
     config_path   = MODEL_DIR / "model_config.json"
 
-    if xgb_path.exists():
+    checksum_path = MODEL_DIR / "artifact_checksums.json"
+    expected_checksums = {}
+    try:
+        expected_checksums = json.loads(checksum_path.read_text(encoding="utf-8")).get("files", {})
+    except (OSError, ValueError, TypeError):
+        pass
+
+    def integrity_ok(relative_path: str) -> bool:
+        expected = expected_checksums.get(relative_path)
+        path = MODEL_DIR / relative_path
+        if not expected or not path.is_file():
+            return False
+        return hashlib.sha256(path.read_bytes()).hexdigest() == expected
+
+    if integrity_ok("crispr_xgb_model.json"):
         try:
             import xgboost as xgb
             _xgb_model = xgb.XGBClassifier()
@@ -137,7 +151,16 @@ def _load_models():
     # Prefer the portable reconstruction (immune to the pickle
     # cross-platform issue); fall back to the legacy pickle only if the
     # portable artifacts haven't been generated yet.
+    portable_files = ["portable/manifest.json"]
     if manifest_path.exists():
+        try:
+            portable_files.extend(
+                f"portable/{row['booster_file']}"
+                for row in json.loads(manifest_path.read_text(encoding="utf-8")).get("folds", [])
+            )
+        except (OSError, ValueError, TypeError, KeyError):
+            portable_files = []
+    if portable_files and all(integrity_ok(path) for path in portable_files):
         try:
             manifest = json.load(manifest_path.open())
             _calib_model = PortableCalibratedModel(manifest, portable_dir)
@@ -145,7 +168,7 @@ def _load_models():
         except Exception as e:
             print(f"Warning: Portable calibrated model load failed: {e}")
             _calib_model = None
-    elif calib_path.exists():
+    elif integrity_ok("crispr_xgb_calibrated.pkl"):
         try:
             import joblib
             _calib_model = joblib.load(calib_path)
@@ -153,7 +176,7 @@ def _load_models():
             print(f"Warning: Calibrated model load failed: {e}")
             _calib_model = None
 
-    if config_path.exists():
+    if integrity_ok("model_config.json"):
         with config_path.open() as f:
             _config = json.load(f)
         _feature_list = _config.get("features", [])
