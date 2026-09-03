@@ -1,9 +1,16 @@
 """Budget optimizer API. Member 5."""
 
-from fastapi import APIRouter, Query
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query
+from backend.app.auth import AuthUser, require_security
 from pydantic import BaseModel, Field
 from typing import Optional
-from backend.optimizer.knapsack import optimize_budget, CONTROLS
+from backend.optimizer.knapsack import optimize_budget
+from backend.scenario_engine.simulator import simulate_enterprise
+from backend.app.api.risks import _load_assets
+from backend.data_access import load_control_catalog
+from backend.ingestion.store import upsert_control_catalog
 
 router = APIRouter()
 
@@ -11,34 +18,80 @@ router = APIRouter()
 class OptimizeRequest(BaseModel):
     budget_inr: float = Field(..., gt=0)
     budget: Optional[float] = None
+    minimum_marginal_rosi: float = Field(default=0.0, ge=-1.0)
+
+
+class ControlInput(BaseModel):
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_-]+$")
+    name: str = Field(min_length=2, max_length=160)
+    cost_inr: float = Field(gt=0)
+    complexity: str = Field(min_length=2, max_length=40)
+    time_weeks: float = Field(gt=0)
+    overrides: dict[str, bool | int | float]
+
+
+class ControlCatalogueInput(BaseModel):
+    source_name: str = Field(min_length=2, max_length=120)
+    observed_at: datetime
+    controls: list[ControlInput] = Field(min_length=1)
 
 
 @router.post("")
-def optimize(body: OptimizeRequest):
+def optimize(body: OptimizeRequest, user: AuthUser = Depends(require_security)):
     budget = body.budget_inr or body.budget or 10_000_000
-    return optimize_budget(float(budget))
+    return optimize_budget(float(budget), body.minimum_marginal_rosi, user.organization_id)
 
 
 @router.get("")
-def optimize_get(budget: float = Query(10_000_000)):
-    return optimize_budget(float(budget))
+def optimize_get(budget: float = Query(10_000_000), user: AuthUser = Depends(require_security)):
+    return optimize_budget(float(budget), organization_id=user.organization_id)
+
+
+def _get_controls_with_reduction(organization_id=None):
+    assets = _load_assets(organization_id)
+    controls_with_reduction = []
+    for c in load_control_catalog(organization_id=organization_id):
+        res = simulate_enterprise(assets, c.get("overrides", {}), organization_id=organization_id)
+        c_copy = dict(c)
+        c_copy["risk_reduction_inr"] = res["reduction_inr"]
+        controls_with_reduction.append(c_copy)
+    return controls_with_reduction
 
 
 @router.get("/controls")
-def list_controls():
+def list_controls(user: AuthUser = Depends(require_security)):
+    controls_with_reduction = _get_controls_with_reduction(user.organization_id)
     return {
-        "controls": CONTROLS,
-        "count": len(CONTROLS),
-        "total_catalogue_cost_inr": sum(c["cost_inr"] for c in CONTROLS),
-        "total_catalogue_reduction_inr": sum(c["risk_reduction_inr"] for c in CONTROLS),
+        "controls": controls_with_reduction,
+        "count": len(controls_with_reduction),
+        "total_catalogue_cost_inr": sum(c["cost_inr"] for c in controls_with_reduction),
+        "total_catalogue_reduction_inr": sum(c["risk_reduction_inr"] for c in controls_with_reduction),
+    }
+
+
+@router.post("/controls", status_code=201)
+def replace_controls(body: ControlCatalogueInput, user: AuthUser = Depends(require_security)):
+    controls = [control.model_dump() for control in body.controls]
+    count = upsert_control_catalog(
+        controls,
+        source_name=body.source_name,
+        observed_at=body.observed_at,
+        data_origin="LIVE",
+        organization_id=user.organization_id,
+    )
+    return {
+        "ingested": count,
+        "data_origin": "LIVE",
+        "source_name": body.source_name,
+        "observed_at": body.observed_at,
     }
 
 
 @router.get('/recommend')
-def recommend_quick_wins():
+def recommend_quick_wins(user: AuthUser = Depends(require_security)):
     """Top 3 quick wins under 50L budget — for dashboard cards."""
-    from backend.optimizer.knapsack import CONTROLS
-    quick_wins = [c for c in CONTROLS if c['cost_inr'] <= 5_000_000]
+    controls_with_reduction = _get_controls_with_reduction(user.organization_id)
+    quick_wins = [c for c in controls_with_reduction if c['cost_inr'] <= 5_000_000]
     ranked = sorted(quick_wins, key=lambda c: c['risk_reduction_inr'] / c['cost_inr'], reverse=True)[:3]
     return {
         'quick_wins': [

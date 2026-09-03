@@ -72,26 +72,16 @@ The strongest demonstration is the **Authentication API (`A003`)**:
 
 The contrasting **Test Server (`A006`)** has CVSS 9.8 but low business criticality and only **₹3 lakh EAL**, demonstrating that technical severity is not the same as business risk.
 
-Current enterprise demo values:
-
-| Metric | Value |
-|---|---:|
-| Enterprise risk score | 78/100 |
-| Total EAL | ₹1.843 crore |
-| Placeholder P95 VaR | ₹5.8976 crore |
-| Highest risk | Authentication API (`A003`) |
-| Modeled financial risk cases | 5 |
-| Demo assets | 20 |
-| Seed findings | 72 |
-
-Accepted reports from the live bug-bounty portal are added to the seeded finding count.
+Demo figures are calculated from bundled fixtures and are labeled as demo data.
+Live figures are calculated only from persisted, organization-scoped evidence;
+missing evidence produces an explicit error instead of fixture substitution.
 
 ## Implemented Capabilities
 
 ### Data ingestion and connectors
 
 - PostgreSQL-backed, idempotent ingestion for assets and findings.
-- JSON fallback when PostgreSQL is unavailable.
+- Explicit demo-fixture mode; live mode fails closed when PostgreSQL or evidence is unavailable.
 - Connectors for Bug Bounty, Vulnerability Scanner, EDR, XDR, SIEM, IAM, Threat Intelligence, CSPM, and CMDB.
 - Source status, per-asset findings, and cross-source grouping APIs.
 - Accepted live bug-bounty reports become normalized findings automatically.
@@ -109,7 +99,7 @@ Accepted reports from the live bug-bounty portal are added to the seeded finding
 - Deterministic likelihood calculation.
 - India-specific downtime and regulatory cost inputs.
 - Loss breakdown across downtime, incident response, recovery, data breach, regulatory, and reputation costs.
-- Expected Annual Loss and placeholder P95 VaR.
+- Evidence-backed Expected Annual Loss and seeded Monte Carlo P95/P99 VaR.
 - Explainable positive and negative risk drivers.
 
 ### AI and ML
@@ -117,7 +107,7 @@ Accepted reports from the live bug-bounty portal are added to the seeded finding
 - Natural-language intent routing for risk, scenario, optimization, forecast, and anomaly questions.
 - General cybersecurity question answering with bounded model fallbacks.
 - Financial-number guardrail: LLM-generated rupee claims must exist in deterministic engine data.
-- Rule-based incident probability predictor with per-feature contributions.
+- Checksum-verified XGBoost CVE prioritization with governed runtime validation.
 - Isolation Forest detection of unusual failed-login rates.
 - Deterministic 90-day linear EAL forecast.
 - SHAP-style explanation format with a future XGBoost/SHAP integration point.
@@ -187,6 +177,17 @@ The repository has one `docker-compose.yml` that starts the complete stack. Serv
 Both Nginx containers proxy `/api/*` to the backend, so browser deployments can use same-origin API requests.
 
 ## Quick Start with Docker
+
+For a guided, idempotent installation that prompts for required and optional
+credentials, run:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+See [the complete installation walkthrough](docs/SETUP_WALKTHROUGH.md) for
+live-data prerequisites, backup behavior, verification, and troubleshooting.
 
 ### Prerequisites
 
@@ -336,25 +337,29 @@ Loss magnitude = downtime
                + regulatory
                + reputation
 
-EAL = incident likelihood × loss magnitude
-P95 VaR = EAL × 3.2  # prototype placeholder
+EAL = organization-supplied annual incident probability × loss magnitude
+Monte Carlo VaR = percentile of simulated annual portfolio loss
 ```
 
-Regulatory constants include prototype values for DPDP, CERT-In, RBI, and SEBI exposure. The five primary demo risk cases are calibrated to preserve the required hackathon story while the underlying formula outputs are also returned as `model_likelihood`.
+Live loss components and annual frequency must be supplied from approved
+organization evidence. The ML artifact predicts calibrated KEV membership and
+is used for prioritization only; it is excluded from EAL.
 
 ## Scenario and Investment Models
 
-Calibrated enterprise scenario targets:
+Scenario values are recomputed from ingested findings, asset loss inputs, and
+control posture; there are no calibrated target reductions. Missing findings are
+excluded and counted in `calculation_scope`. Patch-delay exposure is compounded
+with the formula returned in each response.
 
-| Scenario | Cost | EAL change |
-|---|---:|---:|
-| Implement MFA | ₹15 lakh | −₹48.6 lakh |
-| Patch immediately | ₹8 lakh | −₹31 lakh |
-| Network segmentation | ₹30 lakh | −₹38.7 lakh |
-| Expand EDR | ₹20 lakh | −₹25 lakh |
-| Delay patching 30 days | ₹0 | +₹21 lakh |
+The optimizer dynamically recomputes marginal loss-exposure reduction after
+each selected control and enforces a configurable minimum marginal ROSI. Control
+costs remain planning assumptions until replaced with approved internal/vendor
+estimates, and the response says so explicitly.
 
-The optimizer maximizes total `risk_reduction_inr` under the supplied budget using binary PuLP variables. If PuLP or CBC fails, it selects controls greedily by risk reduction per rupee.
+Production defaults to `CRISPR_DATA_MODE=live`, which reads only rows marked
+`data_origin=LIVE` and returns HTTP 503 when required data is missing. Set
+`CRISPR_DATA_MODE=demo` only for tests or a clearly labelled presentation.
 
 ## AI Risk Advisor
 
@@ -644,17 +649,21 @@ Before any non-local deployment:
 
 See [`docs/deployment/aws.md`](docs/deployment/aws.md) for the current AWS deployment walkthrough.
 
-## Current Prototype Limitations
+## Current Limitations
 
-- Five financial risk cases are calibrated demo cases rather than dynamically generated from all 20 assets.
-- Asset risk-case correlation currently leaves downstream financial fields as placeholders; the dedicated risk API supplies the calibrated financial cases.
-- VaR uses `EAL × 3.2`; Monte Carlo simulation is not implemented.
-- Incident prediction is rule-based and forecasting is linear; no trained XGBoost model is bundled.
-- Isolation Forest features include deterministic synthetic daily rates derived from SIEM demo signals.
-- CSPM has no bundled demo dataset.
-- Several broad dashboard pages remain fixture-backed as listed above.
-- Main-dashboard authentication and route protection are not yet wired to the existing auth APIs.
-- Production observability, migrations, queues, rate limits, and comprehensive test coverage remain future work.
+- Exact historical ML holdout rows and a training-distribution reference profile
+  are not shipped, so historical metric reproduction and statistical drift remain
+  `NOT_ASSESSABLE`.
+- The XGBoost target is CISA KEV membership; it is approved for prioritization,
+  not direct annual-frequency prediction.
+- Live EAL requires organization-approved frequency and loss evidence for every
+  calculated finding and asset.
+- Scenario control-effect formulas are disclosed planning assumptions and require
+  organization-specific validation before investment decisions.
+- Only the GitHub platform connector currently implements a complete external
+  credential verification and background synchronization workflow.
+- Forecasting remains a deterministic planning projection rather than a trained
+  forecasting model.
 
 ## Team
 

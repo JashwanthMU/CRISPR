@@ -4,10 +4,8 @@
 // Every page/component should import from here, never call axios/fetch
 // directly. In demo mode (default — see API_MODE in client.ts) every
 // function resolves fixture data after a small simulated delay. In live
-// mode, it calls the real backend and — consistent with the rest of this
-// app's "never crash the UI on a missing backend" philosophy — falls back
-// to the same fixtures if the request fails or the endpoint isn't
-// implemented yet.
+// mode, it calls the real backend and propagates failures. Fixture substitution
+// is allowed only in explicitly configured demo mode.
 //
 // Components never need to know which mode is active: they always get back
 // the same shape (see src/types).
@@ -37,17 +35,18 @@ import { runAnalysis as runDemoAnalysis } from '../../demo/demoStore';
 async function liveOrFallback<T>(
   path: string,
   fallback: T,
-  method: 'get' | 'post' = 'get',
+  method: 'get' | 'post' | 'patch' = 'get',
   body?: unknown,
   select: (payload: any) => T = (payload) => payload as T,
 ): Promise<T> {
   if (API_MODE === 'demo') return simulateLatency(fallback);
-  try {
-    const res = method === 'get' ? await httpClient.get(path) : await httpClient.post(path, body);
-    return res?.data == null ? fallback : select(res.data);
-  } catch {
-    return fallback;
-  }
+  const res = method === 'get'
+    ? await httpClient.get(path)
+    : method === 'patch'
+      ? await httpClient.patch(path, body)
+      : await httpClient.post(path, body);
+  if (res?.data == null) throw new Error(`Backend returned no data for ${method.toUpperCase()} ${path}`);
+  return select(res.data);
 }
 
 // ----------------------------------------------------------------------------
@@ -70,9 +69,11 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
-  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.findings) ? payload.findings : MOCK_FINDINGS,
-  );
+  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.findings)) return payload.findings;
+    throw new Error('Backend returned an invalid findings payload');
+  });
 }
 
 export function getFinding(id: string): Promise<Finding | undefined> {
@@ -80,9 +81,11 @@ export function getFinding(id: string): Promise<Finding | undefined> {
 }
 
 export function getSources() {
-  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.sources) ? payload.sources : MOCK_SOURCES,
-  );
+  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.sources)) return payload.sources;
+    throw new Error('Backend returned an invalid sources payload');
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -132,7 +135,20 @@ export function getScaFindings(repositoryName?: string) {
 // Integrations
 // ----------------------------------------------------------------------------
 export function getIntegrations(): Promise<Integration[]> {
-  return liveOrFallback('/api/integrations', INTEGRATIONS);
+  return liveOrFallback('/api/integrations', INTEGRATIONS, 'get', undefined, (payload) => {
+    if (!Array.isArray(payload?.integrations)) throw new Error('Backend returned an invalid integrations payload');
+    return payload.integrations.map((item: any) => ({
+      id: item.id,
+      key: item.provider,
+      name: item.name,
+      category: item.provider === 'github' ? 'sca' : 'vulnerability_scanner',
+      status: ['connected', 'error', 'syncing'].includes(item.status) ? item.status : 'disconnected',
+      lastSync: item.last_sync_at,
+      itemsIngested: item.items_ingested ?? 0,
+      errors: item.last_error ? 1 : 0,
+      description: item.config?.organization ? `GitHub organization: ${item.config.organization}` : 'External platform connection',
+    }));
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -160,11 +176,11 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
       id: finding.finding_id,
       cve: finding.cve!,
       severity: finding.severity,
-      cvss: finding.severity === 'CRITICAL' ? 9.6 : finding.severity === 'HIGH' ? 7.8 : 5.4,
+      cvss: finding.cvss ?? null,
       component: finding.asset_id,
       affectedAssets: [finding.asset_id],
-      exploitAvailable: finding.finding_type === 'ACTIVE_EXPLOITATION' || finding.status === 'VALIDATED',
-      patchAvailable: true,
+      exploitAvailable: finding.exploited_in_wild ?? null,
+      patchAvailable: finding.patch_available ?? null,
       status: finding.status,
     })));
 }
@@ -177,14 +193,9 @@ export async function runAnalysis(): Promise<{ started: boolean }> {
     await runDemoAnalysis();
     return { started: true };
   }
-  try {
-    // /api/analysis/run not implemented — drive demo engine only
-    return { started: true };
-  } catch {
-    // Even in live mode, still drive the visual demo engine so the UI isn't dead.
-    await runDemoAnalysis();
-    return { started: true };
-  }
+  const response = await httpClient.post('/api/analysis/run');
+  if (response?.data?.started !== true) throw new Error('Backend did not accept the analysis job');
+  return response.data;
 }
 
 // ----------------------------------------------------------------------------
@@ -231,4 +242,69 @@ export function getForecast() {
   return liveOrFallback('/api/assistant/forecast', [], 'get', undefined, (p) =>
     Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
   );
+}
+export default httpClient;
+export { httpClient, API_MODE };
+
+// ----------------------------------------------------------------------------
+// Platform Connections — Phase 1 live endpoints
+// ----------------------------------------------------------------------------
+export function getRemediation() {
+  return liveOrFallback("/api/remediation", { items: [], summary: {}, count: 0 }, "get", undefined, (p) => p);
+}
+
+export function updateRemediationStatus(id: string, status: string) {
+  return liveOrFallback(`/api/remediation/${id}`, null, "patch", { status });
+}
+
+export function getRemediationStats() {
+  return liveOrFallback("/api/remediation/stats/summary", {}, "get", undefined, (p) => p);
+}
+
+export function getPolicies() {
+  return liveOrFallback("/api/policies", { policies: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function togglePolicy(id: string) {
+  return liveOrFallback(`/api/policies/${id}/toggle`, null, "patch", {});
+}
+
+export function getLiveIntegrations() {
+  return liveOrFallback("/api/integrations", { integrations: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function reconnectIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/reconnect`, null, "post", {});
+}
+
+export function disableIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/disable`, null, "post", {});
+}
+
+export function getThreatIntel() {
+  return liveOrFallback("/api/threat-intel", { actors: [], campaigns: [] }, "get", undefined, (p) => p);
+}
+
+export function getThreatActors() {
+  return liveOrFallback("/api/threat-intel/actors", [], "get", undefined, (p) =>
+    Array.isArray(p?.actors) ? p.actors : []
+  );
+}
+
+export function getAttackPaths() {
+  return liveOrFallback("/api/attack-paths", [], "get", undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.attack_paths) ? p.attack_paths : []
+  );
+}
+
+export function getSettings() {
+  return liveOrFallback("/api/settings", {}, "get", undefined, (p) => p);
+}
+
+export function updateSettings(data: Record<string, any>) {
+  return liveOrFallback("/api/settings", null, "patch", data);
+}
+
+export function getReport(id: string) {
+  return liveOrFallback(`/api/reports/${id}`, null);
 }

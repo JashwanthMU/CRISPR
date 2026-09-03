@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Inbox, GitPullRequest, UserPlus, CheckCircle2 } from 'lucide-react';
-import { REMEDIATION_SCENARIOS } from '../demo/fixtures';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import OpenPrModal from '../components/codesecurity/OpenPrModal';
 import { formatRupees, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
 import type { RemediationScenario, ScenarioStatus } from '../types';
+import api from '../lib/api';
 
 const STATUS_LABEL: Record<ScenarioStatus, string> = {
   NOT_STARTED: 'Not Started',
@@ -22,17 +22,51 @@ const STATUS_COLOR: Record<ScenarioStatus, string> = {
   RESOLVED: TOKENS.success,
 };
 
+const normalizeItem = (item: any): RemediationScenario => ({
+  ...item,
+  finding: item.finding ?? item.finding_id ?? 'Unlinked finding',
+  affectedResource: item.affectedResource ?? item.asset_id ?? 'Unlinked asset',
+  recommendedFix: item.recommendedFix ?? item.recommended_fix ?? '',
+  estimatedEffort: item.estimatedEffort ?? item.metadata?.estimated_effort ?? 'Not estimated',
+  riskReductionInr: Number(item.riskReductionInr ?? item.risk_reduction_inr ?? 0),
+  repository: item.repository ?? item.metadata?.repository,
+  branch: item.branch ?? item.metadata?.branch,
+});
+
 export default function RemediationQueue() {
-  const [scenarios, setScenarios] = useState<RemediationScenario[]>(REMEDIATION_SCENARIOS.map((s) => ({ ...s })));
+  const [scenarios, setScenarios] = useState<RemediationScenario[]>([]);
   const [prTarget, setPrTarget] = useState<RemediationScenario | null>(null);
 
-  const updateStatus = (id: string, status: ScenarioStatus) => {
-    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+  useEffect(() => {
+    api.get('/api/remediation').then((res) => {
+      setScenarios((res.data.items || []).map(normalizeItem));
+    });
+  }, []);
+
+  const updateStatus = async (id: string, status: ScenarioStatus) => {
+    try {
+      const current = scenarios.find((item) => item.id === id);
+      if (!current) return;
+      const res = await api.patch(`/api/remediation/${id}`, { status, expected_version: current.version ?? 1 });
+      setScenarios((prev) => prev.map((s) => (s.id === id ? normalizeItem(res.data) : s)));
+    } catch (e) {
+      toast.error('Update failed', 'Could not update status');
+    }
   };
 
-  const assign = (s: RemediationScenario) => {
-    toast.success('Assigned', `${s.title} assigned to ${s.owner?.name ?? 'the owning team'}.`);
-    updateStatus(s.id, 'IN_PROGRESS');
+  const assign = async (s: RemediationScenario) => {
+    try {
+      const res = await api.post(`/api/remediation/${s.id}/assign`, {
+        owner_name: 'Current User',
+        owner_initials: 'CU',
+        owner_team: 'Security',
+        expected_version: s.version ?? 1,
+      });
+      setScenarios((prev) => prev.map((item) => (item.id === s.id ? normalizeItem(res.data) : item)));
+      toast.success('Assigned', `${s.title} assigned to you.`);
+    } catch (e) {
+      toast.error('Assignment failed', 'Could not assign issue');
+    }
   };
 
   const markResolved = (s: RemediationScenario) => {

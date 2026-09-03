@@ -95,7 +95,8 @@ PostgreSQL assets + findings
 Refreshes are idempotent: existing IDs are updated and new IDs are inserted.
 The backend performs a refresh during startup. Security-team users can request
 an immediate refresh from the application with **Sync sources** or through the
-API. JSON is used only as connector fallback if PostgreSQL is unavailable.
+API. JSON fallback is available only when `CRISPR_DATA_MODE=demo`; live mode
+returns an error rather than substituting fixture records.
 
 ## Current demo volume
 
@@ -120,10 +121,49 @@ GET  /api/findings/correlate
 GET  /api/findings/asset/{asset_id}
 GET  /api/ingestion/status
 POST /api/ingestion/refresh
+POST /api/ingestion/assets
+POST /api/ingestion/control-postures
+POST /api/ingestion/nvd/sync
+POST /api/ingestion/nvd/refresh
 ```
 
 The ingestion status and refresh endpoints require an authenticated
 security-team bearer token.
+
+## Live NVD ingestion
+
+NVD describes CVEs globally; it does not prove that a CVE affects a particular
+asset. Live ingestion therefore requires an explicit scanner, SBOM, or CMDB
+mapping containing `asset_id`, `cve`, `first_seen`, and `patch_age_days`.
+CRISPR then retrieves CVSS/CWE/vector fields from NVD CVE API 2.0 and current
+EPSS values from FIRST. Records missing inputs required by the deployed model
+are reported as failures and are not replaced with guessed values.
+
+Set `CRISPR_DATA_MODE=live`, `NVD_API_KEY`, and a contact-bearing
+`NVD_USER_AGENT` in `.env`, restart the backend, authenticate, then load assets
+and control postures before calling `/api/ingestion/nvd/sync`. Example mapping:
+
+```json
+{
+  "mappings": [{
+    "asset_id": "payment-api-01",
+    "cve": "CVE-2024-3400",
+    "first_seen": "2026-09-03",
+    "patch_age_days": 2,
+    "patch_available": true,
+    "mapping_source": "Tenable production scan",
+    "confidence": 1.0
+  }],
+  "include_epss": true
+}
+```
+
+Successful rows include retrieval timestamps, source URLs, CVSS source/type,
+and a `provenance.synthetic_fields: []` declaration. Repeating the same
+asset/CVE mapping updates its deterministic finding rather than duplicating it.
+After initial ingestion, `/api/ingestion/nvd/refresh` refreshes NVD and EPSS
+metadata for all mapped live CVEs. Patch age is intentionally retained from
+the scanner record because NVD publication age is not an asset's patch age.
 
 ## Running and inspecting PostgreSQL
 

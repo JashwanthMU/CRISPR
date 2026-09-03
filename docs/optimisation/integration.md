@@ -150,14 +150,9 @@ curl "http://localhost:8000/api/scenarios?patch_delay=30"
 }
 ```
 
-**Key demo numbers (hardcoded for presentation):**
-
-| Scenario | `reduction_lakh` |
-|---|---|
-| MFA | `48.6` |
-| Patch now | `31.0` |
-| Segmentation | `38.7` |
-| Delay 30 days | `-21.0` (risk increases) |
+Scenario numbers are dynamic. Do not copy a fixed rupee reduction into a jury
+report: record the API response together with its data mode, calculation scope,
+model version, and input snapshot.
 
 ---
 

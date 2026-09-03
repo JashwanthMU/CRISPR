@@ -198,10 +198,10 @@ sequenceDiagram
     NORM->>CORR: List[Finding] — validated objects
     CORR->>CORR: Group by asset_id\nCompute confidence = BASE + Σ source_boosts
     CORR->>RISK: RiskCase objects with business_criticality
-    RISK->>RISK: calculate_likelihood(cvss, exploit_in_wild,\npatch_age, internet_facing, CE, threat_intel)
-    RISK->>FIN: likelihood + asset record
+    RISK->>RISK: XGBoost KEV score for CVE prioritization
+    RISK->>FIN: approved annual frequency evidence + asset record
     FIN->>FIN: LM = downtime + IR + recovery\n+ data_breach + regulatory + reputation
-    FIN->>FIN: EAL = likelihood × LM\nVaR = EAL × 3.2
+    FIN->>FIN: EAL = annual incident probability × LM\nVaR = seeded Monte Carlo percentile
     FIN->>AI: risk_cases with eal_inr, var_95_inr
     AI->>AI: route_intent() → keyword match → LLM fallback
     AI->>AI: handler() → fetch live figures from risk tools
@@ -257,9 +257,9 @@ graph TD
     end
 
     subgraph fin["financial_engine/"]
-        LOSS["loss_calculator.py\ncalculate_loss_magnitude(asset)\n\nComponents:\n  downtime_loss = hours × hourly_rate × criticality\n  ir_cost = 300K + criticality×500K\n  recovery_cost = 200K + criticality×600K\n  data_breach = value_inr × 15% (if sensitivity≥4)\n  regulatory = CERT-In + RBI + DPDP×5%\n  reputation = value_inr × 8% × criticality\n\n→ {total_inr, breakdown}"]
+        LOSS["loss_calculator.py\ncalculate_loss_magnitude(asset)\n\nLIVE components supplied by organization:\n  expected downtime × hourly cost\n  incident response\n  recovery\n  data breach exposure\n  expected regulatory exposure\n  reputation exposure\n\n→ {total_inr, breakdown, sources}"]
 
-        EAL_C["calculate_eal(likelihood, loss_magnitude)\n\nEAL = likelihood × loss_magnitude.total_inr\nVaR 95% = EAL × 3.2\nrisk_score = min(likelihood×100 + total_loss/1M, 100)\n\n→ {eal_inr, eal_lakh, var_95_inr, risk_score}"]
+        EAL_C["calculate_eal(annual_probability, loss_magnitude)\n\nEAL = evidenced annual probability × total loss\nPortfolio VaR = seeded Monte Carlo percentile\nKEV score is excluded from EAL\n\n→ {eal_inr, eal_lakh, calculation evidence}"]
     end
 
     subgraph const["constants.py"]
@@ -320,7 +320,7 @@ graph TD
     subgraph sce["scenario_engine/simulator.py"]
         PRE["PRESET_SCENARIOS:\n  mfa — ₹15L cost, ₹48.6L reduction\n  patch_now — ₹8L cost, ₹31L reduction\n  segment — ₹30L cost, ₹38.7L reduction\n  delay_30 — ₹0 cost, −₹21L (increases risk)"]
 
-        CAL["CALIBRATED_IMPACTS dict\nEnsures demo targets are hit exactly\nDistributes reduction per-asset by EAL share"]
+        CAL["Dynamic scenario recomputation\nNo target reductions\nMissing inputs are disclosed"]
 
         SIM["simulate_enterprise(assets, overrides)\n1. Translate overrides → control_overrides\n2. Compute baseline EAL per asset\n3. Apply calibrated impact (if preset)\n4. Return per_asset + enterprise totals"]
 

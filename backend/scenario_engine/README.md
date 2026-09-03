@@ -40,18 +40,19 @@ simulate_enterprise(assets, overrides)
 Enterprise total reduction
 ```
 
-Calibrated demo targets are hard-coded in `CALIBRATED_IMPACTS` so the demo always hits the required numbers regardless of small formula drift across members.
+No scenario target is hard-coded. Reductions are recomputed from the selected
+data mode's findings, assets, loss inputs, and control posture. Assets without a
+finding are excluded and reported in `calculation_scope`.
 
 ---
 
-## Demo targets (must always match)
+## Invariants
 
-| Scenario | EAL Reduction | Cost | ROSI |
-|---|---|---|---|
-| Implement MFA | ₹48.6L | ₹15L | 224% |
-| Patch immediately | ₹31.0L | ₹8L | 288% |
-| Network segmentation | ₹38.7L | ₹30L | 29% |
-| Delay patching 30 days | **−₹21.0L** (risk ↑) | ₹0 | — |
+- Effective controls must not increase modeled exposure.
+- A positive patch delay must increase or maintain exposure.
+- `reduction_inr = before_eal_inr - after_eal_inr` for every asset.
+- Returned likelihood details identify the model component and every explicit
+  environmental/delay multiplier.
 
 ---
 

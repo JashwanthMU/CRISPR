@@ -62,26 +62,26 @@
   "optimal_threshold_reference_only": 0.975,
   "probability_bands": [
     {
-      "min": 0.9,
+      "min": 0.4,
       "max": 1.0,
       "tier": "CRITICAL",
       "action": "Immediate remediation"
     },
     {
-      "min": 0.7,
-      "max": 0.9,
+      "min": 0.2,
+      "max": 0.4,
       "tier": "HIGH",
       "action": "High priority \u2014 schedule within days"
     },
     {
-      "min": 0.4,
-      "max": 0.7,
+      "min": 0.05,
+      "max": 0.2,
       "tier": "MEDIUM",
       "action": "Security review"
     },
     {
       "min": 0.0,
-      "max": 0.4,
+      "max": 0.05,
       "tier": "LOW",
       "action": "Monitor"
     }
@@ -302,6 +302,6 @@
     "ranking_model": "crispr_xgb_model.json (load with xgb.XGBClassifier().load_model())",
     "eal_model": "crispr_xgb_calibrated.pkl (load with joblib.load())",
     "inference_module": "ml/incident_prediction/model.py",
-    "output": "continuous probability 0.02-0.95 + tier label via assign_tier() -- feeds FAIR EAL calculation and priority ranking, not a bare 0/1 classification"
+    "output": "Platt-calibrated KEV-membership likelihood for prioritization plus a separate raw ranking score. This output is not, by itself, an annual incident probability and must not be presented as one."
   }
 }

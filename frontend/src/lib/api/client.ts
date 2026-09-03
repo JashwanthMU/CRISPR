@@ -21,11 +21,11 @@ httpClient.interceptors.response.use(
   (err) => {
     if (err?.response?.status === 401) clearSession();
     console.warn('[api] request failed', err?.message);
-    return Promise.resolve({ data: null });
+    return Promise.reject(err);
   }
 );
 
-/** Live backend by default; set VITE_API_MODE=demo only for an offline presentation. */
+/** Live backend never substitutes fixtures; demo is an explicit offline mode. */
 export const API_MODE: 'demo' | 'live' = ((import.meta as any).env?.VITE_API_MODE === 'demo' ? 'demo' : 'live');
 
 /** Simulated network latency so demo-mode UI still exercises loading states. */

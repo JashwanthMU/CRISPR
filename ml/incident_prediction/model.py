@@ -4,7 +4,7 @@ Replaces rule-based V1 (ml/incident_prediction/model.py)
 
 Two models:
   final_model      - uncalibrated XGBoost (for CVE ranking)
-  calibrated_model - Platt-scaled (for ₹ EAL calculation)
+  calibrated_model - Platt-scaled KEV-membership score for prioritization
 
 Authors: Jashwanth M U (@JashwanthMU) and Christ Michael Jeniston S (@Kira-007)
 """
@@ -12,6 +12,8 @@ Authors: Jashwanth M U (@JashwanthMU) and Christ Michael Jeniston S (@Kira-007)
 from __future__ import annotations
 
 import json
+import math
+import hashlib
 from pathlib import Path
 from typing import Optional
 
@@ -36,10 +38,12 @@ _cert_in_set: Optional[set] = None
 # (e.g. older model artifact). Keep in sync with the training notebook's
 # PROBABILITY_BANDS constant.
 _DEFAULT_BANDS = [
-    {"min": 0.90, "max": 1.00, "tier": "CRITICAL", "action": "Immediate remediation"},
-    {"min": 0.70, "max": 0.90, "tier": "HIGH",      "action": "High priority — schedule within days"},
-    {"min": 0.40, "max": 0.70, "tier": "MEDIUM",    "action": "Security review"},
-    {"min": 0.00, "max": 0.40, "tier": "LOW",       "action": "Monitor"},
+    # These bands are for the Platt-calibrated model output. They are decision
+    # policy thresholds, not claims about CVSS severity or annual loss.
+    {"min": 0.40, "max": 1.00, "tier": "CRITICAL", "action": "Immediate remediation"},
+    {"min": 0.20, "max": 0.40, "tier": "HIGH",      "action": "High priority — schedule within days"},
+    {"min": 0.05, "max": 0.20, "tier": "MEDIUM",    "action": "Security review"},
+    {"min": 0.00, "max": 0.05, "tier": "LOW",       "action": "Monitor"},
 ]
 
 
@@ -121,7 +125,21 @@ def _load_models():
     manifest_path = portable_dir / "manifest.json"
     config_path   = MODEL_DIR / "model_config.json"
 
-    if xgb_path.exists():
+    checksum_path = MODEL_DIR / "artifact_checksums.json"
+    expected_checksums = {}
+    try:
+        expected_checksums = json.loads(checksum_path.read_text(encoding="utf-8")).get("files", {})
+    except (OSError, ValueError, TypeError):
+        pass
+
+    def integrity_ok(relative_path: str) -> bool:
+        expected = expected_checksums.get(relative_path)
+        path = MODEL_DIR / relative_path
+        if not expected or not path.is_file():
+            return False
+        return hashlib.sha256(path.read_bytes()).hexdigest() == expected
+
+    if integrity_ok("crispr_xgb_model.json"):
         try:
             import xgboost as xgb
             _xgb_model = xgb.XGBClassifier()
@@ -133,7 +151,16 @@ def _load_models():
     # Prefer the portable reconstruction (immune to the pickle
     # cross-platform issue); fall back to the legacy pickle only if the
     # portable artifacts haven't been generated yet.
+    portable_files = ["portable/manifest.json"]
     if manifest_path.exists():
+        try:
+            portable_files.extend(
+                f"portable/{row['booster_file']}"
+                for row in json.loads(manifest_path.read_text(encoding="utf-8")).get("folds", [])
+            )
+        except (OSError, ValueError, TypeError, KeyError):
+            portable_files = []
+    if portable_files and all(integrity_ok(path) for path in portable_files):
         try:
             manifest = json.load(manifest_path.open())
             _calib_model = PortableCalibratedModel(manifest, portable_dir)
@@ -141,7 +168,7 @@ def _load_models():
         except Exception as e:
             print(f"Warning: Portable calibrated model load failed: {e}")
             _calib_model = None
-    elif calib_path.exists():
+    elif integrity_ok("crispr_xgb_calibrated.pkl"):
         try:
             import joblib
             _calib_model = joblib.load(calib_path)
@@ -149,7 +176,7 @@ def _load_models():
             print(f"Warning: Calibrated model load failed: {e}")
             _calib_model = None
 
-    if config_path.exists():
+    if integrity_ok("model_config.json"):
         with config_path.open() as f:
             _config = json.load(f)
         _feature_list = _config.get("features", [])
@@ -169,6 +196,12 @@ def assign_tier(probability: float) -> dict:
     Bands come from model_config.json (probability_bands), so retraining or
     re-tuning bands doesn't require a code change here — just re-run Cell 22.
     """
+    if isinstance(probability, bool) or not isinstance(probability, (int, float)):
+        raise TypeError("probability must be a real number")
+    probability = float(probability)
+    if not math.isfinite(probability) or not 0.0 <= probability <= 1.0:
+        raise ValueError("probability must be finite and between 0 and 1")
+    _load_models()
     bands = _probability_bands or _DEFAULT_BANDS
     for band in bands:
         lo, hi = band["min"], band["max"]
@@ -245,16 +278,11 @@ def _build_feature_vector(
 
 
 def _get_shap_explainer():
-    """Lazy-load a SHAP TreeExplainer against fold 0's raw booster.
+    """Lazy-load a SHAP TreeExplainer against the raw ranking booster.
 
-    Using a single fold (not the full 5-fold ensemble) is a deliberate,
-    disclosed simplification: TreeExplainer computes exact Shapley values
-    per-tree, and averaging that across 5 separately-trained boosters would
-    need a bespoke multi-model aggregation, not something shap supports
-    out of the box for a CalibratedClassifierCV-style ensemble. Fold 0's
-    explanation is representative (all 5 folds are trained on the same
-    feature set with the same hyperparameters, just different CV splits)
-    but is not a formal ensemble-averaged explanation.
+    TreeExplainer explains the uncalibrated ranking model. It does not explain
+    the five-fold Platt ensemble's final calibrated probability; that limitation
+    is disclosed in every returned explanation.
     """
     global _shap_explainer
     if _shap_explainer is not None:
@@ -298,8 +326,8 @@ def explain_prediction(feature_dict: dict) -> Optional[dict]:
                 {"feature": f, "shap_value": round(v, 4)} for f, v in contributions[:5]
             ],
             "base_value": round(float(explainer.expected_value), 4),
-            "note": "Computed from a single representative fold (fold 0), "
-                    "not a formal 5-fold ensemble average - see docstring.",
+            "note": "Explains the raw XGBoost ranking score, not the final "
+                    "five-fold Platt-calibrated probability.",
         }
     except Exception as e:
         print(f"SHAP explanation failed: {e}")
@@ -331,14 +359,14 @@ def predict_incident(
     privileges_required:   int   = -1,
     user_interaction:      int   = -1,
     scope:                 int   = -1,
-    use_calibrated:        bool  = True,  # True for ₹ EAL; False for ranking
+    use_calibrated:        bool  = True,  # Calibrated KEV score; never direct EAL frequency
     explain:               bool  = False,  # True to compute per-prediction SHAP (slower)
 ) -> dict:
     """
     Predict exploitation likelihood for a CVE.
 
     Returns:
-        probability:   float 0.02–0.95 — feeds into FAIR EAL calculation
+        probability:   calibrated KEV-membership likelihood in [0, 1]
         tier:          CRITICAL / HIGH / MEDIUM / LOW — from probability_bands
         action:        recommended next step for that tier
         model_used:    which model produced the output
@@ -349,9 +377,47 @@ def predict_incident(
     (see docs/ml/recall_at_k.csv) showed a single cutoff trades recall for
     precision sharply — at K=500 ranked candidates, the model surfaces 60.7%
     of confirmed exploits; at K=1000, 73.3%. The tier bands below are the
-    production-facing decision surface; the raw probability is preserved for
-    ranking and EAL calculation.
+    production-facing decision surface. The raw score is preserved separately
+    for ranking. Neither output is silently relabelled as an annual frequency.
     """
+    numeric_ranges = {
+        "cvss": (cvss, 0.0, 10.0),
+        "patch_age_days": (patch_age_days, 0, 36500),
+        "control_effectiveness": (control_effectiveness, 0.0, 1.0),
+        "epss_score": (epss_score, 0.0, 1.0),
+        "epss_percentile": (epss_percentile, 0.0, 1.0),
+        "days_since_published": (days_since_published, 0, 36500),
+    }
+    for name, (value, minimum, maximum) in numeric_ranges.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{name} must be a real number")
+        if not math.isfinite(float(value)) or not minimum <= float(value) <= maximum:
+            raise ValueError(f"{name} must be between {minimum} and {maximum}")
+    if not isinstance(exploit_in_wild, bool) or not isinstance(internet_facing, bool):
+        raise TypeError("exploit_in_wild and internet_facing must be booleans")
+    categorical_ranges = {
+        "attack_vector": (attack_vector, {-1, 0, 1, 2, 3}),
+        "attack_complexity": (attack_complexity, {-1, 0, 1}),
+        "privileges_required": (privileges_required, {-1, 0, 1, 2}),
+        "user_interaction": (user_interaction, {-1, 0, 1}),
+        "scope": (scope, {-1, 0, 1}),
+    }
+    for name, (value, allowed) in categorical_ranges.items():
+        if isinstance(value, bool) or value not in allowed:
+            raise ValueError(f"{name} must be one of {sorted(allowed)}")
+    binary_flags = {
+        "flag_rce": flag_rce,
+        "flag_sqli": flag_sqli,
+        "flag_xss": flag_xss,
+        "flag_buffer_overflow": flag_buffer_overflow,
+        "flag_priv_escalation": flag_priv_escalation,
+        "flag_dos": flag_dos,
+        "flag_dir_traversal": flag_dir_traversal,
+    }
+    for name, value in binary_flags.items():
+        if isinstance(value, bool) or value not in (0, 1):
+            raise ValueError(f"{name} must be 0 or 1")
+
     _load_models()
     cert_in_set = _load_cert_in()
 
@@ -365,11 +431,6 @@ def predict_incident(
         2 if cvss >= 4.0 else
         1
     )
-
-    # If exploit_in_wild is known but epss_score not passed, approximate it
-    if epss_score == 0.0 and exploit_in_wild:
-        epss_score      = 0.70
-        epss_percentile = 0.97
 
     # ── Try XGBoost model ────────────────────────────────────────
     model_to_use = _calib_model if (use_calibrated and _calib_model) else _xgb_model
@@ -399,32 +460,27 @@ def predict_incident(
             prob  = float(model_to_use.predict_proba(X_arr)[0][1])
 
             if use_calibrated:
-                # Calibrated probability feeds directly into EAL (rupees), so
-                # a 0.02 floor would inflate a genuinely near-zero-risk
-                # finding's dollar exposure by up to ~33x (0.0006 -> 0.02).
-                # Only clip at a much smaller floor to avoid degenerate math
-                # (e.g. a hard zero), never to manufacture a minimum EAL.
-                prob = max(0.0005, min(0.98, prob))
+                # Preserve calibrated KEV membership without a fabricated
+                # floor. Financial EAL uses separate frequency evidence.
+                # Preserve genuine zero/one probabilities. A non-zero floor
+                # manufactures financial exposure and is not statistically
+                # justified by the trained artifact.
+                prob = max(0.0, min(1.0, prob))
             else:
                 # Raw/uncalibrated score is used for ranking only, never for
                 # a rupee figure - a 0.02 floor here just keeps every CVE
                 # sortable and doesn't distort a financial number.
                 prob = max(0.02, min(0.95, prob))
 
-            # Tier bands (probability_bands in model_config.json) were
-            # validated against the RAW/uncalibrated score distribution
-            # (see threshold_sweep in model_config.json - all entries are
-            # 0.5-0.975, i.e. raw-model range). Calibrated probabilities for
-            # this demo's findings cluster well under 0.40, so applying the
-            # same bands to calibrated output means every finding reads as
-            # LOW regardless of actual relative risk. Always compute tier
-            # from the raw score, independent of which score feeds the EAL.
-            if use_calibrated:
-                raw_prob = float(_xgb_model.predict_proba(X_arr)[0][1]) if _xgb_model is not None else prob
-                raw_prob = max(0.02, min(0.95, raw_prob))
-                tier_info = assign_tier(raw_prob)
-            else:
-                tier_info = assign_tier(prob)
+            # The displayed tier and displayed probability must share the
+            # same scale. Mixing a raw-model tier with a calibrated number is
+            # misleading and caused 30% calibrated probabilities to be LOW.
+            tier_info = assign_tier(prob)
+            raw_prob = (
+                float(_xgb_model.predict_proba(X_arr)[0][1])
+                if _xgb_model is not None
+                else None
+            )
 
             model_name = (
                 "xgb_v4_calibrated (Platt)" if use_calibrated and _calib_model
@@ -433,12 +489,21 @@ def predict_incident(
 
             return {
                 "probability":   round(prob, 4),
+                "ranking_score": round(raw_prob, 4) if raw_prob is not None else None,
                 "tier":          tier_info["tier"],
                 "action":        tier_info["action"],
                 "model":         model_name,
                 "model_version": _config.get("model_version", "xgb_v4") if _config else "xgb_v4",
                 "is_cert_in":    bool(is_cert_in_flag),
                 "epss_score":    epss_score,
+                "probability_semantics": "calibrated KEV-membership likelihood; not an annual incident probability",
+                "input_provenance": {
+                    "epss": "caller supplied" if epss_score > 0 else "missing (zero; no synthetic substitution)",
+                    "exploit_in_wild_used_by_model": False,
+                    "internet_facing_used_by_model": False,
+                    "control_effectiveness_used_by_model": False,
+                    "patch_age_days_used_by_model": False,
+                },
                 "contributions": explain_prediction(feature_dict) if explain else None,
             }
         except Exception as e:
@@ -491,7 +556,10 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
         sc_map  = {"UNCHANGED": 0, "CHANGED": 1}
 
         def encode(val, mapping, default=-1):
-            if val is None: return default
+            if val is None:
+                return default
+            if isinstance(val, int) and not isinstance(val, bool):
+                return val if val in mapping.values() else default
             return mapping.get(str(val).upper(), default)
 
         return predict_incident(
@@ -528,13 +596,32 @@ def predict_from_risk_row(risk_row: dict) -> Optional[dict]:
             explain=bool(risk_row.get("explain", False)),
         )
     except (TypeError, ValueError, KeyError) as e:
-        return {"probability": 0.1, "model": "error_fallback", "error": str(e)}
+        # Do not manufacture a probability for malformed input. Callers must
+        # either reject the record or invoke an explicitly named fallback.
+        return {"probability": None, "model": "invalid_input", "error": str(e)}
 
 
 def get_model_info() -> dict:
     """Return model metadata — used by /api/health and /api/assistant."""
     _load_models()
     if _config:
+        checksums_path = MODEL_DIR / "artifact_checksums.json"
+        artifact_integrity = {"verified": False, "files": {}}
+        if checksums_path.exists():
+            checksums = json.loads(checksums_path.read_text(encoding="utf-8"))
+            file_results = {}
+            for relative_path, expected in checksums.get("files", {}).items():
+                artifact_path = MODEL_DIR / relative_path
+                actual = hashlib.sha256(artifact_path.read_bytes()).hexdigest() if artifact_path.exists() else None
+                file_results[relative_path] = {
+                    "expected_sha256": expected,
+                    "actual_sha256": actual,
+                    "matches": actual == expected,
+                }
+            artifact_integrity = {
+                "verified": bool(file_results) and all(row["matches"] for row in file_results.values()),
+                "files": file_results,
+            }
         return {
             "model_version":    _config.get("model_version"),
             "trained_on":       _config.get("trained_on"),
@@ -544,7 +631,14 @@ def get_model_info() -> dict:
             "probability_bands":_config.get("probability_bands", _DEFAULT_BANDS),
             "features":         _feature_list,
             "india_signal":     "CERT-In advisory flag (is_cert_in)",
-            "calibrated":       (MODEL_DIR / "crispr_xgb_calibrated.pkl").exists(),
+            "calibrated":       _calib_model is not None,
+            "calibration_runtime": (
+                "portable five-fold sigmoid ensemble"
+                if isinstance(_calib_model, PortableCalibratedModel)
+                else "legacy pickle" if _calib_model is not None else None
+            ),
             "known_limitations":_config.get("known_limitations", []),
+            "artifact_integrity": artifact_integrity,
+            "reported_metrics_status": "metadata_only; holdout rows are not shipped, so metrics cannot be independently reproduced from this repository",
         }
     return {"model_version": "rule_based_v1", "trained_on": None}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ScrollText, Download, Plus } from 'lucide-react';
-import { getReports } from '../lib/api';
+import api from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { SkeletonTable } from '../components/common/Skeleton';
 
@@ -9,27 +9,55 @@ interface ReportItem {
   name: string;
   generated: string;
   format: string;
+  description?: string;
+  status?: string;
 }
 
 export default function Reports() {
   const [reports, setReports] = useState<ReportItem[] | null>(null);
 
   useEffect(() => {
-    getReports().then((r) => setReports(r as ReportItem[]));
+    api.get('/api/reports').then((res) => {
+      setReports(res.data.reports);
+    });
   }, []);
 
-  const generateNew = () => {
+  const loadReports = () => api.get('/api/reports').then((res) => setReports(res.data.reports));
+
+  const generateNew = async () => {
     toast.info('Generating report…');
-    setTimeout(() => {
-      const newReport: ReportItem = {
-        id: `rep-${Date.now()}`,
-        name: 'Ad-hoc Security Posture Snapshot',
-        generated: new Date().toISOString().slice(0, 10),
-        format: 'PDF',
-      };
-      setReports((prev) => [newReport, ...(prev ?? [])]);
-      toast.success('Report generated', newReport.name);
-    }, 1200);
+    try {
+      await api.post('/api/reports', {
+        report_type: 'FINDINGS_DIGEST',
+        name: `Findings Digest — ${new Date().toISOString().slice(0, 10)}`,
+        format: 'JSON',
+      });
+      await loadReports();
+      toast.success('Report queued', 'The worker is generating the report from persisted findings.');
+    } catch (error: any) {
+      toast.error('Report generation failed', error?.response?.data?.detail ?? error.message);
+    }
+  };
+
+  const downloadReport = async (reportId: string, name: string) => {
+    try {
+      toast.info('Preparing download...');
+      const res = await api.get(`/api/reports/${reportId}`);
+      
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Download complete', `${name}.json`);
+    } catch (e) {
+      toast.error('Download failed');
+    }
   };
 
   return (
@@ -64,14 +92,17 @@ export default function Reports() {
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ fontWeight: 600 }}>{r.name}</td>
+                  <td style={{ maxWidth: 300 }}>
+                    <div style={{ fontWeight: 600 }}>{r.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
+                  </td>
                   <td style={{ color: 'var(--text-muted)' }}>{r.generated}</td>
                   <td>{r.format}</td>
                   <td>
                     <button
                       className="btn-secondary"
                       style={{ padding: '4px 10px', fontSize: '0.6875rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                      onClick={() => toast.success('Download started', `${r.name}.${r.format.toLowerCase()}`)}
+                      onClick={() => downloadReport(r.id, r.name)}
                     >
                       <Download size={12} /> Download
                     </button>

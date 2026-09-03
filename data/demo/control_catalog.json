@@ -1,0 +1,9 @@
+[
+  {"id":"mfa","name":"MFA for all privileged accounts","cost_inr":1500000,"complexity":"Low","time_weeks":2,"overrides":{"implement_mfa":true}},
+  {"id":"patching","name":"Emergency patch deployment","cost_inr":800000,"complexity":"Medium","time_weeks":1,"overrides":{"implement_patching":true}},
+  {"id":"segmentation","name":"Network micro-segmentation","cost_inr":3000000,"complexity":"High","time_weeks":6,"overrides":{"implement_segmentation":true}},
+  {"id":"edr_expand","name":"EDR rollout to all endpoints","cost_inr":2000000,"complexity":"Medium","time_weeks":3,"overrides":{"edr_expand":true}},
+  {"id":"cloud_hard","name":"Cloud configuration hardening","cost_inr":1500000,"complexity":"Medium","time_weeks":2,"overrides":{"cloud_hardening":true}},
+  {"id":"backup","name":"Immutable backup implementation","cost_inr":600000,"complexity":"Low","time_weeks":1,"overrides":{"immutable_backup":true}},
+  {"id":"training","name":"Security awareness training","cost_inr":300000,"complexity":"Low","time_weeks":2,"overrides":{"training":true}}
+]

@@ -6,7 +6,6 @@ import FinancialBreakdownBar from '../components/charts/FinancialBreakdownBar';
 import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
 import { getCompliance, getControls, getEnterprise, getForecast, getGaps, getRisks, optimize } from '../services/api';
-import { MOCK_ENTERPRISE, MOCK_RISKS, MOCK_COMPLIANCE, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
 import { formatRupees, formatLakh, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
 
@@ -34,13 +33,13 @@ function complianceColor(score: number) {
 
 export default function FinancialDashboard() {
   const navigate = useNavigate();
-  const [enterprise, setEnterprise] = useState<any>(MOCK_ENTERPRISE);
-  const [risks, setRisks] = useState<any[]>(MOCK_RISKS);
-  const [compliance, setCompliance] = useState<any[]>(MOCK_COMPLIANCE);
+  const [enterprise, setEnterprise] = useState<any>(null);
+  const [risks, setRisks] = useState<any[]>([]);
+  const [compliance, setCompliance] = useState<any[]>([]);
   const [gaps, setGaps] = useState<any[]>([]);
   const [actions, setActions] = useState<any[]>([]);
   const [forecast, setForecast] = useState<any[]>([]);
-  const [usingDemo, setUsingDemo] = useState({ enterprise: false, risks: false, compliance: false });
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedAssetId, setSelectedAssetId] = useState('A003');
   const [budget, setBudget] = useState(10000000); // ₹100L default
@@ -50,11 +49,8 @@ export default function FinancialDashboard() {
   useEffect(() => {
     Promise.all([getEnterprise(), getRisks(), getCompliance(), getGaps(), getControls(), getForecast()]).then(([e, r, c, g, controls, trend]) => {
       if (e?.data) setEnterprise(e.data);
-      else setUsingDemo((u) => ({ ...u, enterprise: true }));
       if (r?.data) setRisks(r.data);
-      else setUsingDemo((u) => ({ ...u, risks: true }));
       if (c?.data) setCompliance(c.data);
-      else setUsingDemo((u) => ({ ...u, compliance: true }));
       if (g?.data) setGaps(g.data);
       if (controls?.data) {
         setActions(
@@ -73,6 +69,9 @@ export default function FinancialDashboard() {
       if (trend?.data) {
         setForecast(trend.data.map((point: any) => ({ day: point.day, current: point.eal_inr / 100_000 })));
       }
+    }).catch((error) => {
+      const detail = error?.response?.data?.detail;
+      setLoadError(typeof detail === 'string' ? detail : 'Financial risk data is currently unavailable.');
     });
   }, []);
 
@@ -90,20 +89,17 @@ export default function FinancialDashboard() {
     setOptimizing(true);
     try {
       const res = await optimize(budget);
-      setOptimizeResult(res?.data || { ...MOCK_OPTIMIZE_RESULT, budget_inr: budget });
-    } catch {
-      setOptimizeResult({ ...MOCK_OPTIMIZE_RESULT, budget_inr: budget });
+      if (!res?.data) throw new Error('Optimizer returned no result');
+      setOptimizeResult(res.data);
+    } catch (error: any) {
+      toast.error('Optimization failed', error?.response?.data?.detail ?? 'No verified optimization result is available.');
     } finally {
       setOptimizing(false);
     }
   };
 
-  useEffect(() => {
-    // seed initial optimizer result with default ₹100L budget so the section isn't empty
-    setOptimizeResult(MOCK_OPTIMIZE_RESULT);
-  }, []);
-
-  const currentSpend = enterprise.current_spend_inr ?? 2800000;
+  const currentSpend = enterprise?.current_spend_inr;
+  const bestAction = actions[0];
 
   return (
     <div className="page-container page-stack">
@@ -112,36 +108,49 @@ export default function FinancialDashboard() {
         <p className="page-subtitle">Board-level financial exposure · NovaPay Financial Services</p>
       </div>
 
+      {loadError && (
+        <div className="card" style={{ borderColor: 'var(--color-critical)', color: 'var(--color-critical)' }}>
+          <strong>Financial calculation unavailable:</strong> {loadError}
+          <div style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+            Live EAL requires a current, evidenced annual incident-frequency assessment for every finding.
+          </div>
+        </div>
+      )}
+
+      {enterprise?.financial_methodology && (
+        <div className="card" style={{ padding: '12px 16px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>Audited methodology:</strong>{' '}
+          {enterprise.financial_methodology.formula}. KEV model is used for prioritization only.
+        </div>
+      )}
+
       {/* KPI Row */}
       <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard
           title="Expected Annual Loss"
-          value={formatLakh(enterprise.total_eal_lakh)}
+          value={enterprise ? formatLakh(enterprise.total_eal_lakh) : 'Unavailable'}
           subtitle="Total cyber exposure this year"
           icon={<IndianRupee size={16} />}
           accentColor={TOKENS.critical}
-          demo={usingDemo.enterprise}
         />
         <KPICard
           title="P95 Cyber VaR"
-          value={formatRupees(enterprise.var_95_inr)}
+          value={enterprise ? formatRupees(enterprise.var_95_inr) : 'Unavailable'}
           subtitle="Worst-case annual scenario"
           icon={<TrendingUp size={16} />}
           accentColor={TOKENS.sevHigh}
-          demo={usingDemo.enterprise}
         />
         <KPICard
           title="Current Security Spend"
-          value={`${formatRupees(currentSpend)}/yr`}
-          subtitle={`vs. ${formatLakh(enterprise.total_eal_lakh)} annual loss exposure`}
+          value={currentSpend == null ? 'Not supplied' : `${formatRupees(currentSpend)}/yr`}
+          subtitle={enterprise ? `vs. ${formatLakh(enterprise.total_eal_lakh)} annual loss exposure` : 'Awaiting verified financial inputs'}
           icon={<Wallet size={16} />}
           accentColor={TOKENS.primaryBlue}
-          demo={usingDemo.enterprise}
         />
         <KPICard
           title="Optimal ROSI"
-          value="980%"
-          subtitle="Top action: Enable MFA"
+          value={bestAction ? `${bestAction.rosi_pct}%` : 'Unavailable'}
+          subtitle={bestAction ? `Top action: ${bestAction.name}` : 'Awaiting verified control catalogue'}
           icon={<Percent size={16} />}
           accentColor={TOKENS.success}
         />

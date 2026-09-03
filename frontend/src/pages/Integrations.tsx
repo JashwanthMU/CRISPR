@@ -5,7 +5,7 @@ import IntegrationLogo from '../components/common/IntegrationLogo';
 import { toast } from '../lib/toastStore';
 import { TOKENS } from '../utils/format';
 import type { Integration, IntegrationStatus } from '../types';
-import { getSources } from '../services/api';
+import { API_MODE, getIntegrations, httpClient } from '../lib/api';
 
 const STATUS_COLOR: Record<IntegrationStatus, string> = {
   connected: TOKENS.success,
@@ -24,25 +24,16 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
 };
 
 export default function Integrations() {
-  const [items, setItems] = useState<Integration[]>(INTEGRATIONS.map((i) => ({ ...i })));
+  const [items, setItems] = useState<Integration[]>(API_MODE === 'demo' ? INTEGRATIONS.map((i) => ({ ...i })) : []);
 
   useEffect(() => {
-    getSources().then((response) => {
-      const sources = response?.data ?? [];
-      const sourceByKey = new Map<string, any>(
-        sources.map((source: any) => [String(source.source).toLowerCase().replace(/_/g, ''), source]),
-      );
-      setItems((current) => current.map((integration) => {
-        const source = sourceByKey.get(integration.key.replace(/_/g, ''));
-        return source
-          ? { ...integration, status: source.status, itemsIngested: source.count }
-          : integration;
-      }));
+    getIntegrations().then(setItems).catch((error) => {
+      toast.error('Integrations unavailable', error?.response?.data?.detail ?? error.message);
     });
   }, []);
 
   useEffect(() => {
-    // Simulate any items in 'connecting' state resolving to 'connected' after a delay.
+    if (API_MODE !== 'demo') return;
     const connecting = items.filter((i) => i.status === 'connecting');
     if (connecting.length === 0) return;
     const timer = setTimeout(() => {
@@ -59,11 +50,28 @@ export default function Integrations() {
   }, [items]);
 
   const connect = (id: string) => {
+    if (API_MODE !== 'demo') {
+      toast.info('Credential required', 'Configure a GitHub token and organization through the integration configuration endpoint.');
+      return;
+    }
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connecting' } : i)));
     toast.info('Connecting…', 'Establishing a secure connection and requesting scopes.');
   };
 
-  const reconnect = (id: string) => {
+  const reconnect = async (id: string) => {
+    if (API_MODE !== 'demo') {
+      try {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
+        await httpClient.post(`/api/integrations/${id}/reconnect`);
+        await httpClient.post(`/api/integrations/${id}/sync`);
+        setItems(await getIntegrations());
+        toast.success('Sync queued', 'Credentials were verified and a durable synchronization job was queued.');
+      } catch (error: any) {
+        setItems(await getIntegrations().catch(() => items));
+        toast.error('Reconnect failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
     setTimeout(() => {
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connected', lastSync: new Date().toISOString() } : i)));
@@ -71,14 +79,33 @@ export default function Integrations() {
     }, 1400);
   };
 
-  const disable = (id: string) => {
+  const disable = async (id: string) => {
+    if (API_MODE !== 'demo') {
+      try {
+        await httpClient.post(`/api/integrations/${id}/disable`);
+        setItems(await getIntegrations());
+        toast.warning('Integration disabled', 'The stored credential was removed and synchronization stopped.');
+      } catch (error: any) {
+        toast.error('Disable failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'disconnected', itemsIngested: 0 } : i)));
     toast.warning('Integration disabled', 'Ingestion has been paused for this source.');
   };
 
-  const testConnection = (name: string) => {
+  const testConnection = async (integration: Integration) => {
+    if (API_MODE !== 'demo') {
+      try {
+        const { data } = await httpClient.post(`/api/integrations/${integration.id}/reconnect`);
+        toast.success('Connection healthy', `${data.account ?? integration.name} authenticated successfully.`);
+      } catch (error: any) {
+        toast.error('Connection failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
     toast.info('Testing connection…');
-    setTimeout(() => toast.success('Connection healthy', `${name} responded in 214ms.`), 1000);
+    setTimeout(() => toast.success('Connection healthy', `${integration.name} responded in 214ms.`), 1000);
   };
 
   const connectedCount = items.filter((i) => i.status === 'connected' || i.status === 'syncing').length;
@@ -148,7 +175,7 @@ export default function Integrations() {
                   <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => reconnect(integration.id)}>
                     <RefreshCw size={12} /> Reconnect
                   </button>
-                  <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem' }} onClick={() => testConnection(integration.name)}>
+                  <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem' }} onClick={() => testConnection(integration)}>
                     Test
                   </button>
                   <button className="icon-btn" title="Configure" onClick={() => toast.info(`Configure ${integration.name}`, 'Configuration panel would open here.')}>

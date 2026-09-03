@@ -13,13 +13,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Never throw on network/HTTP errors — resolve with data: null so callers can fall back to mock data.
 api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err?.response?.status === 401) clearSession();
     console.warn('API error', err?.message);
-    return Promise.resolve({ data: null });
+    return Promise.reject(err);
   }
 );
 

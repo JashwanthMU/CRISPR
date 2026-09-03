@@ -31,20 +31,24 @@ CRISPR implements the **Factor Analysis of Information Risk (FAIR)** model, the 
 ### 1.1 Core Formula
 
 ```
-EAL = LEF × LM
+EAL = annual incident probability × LM
 
 where:
-  LEF = Loss Event Frequency = TEF × (1 − CE)
+  annual incident probability = current, approved organization evidence
   LM  = Loss Magnitude (₹)
-  TEF = Threat Event Frequency (events/year)
-  CE  = Control Effectiveness (0.0 – 1.0)
+  ML KEV score = prioritization only; excluded from EAL
 
-VaR (95th percentile) = EAL × 3.2
+VaR = percentile of 10,000 seeded annual portfolio-loss simulations
 ```
 
 ### 1.2 Likelihood Calculation
 
-Implemented in `backend/risk_engine/likelihood.py`:
+Demo mode retains a deterministic likelihood formula for fixture-based
+demonstration. Live mode does not use that formula for EAL. It requires a
+current record in `incident_frequency_assessments`, with methodology, evidence
+reference, confidence, observation time, and expiry.
+
+The legacy demo-only formula in `backend/risk_engine/likelihood.py` is:
 
 ```
 likelihood = Σ (feature_score × weight)

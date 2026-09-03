@@ -21,7 +21,8 @@ from backend.database.connection import get_connection
 TOKEN_SECRET = os.getenv("AUTH_SECRET", "")
 TOKEN_ISSUER = "crispr-api"
 TOKEN_AUDIENCE = "crispr-web"
-TOKEN_LIFETIME_HOURS = 12
+TOKEN_LIFETIME_MINUTES = int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "30"))
+DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -81,6 +82,7 @@ class AuthUser(BaseModel):
     name: str
     email: EmailStr
     role: UserRole
+    organization_id: UUID = DEFAULT_ORGANIZATION_ID
 
 
 def create_token(user: dict) -> str:
@@ -94,7 +96,8 @@ def create_token(user: dict) -> str:
         "aud": TOKEN_AUDIENCE,
         "iat": int(now.timestamp()),
         "nbf": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=TOKEN_LIFETIME_HOURS)).timestamp()),
+        "exp": int((now + timedelta(minutes=TOKEN_LIFETIME_MINUTES)).timestamp()),
+        "organization_id": str(user.get("organization_id", DEFAULT_ORGANIZATION_ID)),
     }, separators=(",", ":")).encode())
     signing_input = f"{header}.{payload}"
     signature = _b64(hmac.new(TOKEN_SECRET.encode(), signing_input.encode(), hashlib.sha256).digest())
@@ -138,25 +141,23 @@ def get_current_user(
         if int(payload["exp"]) < now or int(payload["nbf"]) > now:
             raise ValueError("Expired token")
         user_id = UUID(payload["sub"])
+        token_organization_id = UUID(payload["organization_id"])
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as error:
         raise unauthorized from error
-    import os as _os
     try:
         with get_connection() as connection:
             user = connection.execute(
-                "SELECT user_id, name, email, role FROM users WHERE user_id = %s",
+                "SELECT user_id, name, email, role, organization_id FROM users WHERE user_id = %s",
                 (user_id,),
             ).fetchone()
-    except OperationalError:
-        # DB unavailable — reconstruct user from JWT payload (demo/local mode)
-        demo_user = {
-            "user_id": str(user_id),
-            "name": payload.get("name", "Security Admin"),
-            "email": payload.get("email", _os.getenv("SECURITY_ADMIN_EMAIL", "security@novapay.com")),
-            "role": payload.get("role", "SECURITY"),
-        }
-        return AuthUser.model_validate(demo_user)
+    except OperationalError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PostgreSQL is unavailable; token ownership could not be verified",
+        ) from error
     if not user:
+        raise unauthorized
+    if user["organization_id"] != token_organization_id:
         raise unauthorized
     return AuthUser.model_validate(user)
 
@@ -171,7 +172,7 @@ def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 def ensure_default_security_user() -> None:
-    """Ensure the configured security administrator exists with current credentials."""
+    """Create the configured security administrator once without rotating its password."""
     from uuid import uuid4
 
     email = os.getenv("SECURITY_ADMIN_EMAIL", "").strip().lower()
@@ -180,16 +181,28 @@ def ensure_default_security_user() -> None:
     password = os.getenv("SECURITY_ADMIN_PASSWORD", "")
     if len(password) < 12:
         raise RuntimeError("SECURITY_ADMIN_PASSWORD must be at least 12 characters")
-    password_hash = hash_password(password)
     with get_connection() as connection:
-        connection.execute(
+        existing = connection.execute(
+            "SELECT user_id FROM users WHERE email=%s", (email,)
+        ).fetchone()
+        if existing:
+            connection.execute(
+                """INSERT INTO organization_members(organization_id,user_id,role)
+                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+                (DEFAULT_ORGANIZATION_ID, existing["user_id"]),
+            )
+            return
+        user = connection.execute(
             """
-            INSERT INTO users (user_id, name, email, password_hash, role)
-            VALUES (%s, %s, %s, %s, 'SECURITY')
-            ON CONFLICT (email) DO UPDATE SET
-                name = EXCLUDED.name,
-                password_hash = EXCLUDED.password_hash,
-                role = 'SECURITY'
+            INSERT INTO users (user_id, name, email, password_hash, role, organization_id)
+            VALUES (%s, %s, %s, %s, 'SECURITY', %s)
+            ON CONFLICT (email) DO NOTHING
             """,
-            (uuid4(), "NovaPay Security Team", email, password_hash),
+            (uuid4(), "NovaPay Security Team", email, hash_password(password), DEFAULT_ORGANIZATION_ID),
+        )
+        row = connection.execute("SELECT user_id FROM users WHERE email=%s", (email,)).fetchone()
+        connection.execute(
+            """INSERT INTO organization_members(organization_id,user_id,role)
+               VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+            (DEFAULT_ORGANIZATION_ID, row["user_id"]),
         )

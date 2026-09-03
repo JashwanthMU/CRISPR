@@ -104,6 +104,8 @@ export interface Finding {
   title: string;
   cve?: string;
   cvss?: number;
+  exploited_in_wild?: boolean;
+  patch_available?: boolean;
   severity: Severity;
   confidence: number; // 0..1
   first_seen: string;
@@ -302,6 +304,7 @@ export interface RemediationScenario {
   status: ScenarioStatus;
   repository?: string;
   branch?: string;
+  version?: number;
 }
 
 // ----------------------------------------------------------------------------
@@ -388,10 +391,10 @@ export interface Vulnerability {
   id: string;
   cve: string;
   severity: Severity;
-  cvss: number;
+  cvss: number | null;
   component: string;
   affectedAssets: string[];
-  exploitAvailable: boolean;
-  patchAvailable: boolean;
+  exploitAvailable: boolean | null;
+  patchAvailable: boolean | null;
   status: FindingStatus;
 }
