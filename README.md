@@ -186,7 +186,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-See [the complete installation walkthrough](docs/SETUP_WALKTHROUGH.md) for
+See [the complete installation walkthrough](docs/deployment/setup.md) for
 live-data prerequisites, backup behavior, verification, and troubleshooting.
 
 ### Prerequisites
@@ -610,29 +610,39 @@ CRISPR/
 ├── ai/                         # Advisor routing, tools, model client and guardrail
 ├── backend/
 │   ├── app/api/                # FastAPI routers
+│   ├── app/models/             # HTTP request and response schemas
 │   ├── asset_intelligence/     # Business criticality
 │   ├── compliance/             # Framework mappings and gaps
 │   ├── connectors/             # Security-source adapters
 │   ├── controls/               # Control effectiveness
 │   ├── correlation/            # Finding correlation
-│   ├── database/               # PostgreSQL connection and schema
+│   ├── database/               # PostgreSQL connection and Alembic migrations
 │   ├── financial_engine/       # Loss magnitude and EAL
 │   ├── ingestion/              # JSON loading and database upserts
 │   ├── normalization/          # Unified finding conversion
 │   ├── optimizer/              # PuLP/greedy investment optimizer
 │   ├── risk_engine/            # Likelihood and drivers
 │   ├── scenario_engine/        # What-if simulations
+│   ├── repositories/           # PostgreSQL persistence operations
+│   ├── services/               # Business workflows and orchestration
+│   ├── security/               # Credential encryption helpers
+│   ├── workers/                # Persistent background job worker
 │   └── tests/                  # Backend tests
 ├── bug-bounty/                 # Reporter and security-review React portal
 ├── crispr_products/            # Separate animated product-tour prototype
 ├── data/demo/                  # NovaPay assets and source findings
-├── docs/                       # Architecture, methodology and deployment notes
+├── docs/                       # Indexed architecture, API, deployment and methodology docs
 ├── frontend/                   # Main React 18 dashboard
 ├── ml/                         # Prediction, anomaly, forecast and explanation models
+├── tools/                      # Audits and operator utilities
 ├── docker-compose.yml          # Complete application stack
 ├── requirements.txt            # Runtime Python dependencies
 └── requirements-ml-v2.txt      # Optional future training dependencies
 ```
+
+See the [documentation index](docs/README.md) and the detailed
+[project structure guide](docs/development/project-structure.md) before adding
+new modules.
 
 ## Security Notes
 

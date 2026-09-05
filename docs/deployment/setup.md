@@ -177,7 +177,7 @@ exposure, reputation exposure, and expected regulatory exposure. A statutory
 maximum must not be entered as an expected fine. The frequency assessment must
 come from an approved FAIR exercise, incident-history calibration, actuarial
 source, or insurer model; NVD CVSS and KEV membership are not annual frequency.
-See `docs/PHASE5_FINANCIAL_GOVERNANCE.md` for the request format.
+See `docs/governance/financial-risk.md` for the request format.
 
 After inputs are available:
 
