@@ -4,7 +4,7 @@ This document serves as an overview of the CRISPR platform architecture. For com
 
 ## Related Documents
 - [Detailed System Architecture](architecture/system_architecture.md) - Contains full Mermaid sequence diagrams and component details.
-- [Database Schema](api_schemas.md) - Contains data storage structures.
+- [API contracts](api/contracts.md) - Documents the HTTP resource contracts.
 
 ## Core Components
 - **Frontend App**: React/TypeScript application powered by Vite.

@@ -9,7 +9,7 @@ info() { printf '\n\033[1;34m[CRISPR]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warning]\033[0m %s\n' "$*" >&2; }
 fail() { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
 
-command -v docker >/dev/null 2>&1 || fail "Docker is required. See docs/SETUP_WALKTHROUGH.md."
+command -v docker >/dev/null 2>&1 || fail "Docker is required. See docs/deployment/setup.md."
 command -v curl >/dev/null 2>&1 || fail "curl is required."
 command -v python3 >/dev/null 2>&1 || fail "python3 is required for secure key generation."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 ('docker compose') is required."
@@ -222,4 +222,4 @@ if curl -fsS http://127.0.0.1:5173/api/health/ready >/dev/null 2>&1 \
 fi
 
 info "Installation workflow completed. Open http://SERVER_IP:5173"
-info "See docs/SETUP_WALKTHROUGH.md for live-data ingestion and verification."
+info "See docs/deployment/setup.md for live-data ingestion and verification."

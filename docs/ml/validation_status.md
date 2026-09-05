@@ -39,7 +39,7 @@ The current artifact is approved for CVE prioritization only. Direct EAL use is
 not approved because CISA KEV membership is not an annual incident-frequency
 target. Phase 5 enforces this boundary: EAL consumes separately persisted,
 time-bounded organization evidence. See [MODEL_CARD.md](MODEL_CARD.md) and
-[Phase 5 Financial Governance](../PHASE5_FINANCIAL_GOVERNANCE.md).
+[Financial Risk Governance](../governance/financial-risk.md).
 
 ## Data-mode guarantee
 

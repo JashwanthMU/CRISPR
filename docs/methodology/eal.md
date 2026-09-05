@@ -3,7 +3,7 @@
 This document summarizes the core FAIR implementation used by CRISPR. For a comprehensive mathematical breakdown, refer to the full methodology document.
 
 ## Related Documents
-- [Detailed Methodology](methodology/methodology.md) - Contains exhaustive formulas, regulatory tables, and downtime matrices.
+- [Detailed Methodology](methodology.md) - Contains exhaustive formulas, regulatory tables, and downtime matrices.
 
 ## Core Formula
 CRISPR calculates live Expected Annual Loss as:
@@ -13,7 +13,7 @@ The XGBoost target is CISA KEV membership, not annual loss-event frequency.
 Phase 5 therefore excludes it from EAL and uses it only for prioritization.
 Live calculations require a current record in
 `incident_frequency_assessments`; see
-[Phase 5 Financial Governance](PHASE5_FINANCIAL_GOVERNANCE.md).
+[Financial Risk Governance](../governance/financial-risk.md).
 
 ### 1. Likelihood
 Supplied by a time-bounded, organization-approved FAIR, actuarial, insurance,
