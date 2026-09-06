@@ -35,7 +35,7 @@ class SimulationRequest(BaseModel):
 
 @router.post("/events", status_code=status.HTTP_201_CREATED)
 def ingest_events(body: RiskEventBatch, user: AuthUser = Depends(require_security)):
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(status_code=409, detail="Business risk evidence ingestion requires live mode")
     for event in body.events:
         if event.valid_until <= event.observed_at:

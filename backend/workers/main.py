@@ -194,6 +194,8 @@ def sync_generic_http(job: dict) -> dict:
 
 
 def process(job: dict) -> dict:
+    from backend.data_access import set_active_organization
+    set_active_organization(job["organization_id"])
     if job["job_type"] == "integration.sync":
         integration = get_integration(job["organization_id"], UUID(job["payload"]["integration_id"]))
         if not integration:

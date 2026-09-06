@@ -40,7 +40,7 @@ def forecast(
     daily_growth_rate: float = Query(DEFAULT_DAILY_GROWTH_RATE, gt=0, le=0.05),
     user: AuthUser = Depends(require_security),
 ):
-    require_demo_mode("Assumption-based risk projection")
+    require_demo_mode("Assumption-based risk projection", user.organization_id)
     baseline = risk_tools.get_enterprise_summary(user.organization_id).get("total_eal_inr", 0)
     delay_applied = None
     if patch_delay:
@@ -77,6 +77,6 @@ def anomalies(
     threshold_z: float = Query(3.0, ge=1, le=10),
     user: AuthUser = Depends(require_security),
 ):
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         return detect_anomalies(include_llm_summary=include_llm_summary)
     return detect_rate_anomalies(user.organization_id, event_type, lookback_days, recent_hours, threshold_z)

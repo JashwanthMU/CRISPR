@@ -8,7 +8,7 @@ from uuid import UUID, NAMESPACE_URL, uuid4, uuid5
 from psycopg.types.json import Jsonb
 
 from backend.app.api.risks import _all_risks, calculate_enterprise_summary
-from backend.data_access import demo_mode_enabled
+from backend.data_access import demo_mode_enabled, set_active_organization
 from backend.database.connection import get_connection
 from ml.incident_prediction.model import get_model_info
 
@@ -26,7 +26,8 @@ ASSUMPTIONS = {
 
 def _canonical_inputs(organization_id: UUID) -> dict:
     """Capture exact persisted records and timestamps used by an analysis."""
-    origin = "DEMO" if demo_mode_enabled() else "LIVE"
+    set_active_organization(organization_id)
+    origin = "DEMO" if demo_mode_enabled(organization_id) else "LIVE"
     with get_connection() as db:
         assets = db.execute(
             """SELECT asset_id,payload,data_origin,updated_at FROM assets
@@ -61,13 +62,14 @@ def _hash_inputs(inputs: dict) -> str:
 
 
 def run_and_persist_analysis(organization_id: UUID, requested_by: UUID | None = None) -> dict:
+    set_active_organization(organization_id)
     inputs = _canonical_inputs(organization_id)
     input_hash = _hash_inputs(inputs)
     risks = _all_risks(organization_id)
     enterprise = calculate_enterprise_summary(organization_id)
     model = get_model_info()
     calculated_at = datetime.now(timezone.utc)
-    origin = "DEMO" if demo_mode_enabled() else "LIVE"
+    origin = "DEMO" if demo_mode_enabled(organization_id) else "LIVE"
     lineage = {
         "asset_ids": [row["asset_id"] for row in inputs["assets"]],
         "finding_ids": [row["finding_id"] for row in inputs["findings"]],

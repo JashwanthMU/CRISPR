@@ -21,6 +21,7 @@ SOURCE_FILES = {
     "THREAT_INTEL": "threat_intel.json",
 }
 DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
+DEMO_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000002")
 
 
 def load_json(filename: str) -> list[dict]:
@@ -167,15 +168,16 @@ def upsert_control_catalog(
     return len(controls)
 
 
-def refresh_demo_sources() -> dict:
-    result = {"ASSETS": upsert_assets(load_json("assets.json"), data_origin="DEMO")}
+def refresh_demo_sources(organization_id: UUID = DEMO_ORGANIZATION_ID) -> dict:
+    result = {"ASSETS": upsert_assets(load_json("assets.json"), data_origin="DEMO", organization_id=organization_id)}
     for source_type, filename in SOURCE_FILES.items():
-        result[source_type] = upsert_findings(load_json(filename), data_origin="DEMO")
+        result[source_type] = upsert_findings(load_json(filename), data_origin="DEMO", organization_id=organization_id)
     result["CONTROL_CATALOG"] = upsert_control_catalog(
         load_json("control_catalog.json"),
         source_name="bundled-demo-fixture",
         observed_at=datetime.now().astimezone(),
         data_origin="DEMO",
+        organization_id=organization_id,
     )
     return result
 
@@ -201,7 +203,7 @@ def fetch_findings(
 def ingestion_status(organization_id: UUID = DEFAULT_ORGANIZATION_ID) -> list[dict]:
     from backend.data_access import demo_mode_enabled
 
-    origin = "DEMO" if demo_mode_enabled() else "LIVE"
+    origin = "DEMO" if demo_mode_enabled(organization_id) else "LIVE"
     with get_connection() as connection:
         rows = connection.execute(
             f"""

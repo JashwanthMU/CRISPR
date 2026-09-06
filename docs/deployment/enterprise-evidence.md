@@ -39,5 +39,5 @@ sudo docker compose exec backend alembic current
 sudo docker compose exec backend pytest backend -q
 ```
 
-Expected head is `0006_enterprise_evidence`. Live-mode empty inputs return empty
+Expected head is `0007_organization_data_modes`. Live-organization empty inputs return empty
 or `NOT_ASSESSABLE` results, never fixtures.

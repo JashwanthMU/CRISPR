@@ -95,14 +95,14 @@ class ComplianceEvidenceBatch(StrictModel):
     evidence: list[ComplianceEvidence] = Field(min_length=1, max_length=10000)
 
 
-def _require_live() -> None:
-    if demo_mode_enabled():
+def _require_live(organization_id) -> None:
+    if demo_mode_enabled(organization_id):
         raise HTTPException(status_code=409, detail="Enterprise evidence ingestion requires live mode")
 
 
 @router.post("/telemetry", status_code=status.HTTP_201_CREATED)
 def ingest_telemetry(body: TelemetryBatch, user: AuthUser = Depends(require_security)):
-    _require_live()
+    _require_live(user.organization_id)
     with get_connection() as db:
         for event in body.events:
             db.execute(
@@ -123,7 +123,7 @@ def ingest_telemetry(body: TelemetryBatch, user: AuthUser = Depends(require_secu
 
 @router.post("/relationships", status_code=status.HTTP_201_CREATED)
 def ingest_relationships(body: RelationshipBatch, user: AuthUser = Depends(require_security)):
-    _require_live()
+    _require_live(user.organization_id)
     with get_connection() as db:
         for edge in body.edges:
             db.execute(
@@ -146,7 +146,7 @@ def ingest_relationships(body: RelationshipBatch, user: AuthUser = Depends(requi
 
 @router.post("/compliance/requirements", status_code=status.HTTP_201_CREATED)
 def ingest_requirements(body: RequirementBatch, user: AuthUser = Depends(require_security)):
-    _require_live()
+    _require_live(user.organization_id)
     with get_connection() as db:
         for row in body.requirements:
             db.execute(
@@ -161,7 +161,7 @@ def ingest_requirements(body: RequirementBatch, user: AuthUser = Depends(require
 
 @router.post("/compliance/evidence", status_code=status.HTTP_201_CREATED)
 def ingest_compliance_evidence(body: ComplianceEvidenceBatch, user: AuthUser = Depends(require_security)):
-    _require_live()
+    _require_live(user.organization_id)
     inserted = 0
     with get_connection() as db:
         for row in body.evidence:

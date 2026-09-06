@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.get("")
 def compliance_summary(user: AuthUser = Depends(require_security)):
-    summary = get_compliance_summary() if demo_mode_enabled() else compliance_result(user.organization_id)["frameworks"]
+    summary = get_compliance_summary() if demo_mode_enabled(user.organization_id) else compliance_result(user.organization_id)["frameworks"]
     avg = round(sum(s["score"] for s in summary) / len(summary), 1) if summary else 0
     return {
         "frameworks": summary,
@@ -20,7 +20,7 @@ def compliance_summary(user: AuthUser = Depends(require_security)):
 
 @router.get("/gaps")
 def compliance_gaps(user: AuthUser = Depends(require_security)):
-    gaps = get_gaps() if demo_mode_enabled() else compliance_result(user.organization_id)["gaps"]
+    gaps = get_gaps() if demo_mode_enabled(user.organization_id) else compliance_result(user.organization_id)["gaps"]
     total_impact = sum(g["impact_inr"] for g in gaps)
     return {
         "gaps": gaps,
@@ -31,6 +31,6 @@ def compliance_gaps(user: AuthUser = Depends(require_security)):
 
 @router.get("/scores")
 def raw_scores(user: AuthUser = Depends(require_security)):
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         return COMPLIANCE_SCORES
     return {row["framework"]: row["score"] for row in compliance_result(user.organization_id)["frameworks"]}

@@ -5,7 +5,7 @@ from math import prod
 
 from backend.scenario_engine.risk_service import calculate_baseline
 from backend.controls.effectiveness import calculate_control_effectiveness, get_controls_for_asset
-from backend.data_access import demo_mode_enabled, load_findings
+from backend.data_access import demo_mode_enabled, load_findings, set_active_organization
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_eal, calculate_loss_magnitude
 from backend.database.connection import get_connection
@@ -83,6 +83,8 @@ def simulate_scenario(base_controls: dict, overrides: dict, asset: dict, finding
 
 
 def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict | None = None, organization_id=None) -> dict:
+    if organization_id is not None:
+        set_active_organization(organization_id)
     control_overrides = {}
     if overrides.get("implement_mfa") is True or overrides.get("mfa_coverage") is not None:
         control_overrides["mfa_coverage"] = float(overrides.get("mfa_coverage", 1.0))
