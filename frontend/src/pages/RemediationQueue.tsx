@@ -7,6 +7,8 @@ import { formatRupees, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
 import type { RemediationScenario, ScenarioStatus } from '../types';
 import api from '../lib/api';
+import { API_MODE } from '../lib/api';
+import { REMEDIATION_SCENARIOS } from '../demo/fixtures';
 
 const STATUS_LABEL: Record<ScenarioStatus, string> = {
   NOT_STARTED: 'Not Started',
@@ -34,16 +36,21 @@ const normalizeItem = (item: any): RemediationScenario => ({
 });
 
 export default function RemediationQueue() {
-  const [scenarios, setScenarios] = useState<RemediationScenario[]>([]);
+  const [scenarios, setScenarios] = useState<RemediationScenario[]>(API_MODE === 'demo' ? REMEDIATION_SCENARIOS : []);
   const [prTarget, setPrTarget] = useState<RemediationScenario | null>(null);
 
   useEffect(() => {
+    if (API_MODE === 'demo') return;
     api.get('/api/remediation').then((res) => {
       setScenarios((res.data.items || []).map(normalizeItem));
     });
   }, []);
 
   const updateStatus = async (id: string, status: ScenarioStatus) => {
+    if (API_MODE === 'demo') {
+      setScenarios((prev) => prev.map((s) => s.id === id ? { ...s, status } : s));
+      return;
+    }
     try {
       const current = scenarios.find((item) => item.id === id);
       if (!current) return;
@@ -55,6 +62,11 @@ export default function RemediationQueue() {
   };
 
   const assign = async (s: RemediationScenario) => {
+    if (API_MODE === 'demo') {
+      setScenarios((prev) => prev.map((item) => item.id === s.id ? { ...item, owner: { name: 'Current User', initials: 'CU', team: 'Security' }, status: 'IN_PROGRESS' } : item));
+      toast.success('Assigned', `${s.title} assigned to you.`);
+      return;
+    }
     try {
       const res = await api.post(`/api/remediation/${s.id}/assign`, {
         owner_name: 'Current User',

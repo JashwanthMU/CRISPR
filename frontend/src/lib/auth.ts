@@ -41,3 +41,8 @@ export function clearSession(): void {
 export function getAccessToken(): string | null {
   return getSession()?.access_token ?? null;
 }
+
+/** True only for a session whose active tenant is explicitly a demo tenant. */
+export function isDemoOrganization(): boolean {
+  return getSession()?.user?.data_mode === 'DEMO';
+}

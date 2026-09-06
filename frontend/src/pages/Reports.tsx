@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollText, Download, Plus } from 'lucide-react';
 import api from '../lib/api';
+import { API_MODE, getReports } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { SkeletonTable } from '../components/common/Skeleton';
 
@@ -17,6 +18,10 @@ export default function Reports() {
   const [reports, setReports] = useState<ReportItem[] | null>(null);
 
   useEffect(() => {
+    if (API_MODE === 'demo') {
+      getReports().then((items: any) => setReports(items));
+      return;
+    }
     api.get('/api/reports').then((res) => {
       setReports(res.data.reports);
     });
@@ -25,6 +30,12 @@ export default function Reports() {
   const loadReports = () => api.get('/api/reports').then((res) => setReports(res.data.reports));
 
   const generateNew = async () => {
+    if (API_MODE === 'demo') {
+      const report: ReportItem = { id: `demo-${Date.now()}`, name: `Findings Digest — ${new Date().toISOString().slice(0, 10)}`, generated: new Date().toISOString(), format: 'JSON', status: 'READY' };
+      setReports((current) => [report, ...(current ?? [])]);
+      toast.success('Demo report generated', 'The report is available for download.');
+      return;
+    }
     toast.info('Generating report…');
     try {
       await api.post('/api/reports', {
@@ -42,7 +53,7 @@ export default function Reports() {
   const downloadReport = async (reportId: string, name: string) => {
     try {
       toast.info('Preparing download...');
-      const res = await api.get(`/api/reports/${reportId}`);
+      const res = API_MODE === 'demo' ? { data: { report_id: reportId, name, mode: 'DEMO', generated_at: new Date().toISOString() } } : await api.get(`/api/reports/${reportId}`);
       
       const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);

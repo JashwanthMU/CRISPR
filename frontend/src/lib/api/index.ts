@@ -31,6 +31,7 @@ import {
 } from '../../utils/mock';
 import { REPOSITORIES, INTEGRATIONS, SCA_FINDINGS } from '../../demo/fixtures';
 import { runAnalysis as runDemoAnalysis } from '../../demo/demoStore';
+import { isDemoOrganization } from '../auth';
 
 async function liveOrFallback<T>(
   path: string,
@@ -69,6 +70,12 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
+  if (isDemoOrganization()) {
+    return httpClient.get('/api/findings').then(({ data }) => {
+      if (Array.isArray(data?.findings)) return data.findings;
+      throw new Error('Backend returned an invalid findings payload');
+    });
+  }
   return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.findings)) return payload.findings;
@@ -92,6 +99,12 @@ export function getSources() {
 // Assets
 // ----------------------------------------------------------------------------
 export function getAssets(): Promise<Asset[]> {
+  if (isDemoOrganization()) {
+    return httpClient.get('/api/assets').then(({ data }) => {
+      if (Array.isArray(data?.assets)) return data.assets;
+      throw new Error('Backend returned an invalid assets payload');
+    });
+  }
   return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.assets)) return payload.assets;

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FileText, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from '../lib/toastStore';
 import api from '../lib/api';
+import { API_MODE } from '../lib/api';
 
 interface Policy {
   id: string;
@@ -14,15 +15,26 @@ interface Policy {
 }
 
 export default function Policies() {
-  const [policies, setPolicies] = useState<Policy[]>([]);
+  const demoPolicies: Policy[] = [
+    { id: 'demo-policy-1', name: 'Critical vulnerabilities require remediation', description: 'Blocks release when an exploitable critical finding is open.', framework: 'PCI DSS 4.0', enabled: true, severity: 'CRITICAL', version: 1 },
+    { id: 'demo-policy-2', name: 'Privileged accounts require MFA', description: 'Requires MFA for administrators and production access.', framework: 'RBI CSF', enabled: true, severity: 'HIGH', version: 1 },
+    { id: 'demo-policy-3', name: 'Secrets must not enter source control', description: 'Flags verified credentials committed to repositories.', framework: 'ISO 27001', enabled: false, severity: 'HIGH', version: 1 },
+  ];
+  const [policies, setPolicies] = useState<Policy[]>(API_MODE === 'demo' ? demoPolicies : []);
 
   useEffect(() => {
+    if (API_MODE === 'demo') return;
     api.get('/api/policies').then((res) => {
       setPolicies(res.data.policies || []);
     });
   }, []);
 
   const toggle = async (policy: Policy) => {
+    if (API_MODE === 'demo') {
+      setPolicies((prev) => prev.map((p) => p.id === policy.id ? { ...p, enabled: !p.enabled, version: p.version + 1 } : p));
+      toast.success(`Policy ${policy.enabled ? 'disabled' : 'enabled'}`);
+      return;
+    }
     try {
       const res = await api.patch(`/api/policies/${policy.id}/toggle`, { expected_version: policy.version });
       setPolicies((prev) => prev.map((p) => (p.id === policy.id ? res.data : p)));
