@@ -13,6 +13,9 @@ def upgrade() -> None:
     ALTER TABLE organizations ADD COLUMN data_mode VARCHAR(8) NOT NULL DEFAULT 'LIVE';
     ALTER TABLE organizations ADD CONSTRAINT ck_organizations_data_mode
       CHECK(data_mode IN ('LIVE','DEMO'));
+    UPDATE organizations SET name='Company Live',slug='company-live'
+      WHERE organization_id='00000000-0000-0000-0000-000000000001'
+        AND slug='default';
     INSERT INTO organizations(organization_id,name,slug,data_mode)
       VALUES ('00000000-0000-0000-0000-000000000002','CRISPR Demo','crispr-demo','DEMO')
       ON CONFLICT(organization_id) DO UPDATE SET data_mode='DEMO';
