@@ -1,26 +1,6 @@
-import axios from 'axios';
-import { clearSession, getAccessToken } from '../lib/auth';
-
-// An empty base URL uses the deployed page's origin. Nginx proxies /api to the
-// backend container, so browsers never need an EC2-specific hostname.
-const BASE = (import.meta as any).env?.VITE_API_URL || '';
-
-const api = axios.create({ baseURL: BASE, timeout: 8000 });
-
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err?.response?.status === 401) clearSession();
-    console.warn('API error', err?.message);
-    return Promise.reject(err);
-  }
-);
+// Compatibility facade for older pages. All traffic uses the one configured
+// client, interceptor chain and live/demo boundary in lib/api.
+import { httpClient as api } from '../lib/api/client';
 
 const unwrap = (request: Promise<any>, key?: string) =>
   request.then((response) => ({

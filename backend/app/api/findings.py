@@ -16,6 +16,7 @@ from backend.connectors.threat_intel.connector import fetch_findings as fetch_th
 from backend.connectors.vulnerability_scanner.connector import fetch_findings as fetch_vulns
 from backend.connectors.xdr.connector import fetch_findings as fetch_xdr
 from backend.data_access import LiveDataUnavailable, load_findings
+from backend.app.models.responses import FindingCollectionResponse
 
 
 router = APIRouter()
@@ -47,7 +48,7 @@ def load_all_findings(organization_id=None) -> list[dict]:
         raise LiveDataUnavailable(detail)
     return findings
 
-@router.get("")
+@router.get("", response_model=FindingCollectionResponse)
 def get_all_findings(
     limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0),
     severity: str | None = None, source_type: str | None = None,

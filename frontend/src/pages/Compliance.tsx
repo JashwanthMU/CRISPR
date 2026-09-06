@@ -4,6 +4,7 @@ import ProgressBar from '../components/common/ProgressBar';
 import { getCompliance, getGaps } from '../services/api';
 import { MOCK_COMPLIANCE, MOCK_GAPS } from '../utils/mock';
 import { formatRupees, TOKENS } from '../utils/format';
+import { API_MODE } from '../lib/api';
 
 const LABELS: Record<string, string> = {
   ISO_27001: 'ISO 27001',
@@ -24,14 +25,15 @@ function priorityColor(p: string) {
 }
 
 export default function Compliance() {
-  const [compliance, setCompliance] = useState<any[]>(MOCK_COMPLIANCE);
-  const [gaps, setGaps] = useState<any[]>(MOCK_GAPS);
+  const [compliance, setCompliance] = useState<any[]>(API_MODE === 'demo' ? MOCK_COMPLIANCE : []);
+  const [gaps, setGaps] = useState<any[]>(API_MODE === 'demo' ? MOCK_GAPS : []);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([getCompliance(), getGaps()]).then(([c, g]) => {
       if (c?.data) setCompliance(c.data);
       if (g?.data) setGaps(g.data);
-    });
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
   }, []);
 
   return (
@@ -40,6 +42,7 @@ export default function Compliance() {
         <h1 className="page-title">Compliance Dashboard</h1>
         <p className="page-subtitle">Regulatory framework posture and financial impact of open gaps</p>
       </div>
+      {error && <div className="card empty-state">Live compliance data unavailable: {error}</div>}
 
       <div className="responsive-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
         {compliance.map((c) => {

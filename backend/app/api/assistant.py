@@ -7,13 +7,15 @@ GET  /api/assistant/anomalies  SIEM failed-login anomaly scan
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ai.assistant.query_engine import handle_query
 from ai.tools import risk_tools, scenario_tools
 from ml.anomaly_detection.detector import detect_anomalies
 from ml.forecasting.trend import DEFAULT_DAILY_GROWTH_RATE, forecast_eal
+from backend.app.auth import AuthUser, require_security
+from backend.data_access import require_demo_mode
 
 router = APIRouter()
 
@@ -23,10 +25,10 @@ class QueryRequest(BaseModel):
 
 
 @router.post("/query")
-def query(req: QueryRequest):
+def query(req: QueryRequest, user: AuthUser = Depends(require_security)):
     if not req.question or not req.question.strip():
         raise HTTPException(status_code=422, detail="question must not be empty")
-    return handle_query(req.question.strip())
+    return handle_query(req.question.strip(), user.organization_id)
 
 
 @router.get("/forecast")
@@ -35,11 +37,13 @@ def forecast(
     step_days: int = Query(15, ge=1, le=90),
     patch_delay: Optional[int] = Query(None, ge=0, le=365),
     daily_growth_rate: float = Query(DEFAULT_DAILY_GROWTH_RATE, gt=0, le=0.05),
+    user: AuthUser = Depends(require_security),
 ):
-    baseline = risk_tools.get_enterprise_summary().get("total_eal_inr", 0)
+    require_demo_mode("Assumption-based risk projection")
+    baseline = risk_tools.get_enterprise_summary(user.organization_id).get("total_eal_inr", 0)
     delay_applied = None
     if patch_delay:
-        sim = scenario_tools.simulate_patch_delay(patch_delay)
+        sim = scenario_tools.simulate_patch_delay(patch_delay, user.organization_id)
         # Apply the simulator's absolute delay impact to the risks-engine
         # baseline so both stay on one scale (their demo input tables differ).
         delta = sim.get("after_total_eal_inr", 0) - sim.get("before_total_eal_inr", 0)
@@ -64,5 +68,6 @@ def forecast(
 
 
 @router.get("/anomalies")
-def anomalies(include_llm_summary: bool = Query(True)):
+def anomalies(include_llm_summary: bool = Query(True), user: AuthUser = Depends(require_security)):
+    require_demo_mode("Fixture-based anomaly detection")
     return detect_anomalies(include_llm_summary=include_llm_summary)

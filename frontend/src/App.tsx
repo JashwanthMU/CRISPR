@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AppShell from './components/shell/AppShell';
 import ToastHost from './components/common/ToastHost';
@@ -34,6 +35,18 @@ import SettingsPage from './pages/Settings';
 import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
+import { API_MODE } from './lib/api';
+
+function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
+  if (API_MODE === 'demo') return <>{children}</>;
+  return (
+    <div className="page-container">
+      <div className="card empty-state">
+        {feature} is unavailable in live mode until a verified live-data connector is configured.
+      </div>
+    </div>
+  );
+}
 
 function useGlobalShortcuts() {
   useEffect(() => {
@@ -64,20 +77,20 @@ function Shell() {
           <Route path="/findings" element={<Findings />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/risks" element={<Risks />} />
-          <Route path="/attack-paths" element={<AttackPaths />} />
+          <Route path="/attack-paths" element={<DemoOnly feature="Attack paths"><AttackPaths /></DemoOnly>} />
           <Route path="/resources" element={<Resources />} />
 
           <Route path="/vulnerabilities" element={<Vulnerabilities />} />
-          <Route path="/secrets" element={<Secrets />} />
+          <Route path="/secrets" element={<DemoOnly feature="Secret scanning"><Secrets /></DemoOnly>} />
           <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
           <Route path="/cloud-security" element={<CloudSecurity />} />
           <Route path="/identity-security" element={<IdentitySecurity />} />
-          <Route path="/code-security" element={<CodeSecurity />} />
-          <Route path="/code-security/repositories/:id" element={<RepositoryDetail />} />
-          <Route path="/code-security/sca" element={<ScaSbom />} />
+          <Route path="/code-security" element={<DemoOnly feature="Code-security findings"><CodeSecurity /></DemoOnly>} />
+          <Route path="/code-security/repositories/:id" element={<DemoOnly feature="Repository details"><RepositoryDetail /></DemoOnly>} />
+          <Route path="/code-security/sca" element={<DemoOnly feature="SCA and SBOM findings"><ScaSbom /></DemoOnly>} />
 
           <Route path="/scenarios" element={<Scenarios />} />
-          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/recommendations" element={<DemoOnly feature="Generated recommendations"><Recommendations /></DemoOnly>} />
           <Route path="/remediation-queue" element={<RemediationQueue />} />
           <Route path="/investments" element={<Investments />} />
 
@@ -89,7 +102,7 @@ function Shell() {
           <Route path="/api-reference" element={<ApiReference />} />
           <Route path="/settings" element={<SettingsPage />} />
 
-          <Route path="/demo/vscode" element={<VSCodeDemo />} />
+          <Route path="/demo/vscode" element={<DemoOnly feature="VS Code demonstration"><VSCodeDemo /></DemoOnly>} />
 
           <Route path="*" element={<Navigate to="/security" replace />} />
         </Routes>

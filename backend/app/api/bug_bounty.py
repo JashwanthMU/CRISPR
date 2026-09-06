@@ -62,12 +62,12 @@ def submit_report(
             report = connection.execute(
                 """
                 INSERT INTO bug_bounty_reports (
-                    report_id, reporter_user_id, reporter_name, reporter_email,
+                    report_id, organization_id, reporter_user_id, reporter_name, reporter_email,
                     title, asset_id,
                     weakness, severity, description, impact, reproduction_steps,
                     remediation, cve
                 ) VALUES (
-                    %(report_id)s, %(reporter_user_id)s, %(reporter_name)s,
+                    %(report_id)s, %(organization_id)s, %(reporter_user_id)s, %(reporter_name)s,
                     %(reporter_email)s,
                     %(title)s, %(asset_id)s, %(weakness)s, %(severity)s,
                     %(description)s, %(impact)s, %(reproduction_steps)s,
@@ -77,6 +77,7 @@ def submit_report(
                 """,
                 {
                     "report_id": report_id,
+                    "organization_id": user.organization_id,
                     "reporter_user_id": user.user_id,
                     "reporter_name": user.name,
                     "reporter_email": str(user.email),
@@ -94,8 +95,8 @@ def list_reports(
     user: AuthUser = Depends(get_current_user),
 ) -> dict:
     query = "SELECT * FROM bug_bounty_reports"
-    conditions = []
-    parameters = {}
+    conditions = ["organization_id = %(organization_id)s"]
+    parameters = {"organization_id": user.organization_id}
     if user.role != UserRole.SECURITY:
         conditions.append("reporter_user_id = %(user_id)s")
         parameters["user_id"] = user.user_id
@@ -120,8 +121,8 @@ def get_report(
     try:
         with get_connection() as connection:
             report = connection.execute(
-                "SELECT * FROM bug_bounty_reports WHERE report_id = %s",
-                (report_id,),
+                "SELECT * FROM bug_bounty_reports WHERE report_id = %s AND organization_id = %s",
+                (report_id, user.organization_id),
             ).fetchone()
     except OperationalError as error:
         raise _database_unavailable(error) from error
@@ -149,7 +150,7 @@ def review_report(
                     triage_notes = %(triage_notes)s,
                     reviewed_by = %(reviewed_by)s,
                     updated_at = %(updated_at)s
-                WHERE report_id = %(report_id)s
+                WHERE report_id = %(report_id)s AND organization_id = %(organization_id)s
                 RETURNING *
                 """,
                 {
@@ -158,6 +159,7 @@ def review_report(
                     "reviewed_by": security_user.name,
                     "updated_at": datetime.now(timezone.utc),
                     "report_id": report_id,
+                    "organization_id": security_user.organization_id,
                 },
             ).fetchone()
     except OperationalError as error:

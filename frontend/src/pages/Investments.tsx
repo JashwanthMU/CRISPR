@@ -3,22 +3,26 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getControls, optimize } from '../services/api';
 import { MOCK_CONTROLS, MOCK_OPTIMIZE_RESULT } from '../utils/mock';
 import { formatRupees, TOKENS } from '../utils/format';
+import { API_MODE } from '../lib/api';
 
 export default function Investments() {
   const [budgetLakh, setBudgetLakh] = useState(100); // ₹100L default
-  const [result, setResult] = useState<any>(MOCK_OPTIMIZE_RESULT);
-  const [controls, setControls] = useState<any[]>(MOCK_CONTROLS);
+  const [result, setResult] = useState<any>(API_MODE === 'demo' ? MOCK_OPTIMIZE_RESULT : null);
+  const [controls, setControls] = useState<any[]>(API_MODE === 'demo' ? MOCK_CONTROLS : []);
   const [optimizing, setOptimizing] = useState(false);
+  const [error, setError] = useState('');
 
   const budgetInr = budgetLakh * 100000;
 
   const runOptimize = async () => {
     setOptimizing(true);
+    setError('');
     try {
       const res = await optimize(budgetInr);
-      setResult(res?.data || { ...MOCK_OPTIMIZE_RESULT, budget_inr: budgetInr });
-    } catch {
-      setResult({ ...MOCK_OPTIMIZE_RESULT, budget_inr: budgetInr });
+      if (!res?.data) throw new Error('Backend returned no optimization result');
+      setResult(res.data);
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.detail ?? requestError.message);
     } finally {
       setOptimizing(false);
     }
@@ -28,7 +32,7 @@ export default function Investments() {
     Promise.all([optimize(budgetInr), getControls()]).then(([optimization, catalogue]) => {
       if (optimization?.data) setResult(optimization.data);
       if (catalogue?.data) setControls(catalogue.data);
-    });
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
   }, []);
 
   const selectedNames = new Set((result?.selected_controls ?? []).map((c: any) => c.name));
@@ -42,6 +46,7 @@ export default function Investments() {
           NovaPay Investment Optimizer · Maximize risk reduction per rupee spent
         </p>
       </div>
+      {error && <div className="card empty-state">Live optimization unavailable: {error}</div>}
 
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>

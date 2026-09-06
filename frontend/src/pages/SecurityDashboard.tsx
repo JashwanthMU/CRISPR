@@ -14,7 +14,7 @@ import FindingsSummary from '../components/dashboard/FindingsSummary';
 import SecurityPipeline from '../components/dashboard/SecurityPipeline';
 import SecurityInsights from '../components/dashboard/SecurityInsights';
 import RiskCaseDrawer from '../components/riskcases/RiskCaseDrawer';
-import { getEnterprise, getRiskCases, getSources, getFindings, getForecast } from '../lib/api';
+import { API_MODE, getEnterprise, getRiskCases, getSources, getFindings, getForecast } from '../lib/api';
 import { MULTI_SERIES_TREND } from '../demo/fixtures';
 import { useDemoStore } from '../demo/demoStore';
 import { useUiStore, setFilter } from '../lib/uiStore';
@@ -45,12 +45,13 @@ export default function SecurityDashboard() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
   const [trendData, setTrendData] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
   const demoRiskScore = useDemoStore((s) => s.riskScore);
   const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
   const isRunning = useDemoStore((s) => s.isRunning);
   const filters = useUiStore((s) => s.filters);
-  const riskScore = enterprise?.enterprise_risk_score ?? demoRiskScore;
+  const riskScore = enterprise?.enterprise_risk_score ?? (API_MODE === 'demo' ? demoRiskScore : 0);
 
   useEffect(() => {
     Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings(), getForecast()]).then(([e, r, s, f, t]) => {
@@ -59,7 +60,7 @@ export default function SecurityDashboard() {
       setSources(s);
       setFindings(f);
       if (Array.isArray(t) && t.length) setTrendData(t);
-    });
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
   }, []);
 
   const sortedRisks = useMemo(() => [...risks].sort((a, b) => b.risk_score - a.risk_score), [risks]);
@@ -70,8 +71,8 @@ export default function SecurityDashboard() {
   const lowCount = findings.filter((f) => f.severity === 'LOW').length;
   const connectedCount = sources.filter((s) => s.status === 'connected').length;
   const topRisk = sortedRisks[0];
-  const internetExposed = risks.filter((r) => (r as any).exposure === 'INTERNET').length || 2;
-  const openRemediations = 5;
+  const internetExposed = risks.filter((r) => (r as any).exposure === 'INTERNET').length;
+  const openRemediations = 0;
 
   const findingsSummaryRows = [
     { severity: 'CRITICAL' as const, count: criticalCount, trendPct: 8, remediationRate: 25 },
@@ -79,6 +80,10 @@ export default function SecurityDashboard() {
     { severity: 'MEDIUM' as const, count: mediumCount, trendPct: -2, remediationRate: 60 },
     { severity: 'LOW' as const, count: lowCount, trendPct: -6, remediationRate: 80 },
   ];
+
+  if (error) {
+    return <div className="page-container"><div className="card empty-state">Live dashboard unavailable: {error}</div></div>;
+  }
 
   if (!enterprise) {
     return (
@@ -143,7 +148,7 @@ export default function SecurityDashboard() {
         />
         <KPICard
           title="Monitored Assets"
-          value={13}
+          value={new Set(findings.map((finding) => finding.asset_id)).size}
           subtitle="Across code, cloud, and identity"
           icon={<Boxes size={16} />}
           accentColor={TOKENS.secondaryBlue}
@@ -179,7 +184,7 @@ export default function SecurityDashboard() {
       <div className="dashboard-grid-2 animate-in-2" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
         <RiskPostureCard
           score={riskScore}
-          previousScore={previousRiskScore}
+          previousScore={API_MODE === 'demo' ? previousRiskScore : riskScore}
           ealLakh={enterprise.total_eal_lakh}
           onOpenDetail={() => topRisk && setActiveCase(topRisk)}
         />
@@ -319,7 +324,7 @@ export default function SecurityDashboard() {
       <div className="card animate-in-3">
         <div className="card-title">Risk Trend</div>
         <InteractiveTrendChart
-          data={trendData.length ? trendData : MULTI_SERIES_TREND}
+          data={trendData.length ? trendData : API_MODE === 'demo' ? MULTI_SERIES_TREND : []}
           xKey="month"
           series={TREND_SERIES}
           defaultSeries={['enterpriseRisk']}

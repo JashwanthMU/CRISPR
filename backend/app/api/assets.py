@@ -13,6 +13,7 @@ from backend.controls.effectiveness import (
 from backend.correlation.correlator import correlate_findings
 from backend.normalization.normalizer import normalize_all
 from backend.app.api.findings import get_findings_by_asset
+from backend.app.models.responses import AssetCollectionResponse
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ def _asset_name_lookup(assets: list[dict]) -> dict:
     return {a["asset_id"]: a.get("name", a["asset_id"]) for a in assets}
 
 
-@router.get("")
+@router.get("", response_model=AssetCollectionResponse)
 def get_assets(limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0), user: AuthUser = Depends(require_security)):
     assets = []
     for asset in load_assets(user.organization_id):

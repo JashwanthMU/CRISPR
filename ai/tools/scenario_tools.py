@@ -10,29 +10,29 @@ from backend.data_access import load_assets
 from backend.scenario_engine.simulator import simulate_enterprise
 
 
-def _assets() -> list:
-    return load_assets()
+def _assets(organization_id) -> list:
+    return load_assets(organization_id=organization_id)
 
 
-def _run(overrides: dict) -> dict:
-    return simulate_enterprise(_assets(), overrides)
+def _run(overrides: dict, organization_id) -> dict:
+    return simulate_enterprise(_assets(organization_id), overrides, organization_id=organization_id)
 
 
-def get_current_state() -> dict:
-    return _run({})
+def get_current_state(organization_id) -> dict:
+    return _run({}, organization_id)
 
 
-def simulate_mfa() -> dict:
-    return _run({"implement_mfa": True})
+def simulate_mfa(organization_id) -> dict:
+    return _run({"implement_mfa": True}, organization_id)
 
 
-def simulate_patch_delay(days: int = 30) -> dict:
-    return _run({"patch_delay": int(days)})
+def simulate_patch_delay(days: int = 30, organization_id=None) -> dict:
+    return _run({"patch_delay": int(days)}, organization_id)
 
 
-def simulate_patching_now() -> dict:
-    return _run({"implement_patching": True})
+def simulate_patching_now(organization_id) -> dict:
+    return _run({"implement_patching": True}, organization_id)
 
 
-def simulate_segmentation() -> dict:
-    return _run({"implement_segmentation": True})
+def simulate_segmentation(organization_id) -> dict:
+    return _run({"implement_segmentation": True}, organization_id)

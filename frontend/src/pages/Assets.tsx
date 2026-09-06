@@ -7,6 +7,7 @@ import FilterBar from '../components/common/FilterBar';
 import { getAssets, getRisks, getFindings } from '../services/api';
 import { MOCK_ASSETS, MOCK_RISKS, MOCK_FINDINGS } from '../utils/mock';
 import { formatRupees, riskColor, TOKENS } from '../utils/format';
+import { API_MODE } from '../lib/api';
 
 const TYPE_LABELS: Record<string, string> = {
   api_gateway: 'API Gateway',
@@ -16,9 +17,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Assets() {
-  const [assets, setAssets] = useState<any[]>(MOCK_ASSETS);
-  const [risks, setRisks] = useState<any[]>(MOCK_RISKS);
-  const [findings, setFindings] = useState<any[]>(MOCK_FINDINGS);
+  const [assets, setAssets] = useState<any[]>(API_MODE === 'demo' ? MOCK_ASSETS : []);
+  const [risks, setRisks] = useState<any[]>(API_MODE === 'demo' ? MOCK_RISKS : []);
+  const [findings, setFindings] = useState<any[]>(API_MODE === 'demo' ? MOCK_FINDINGS : []);
+  const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -29,7 +31,7 @@ export default function Assets() {
       if (a?.data) setAssets(a.data);
       if (r?.data) setRisks(r.data);
       if (f?.data) setFindings(f.data);
-    });
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
   }, []);
 
   const riskFor = (assetId: string) => risks.find((r) => r.asset_id === assetId);
@@ -57,6 +59,7 @@ export default function Assets() {
       </div>
 
       <div className="card">
+        {error && <div className="empty-state">Live asset data unavailable: {error}</div>}
         <FilterBar
           search={search}
           onSearchChange={setSearch}
