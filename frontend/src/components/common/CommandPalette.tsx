@@ -5,7 +5,7 @@ import { useUiStore, closeCommandPalette, openAIDrawer } from '../../lib/uiStore
 import { MOCK_FINDINGS, MOCK_ASSETS, MOCK_RISKS } from '../../utils/mock';
 import { REPOSITORIES } from '../../demo/fixtures';
 import { NAV_GROUPS } from '../shell/navConfig';
-import { runAnalysis } from '../../demo/demoStore';
+import { API_MODE, runAnalysis } from '../../lib/api';
 import type { CommandResult, CommandResultType } from '../../types';
 
 // "Pages" results are derived from the single shared nav config (see
@@ -91,14 +91,14 @@ export default function CommandPalette() {
 
     if (!q) return [...PAGE_RESULTS, ...actionMatches];
 
-    const assetResults: CommandResult[] = MOCK_ASSETS.filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
+    const assetResults: CommandResult[] = (API_MODE === 'demo' ? MOCK_ASSETS : []).filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
       id: a.asset_id,
       type: 'asset',
       title: a.name,
       subtitle: a.business_service,
       path: `/assets`,
     }));
-    const findingResults: CommandResult[] = MOCK_FINDINGS.filter(
+    const findingResults: CommandResult[] = (API_MODE === 'demo' ? MOCK_FINDINGS : []).filter(
       (f) => f.title.toLowerCase().includes(q) || f.finding_id.toLowerCase().includes(q) || f.cve?.toLowerCase().includes(q)
     ).map((f) => ({
       id: f.finding_id,
@@ -107,14 +107,14 @@ export default function CommandPalette() {
       subtitle: `${f.finding_id}${f.cve ? ' · ' + f.cve : ''}`,
       path: `/findings`,
     }));
-    const riskResults: CommandResult[] = MOCK_RISKS.filter((r) => r.asset_name.toLowerCase().includes(q)).map((r) => ({
+    const riskResults: CommandResult[] = (API_MODE === 'demo' ? MOCK_RISKS : []).filter((r) => r.asset_name.toLowerCase().includes(q)).map((r) => ({
       id: r.asset_id,
       type: 'risk_case',
       title: r.asset_name,
       subtitle: `Risk score ${r.risk_score}`,
       path: `/risks`,
     }));
-    const repoResults: CommandResult[] = REPOSITORIES.filter((r) => r.name.toLowerCase().includes(q)).map((r) => ({
+    const repoResults: CommandResult[] = (API_MODE === 'demo' ? REPOSITORIES : []).filter((r) => r.name.toLowerCase().includes(q)).map((r) => ({
       id: r.id,
       type: 'repository',
       title: r.name,

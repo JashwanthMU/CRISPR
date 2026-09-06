@@ -8,16 +8,27 @@
 4. ML artifact validation and governance records.
 5. Evidence-backed financial-frequency governance.
 
-## Phase 6 — Tenant isolation and merge safety
+## Phase 6 — Tenant isolation and merge safety (completed)
 
 Use tenant-scoped identifiers and foreign keys, pass organization context
 through assistant and threat-intelligence services, and enforce CI on pull
 requests targeting `develop`.
 
-## Phase 7 — Typed APIs and truthful live UI
+Delivered in migration `0005_tenant_isolation`: internal UUID record keys,
+organization-scoped external identifiers and composite foreign keys. Assistant,
+threat-intelligence and bug-bounty access now carries organization context, and
+synthetic analytics are refused in live mode.
+
+## Phase 7 — Typed APIs and truthful live UI (completed foundation)
 
 Add response models and a stable error contract, generate frontend types, merge
 the duplicate API clients, and prohibit fixture fallback in live mode.
+
+The frontend now uses one configured HTTP client. Core collection APIs publish
+typed envelopes, invalid payloads fail visibly, live dashboards start empty,
+and fixture-only screens are explicitly unavailable in live mode. Additional
+resource-specific response models can be introduced without changing these
+stable collection envelopes.
 
 ## Phase 8 — Real connector and telemetry platform
 

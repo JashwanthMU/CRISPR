@@ -1,7 +1,7 @@
 """Durable external integration configuration and synchronization API."""
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Union
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, SecretStr
 
 from backend.app.auth import AuthUser, require_security
 from backend.connectors.github import GitHubConnector
+from backend.connectors.generic_http import GenericHTTPConnector
 from backend.repositories import platform
 from backend.security.secrets import decrypt_credentials, encrypt_credentials
 from backend.services.audit import record_audit_event
@@ -20,7 +21,31 @@ class GitHubIntegrationCreate(BaseModel):
     provider: Literal["github"] = "github"
     name: str = Field(min_length=2, max_length=160)
     token: SecretStr
+    webhook_secret: SecretStr | None = None
     organization: str | None = Field(default=None, max_length=120)
+    sync_interval_minutes: int = Field(default=60, ge=5, le=10080)
+
+
+class GenericHTTPIntegrationCreate(BaseModel):
+    provider: Literal["generic_http"] = "generic_http"
+    name: str = Field(min_length=2, max_length=160)
+    base_url: str = Field(min_length=8, max_length=1000)
+    token: SecretStr | None = None
+    health_path: str = Field(min_length=1, max_length=500)
+    events_path: str = Field(min_length=1, max_length=500)
+    assets_path: str | None = Field(default=None, max_length=500)
+    items_field: str = Field(default="items", min_length=1, max_length=120)
+    next_cursor_field: str = Field(default="next_cursor", min_length=1, max_length=120)
+    cursor_parameter: str = Field(default="cursor", min_length=1, max_length=120)
+    cursor_strategy: Literal["observed_at", "opaque"] = "observed_at"
+    max_pages_per_sync: int = Field(default=100, ge=1, le=10000)
+    external_id_field: str = Field(default="id", min_length=1, max_length=120)
+    event_type_field: str = Field(default="event_type", min_length=1, max_length=120)
+    observed_at_field: str = Field(default="observed_at", min_length=1, max_length=120)
+    asset_id_field: str = Field(default="asset_id", min_length=1, max_length=120)
+    severity_field: str = Field(default="severity", min_length=1, max_length=120)
+    auth_header: str = Field(default="Authorization", min_length=1, max_length=120)
+    auth_prefix: str = Field(default="Bearer", max_length=40)
     sync_interval_minutes: int = Field(default=60, ge=5, le=10080)
 
 
@@ -39,17 +64,26 @@ def integrations(user: AuthUser = Depends(require_security)):
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def configure(body: GitHubIntegrationCreate, user: AuthUser = Depends(require_security)):
-    token = body.token.get_secret_value()
+def configure(body: Union[GitHubIntegrationCreate, GenericHTTPIntegrationCreate], user: AuthUser = Depends(require_security)):
+    if body.provider == "github":
+        token = body.token.get_secret_value()
+        connector = GitHubConnector(token, body.organization)
+        config = {"organization": body.organization, "sync_interval_minutes": body.sync_interval_minutes}
+    else:
+        token = body.token.get_secret_value() if body.token else ""
+        config = body.model_dump(exclude={"provider", "name", "token", "webhook_secret"})
+        connector = GenericHTTPConnector(config, {"token": token})
     try:
-        verification = GitHubConnector(token, body.organization).validate_credentials()
+        verification = connector.validate_credentials()
     except RuntimeError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    config = {"organization": body.organization, "sync_interval_minutes": body.sync_interval_minutes,
-              "verified_account": verification.account}
+    config["verified_account"] = verification.account
     try:
+        credentials = {"token": token} if token else {}
+        if body.provider == "generic_http" and body.webhook_secret:
+            credentials["webhook_secret"] = body.webhook_secret.get_secret_value()
         row = platform.create_integration(
-            user.organization_id, body.provider, body.name, config, encrypt_credentials({"token": token})
+            user.organization_id, body.provider, body.name, config, encrypt_credentials(credentials)
         )
     except Exception as error:
         if "unique" in str(error).lower():
@@ -75,11 +109,13 @@ def reconnect(integration_id: UUID, user: AuthUser = Depends(require_security)):
     row = platform.get_integration(user.organization_id, integration_id, include_secret=True)
     if not row or not row.get("encrypted_credentials"):
         raise HTTPException(status_code=404, detail="Integration or credentials not found")
-    if row["provider"] != "github":
+    if row["provider"] not in {"github", "generic_http"}:
         raise HTTPException(status_code=501, detail=f"Provider {row['provider']} is not implemented")
     credentials = decrypt_credentials(row["encrypted_credentials"])
     try:
-        result = GitHubConnector(credentials["token"], row["config"].get("organization")).healthcheck()
+        connector = (GitHubConnector(credentials["token"], row["config"].get("organization"))
+                     if row["provider"] == "github" else GenericHTTPConnector(row["config"], credentials))
+        result = connector.healthcheck()
     except RuntimeError as error:
         platform.set_integration_state(user.organization_id, integration_id, status="error", last_error=str(error))
         raise HTTPException(status_code=400, detail=str(error)) from error

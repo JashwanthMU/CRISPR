@@ -15,6 +15,7 @@ from ai.tools.guardrail import validate as guardrail_validate
 from ai.tools.llm import chat, is_available
 from ml.anomaly_detection.detector import detect_anomalies
 from ml.forecasting.trend import DEFAULT_DAILY_GROWTH_RATE, forecast_eal
+from backend.data_access import require_demo_mode
 
 INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("mfa_scenario", ("mfa", "multi-factor", "multifactor")),
@@ -111,8 +112,8 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
     return guarded["text"], {}, "llm"
 
 
-def _answer_top_risk(question: str = "") -> tuple[str, dict]:
-    enterprise = risk_tools.get_enterprise_summary()
+def _answer_top_risk(question: str = "", organization_id=None) -> tuple[str, dict]:
+    enterprise = risk_tools.get_enterprise_summary(organization_id)
     top = enterprise.get("top_risk") or {}
     drivers = top.get("risk_drivers") or []
     driver_names = ", ".join((d.get("factor") or d.get("driver") or d.get("name", "")) for d in drivers[:3] if isinstance(d, dict)) \
@@ -130,8 +131,8 @@ def _answer_top_risk(question: str = "") -> tuple[str, dict]:
                     "top_risk": top}
 
 
-def _answer_risk_drivers(question: str) -> tuple[str, dict]:
-    row = risk_tools.find_risk_by_question(question) or risk_tools.get_top_risk()
+def _answer_risk_drivers(question: str, organization_id=None) -> tuple[str, dict]:
+    row = risk_tools.find_risk_by_question(question, organization_id) or risk_tools.get_top_risk(organization_id)
     if not row:
         return "No risk case is currently modeled.", {}
     ce = row.get("control_effectiveness_pct")
@@ -163,8 +164,8 @@ def _scenario_answer(sim: dict, action_label: str) -> tuple[str, dict]:
     return answer, {"scenario": sim}
 
 
-def _answer_mfa(question: str) -> tuple[str, dict]:
-    sim = scenario_tools.simulate_mfa()
+def _answer_mfa(question: str, organization_id=None) -> tuple[str, dict]:
+    sim = scenario_tools.simulate_mfa(organization_id)
     answer, data = _scenario_answer(sim, "Implementing MFA across privileged accounts")
     cost = next((p["cost_inr"] for p in _preset_costs() if p["id"] == "mfa"), None)
     if cost:
@@ -173,19 +174,19 @@ def _answer_mfa(question: str) -> tuple[str, dict]:
     return answer, data
 
 
-def _answer_patch_delay(question: str) -> tuple[str, dict]:
+def _answer_patch_delay(question: str, organization_id=None) -> tuple[str, dict]:
     days = 30
-    sim = scenario_tools.simulate_patch_delay(days)
+    sim = scenario_tools.simulate_patch_delay(days, organization_id)
     answer, data = _scenario_answer(sim, f"Delaying remediation by {days} days")
     return answer, data
 
 
-def _answer_budget(question: str) -> tuple[str, dict]:
+def _answer_budget(question: str, organization_id=None) -> tuple[str, dict]:
     budget = extract_budget_inr(question)
-    plan = optimize_tools.optimize_investment(budget)
+    plan = optimize_tools.optimize_investment(budget, organization_id)
     controls = plan.get("selected_controls", [])
     names = ", ".join(c["name"] for c in controls) or "none fit this budget"
-    enterprise_total = risk_tools.get_enterprise_summary().get("total_eal_inr", 0)
+    enterprise_total = risk_tools.get_enterprise_summary(organization_id).get("total_eal_inr", 0)
     residual = max(enterprise_total - plan.get("total_reduction_inr", 0), 0)
     answer = (
         f"With a {format_inr(budget)} budget, invest in: {names}. Total spend "
@@ -201,8 +202,9 @@ def _answer_budget(question: str) -> tuple[str, dict]:
     }
 
 
-def _answer_forecast(question: str) -> tuple[str, dict]:
-    base = risk_tools.get_enterprise_summary().get("total_eal_inr", 0)
+def _answer_forecast(question: str, organization_id=None) -> tuple[str, dict]:
+    require_demo_mode("Assumption-based risk projection")
+    base = risk_tools.get_enterprise_summary(organization_id).get("total_eal_inr", 0)
     forecast = forecast_eal(base, horizon_days=90, step_days=15,
                             daily_growth_rate=DEFAULT_DAILY_GROWTH_RATE)
     s = forecast["summary"]
@@ -214,7 +216,8 @@ def _answer_forecast(question: str) -> tuple[str, dict]:
     return answer, {"forecast": forecast}
 
 
-def _answer_anomalies(question: str) -> tuple[str, dict]:
+def _answer_anomalies(question: str, organization_id=None) -> tuple[str, dict]:
+    require_demo_mode("Fixture-based anomaly detection")
     detection = detect_anomalies(include_llm_summary=False)
     flagged = detection["anomalies"]
     if flagged:
@@ -231,8 +234,8 @@ def _answer_anomalies(question: str) -> tuple[str, dict]:
     return answer, {"detection": detection}
 
 
-def _answer_enterprise(question: str = "") -> tuple[str, dict]:
-    e = risk_tools.get_enterprise_summary()
+def _answer_enterprise(question: str = "", organization_id=None) -> tuple[str, dict]:
+    e = risk_tools.get_enterprise_summary(organization_id)
     answer = (
         f"Enterprise risk score is {e.get('enterprise_risk_score')} with total expected annual loss of "
         f"{format_inr(e.get('total_eal_inr', 0))} and a 95th-percentile loss of "
@@ -304,7 +307,7 @@ HANDLERS_PARAM = {
 FULL_HANDLERS = {**HANDLERS, **HANDLERS_PARAM}
 
 
-def answer_question(question: str) -> dict:
+def answer_question(question: str, organization_id) -> dict:
     intent = route_intent(question)
     if intent == "general_question":
         answer, data, engine = _answer_general(question)
@@ -316,7 +319,7 @@ def answer_question(question: str) -> dict:
         template, data = _help_answer()
         engine = "template"
     else:
-        template, data = handler(question)
+        template, data = handler(question, organization_id)
         engine = "template"
         llm_answer, violations = _polish_with_llm(intent, question, data)
         if llm_answer:
@@ -325,5 +328,5 @@ def answer_question(question: str) -> dict:
     return {"answer": template, "data": data, "intent": intent, "engine": engine}
 
 
-def handle_query(question: str) -> dict:
-    return answer_question(question)
+def handle_query(question: str, organization_id) -> dict:
+    return answer_question(question, organization_id)

@@ -40,10 +40,9 @@ def upsert_assets(assets: list[dict], data_origin: str = "LIVE", organization_id
                 """
                 INSERT INTO assets (asset_id, payload, data_origin, organization_id)
                 VALUES (%s, %s, %s, %s)
-                ON CONFLICT (asset_id) DO UPDATE
+                ON CONFLICT (organization_id, asset_id) DO UPDATE
                 SET payload = EXCLUDED.payload,
                     data_origin = EXCLUDED.data_origin,
-                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
                 (asset["asset_id"], Jsonb(asset), data_origin, organization_id),
@@ -62,14 +61,13 @@ def upsert_findings(findings: list[dict], data_origin: str = "LIVE", organizatio
                     finding_id, source_type, source_name, asset_id,
                     payload, first_seen, data_origin, organization_id, severity, cve, status
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (finding_id) DO UPDATE SET
+                ON CONFLICT (organization_id, finding_id) DO UPDATE SET
                     source_type = EXCLUDED.source_type,
                     source_name = EXCLUDED.source_name,
                     asset_id = EXCLUDED.asset_id,
                     payload = EXCLUDED.payload,
                     first_seen = EXCLUDED.first_seen,
                     data_origin = EXCLUDED.data_origin,
-                    organization_id = EXCLUDED.organization_id,
                     severity = EXCLUDED.severity,
                     cve = EXCLUDED.cve,
                     status = EXCLUDED.status,
@@ -105,12 +103,11 @@ def upsert_control_postures(
                 INSERT INTO control_postures (
                     asset_id, payload, observed_at, source_name, data_origin, organization_id
                 ) VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (asset_id) DO UPDATE SET
+                ON CONFLICT (organization_id, asset_id) DO UPDATE SET
                     payload = EXCLUDED.payload,
                     observed_at = EXCLUDED.observed_at,
                     source_name = EXCLUDED.source_name,
                     data_origin = EXCLUDED.data_origin,
-                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
                 (posture["asset_id"], Jsonb(posture), observed_at, source_name, data_origin, organization_id),
@@ -155,12 +152,11 @@ def upsert_control_catalog(
                 INSERT INTO control_catalog (
                     control_id, payload, source_name, observed_at, data_origin, organization_id
                 ) VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (control_id) DO UPDATE SET
+                ON CONFLICT (organization_id, control_id) DO UPDATE SET
                     payload = EXCLUDED.payload,
                     source_name = EXCLUDED.source_name,
                     observed_at = EXCLUDED.observed_at,
                     data_origin = EXCLUDED.data_origin,
-                    organization_id = EXCLUDED.organization_id,
                     updated_at = NOW()
                 """,
                 (
@@ -184,12 +180,18 @@ def refresh_demo_sources() -> dict:
     return result
 
 
-def fetch_findings(source_type: str | None = None) -> list[dict]:
+def fetch_findings(
+    source_type: str | None = None,
+    organization_id: UUID = DEFAULT_ORGANIZATION_ID,
+) -> list[dict]:
     query = "SELECT payload FROM findings"
     parameters = ()
+    conditions = ["organization_id = %s"]
+    parameters = [organization_id]
     if source_type:
-        query += " WHERE source_type = %s"
-        parameters = (source_type,)
+        conditions.append("source_type = %s")
+        parameters.append(source_type)
+    query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY first_seen DESC NULLS LAST, finding_id"
     with get_connection() as connection:
         rows = connection.execute(query, parameters).fetchall()

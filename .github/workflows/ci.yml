@@ -2,9 +2,9 @@ name: CRISPR CI
 
 on:
   push:
-    branches: [ "main", "feat/platform-connections" ]
+    branches: [ "main", "develop", "feat/**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   build-and-test:
@@ -55,7 +55,7 @@ jobs:
     - name: Run Tests
       run: |
         alembic upgrade head
-        test "$(alembic current | awk '{print $1}')" = "0004_incident_frequency_evidence"
+        test "$(alembic current | awk '{print $1}')" = "0006_enterprise_evidence"
         python -c "from backend.ingestion.store import refresh_demo_sources; print(refresh_demo_sources())"
         pytest backend/ -q
 
@@ -70,3 +70,11 @@ jobs:
         docker compose build
         docker compose up -d db backend worker
         docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready')"
+
+    - name: Docker diagnostics
+      if: failure()
+      run: docker compose logs --no-color --tail=200 backend worker db
+
+    - name: Stop Docker services
+      if: always()
+      run: docker compose down --volumes

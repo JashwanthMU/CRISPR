@@ -7,6 +7,7 @@ import { ASSET_TYPE_ICON } from '../config/icons';
 import { formatRupees, riskColor } from '../utils/format';
 import ProgressBar from '../components/common/ProgressBar';
 import { getAssets } from '../services/api';
+import { API_MODE } from '../lib/api';
 
 interface Resource {
   asset_id: string;
@@ -33,7 +34,7 @@ const toResources = (assets: any[]): Resource[] => assets.map((a) => ({
 }));
 
 export default function Resources() {
-  const [resources, setResources] = useState<Resource[]>(toResources(MOCK_ASSETS));
+  const [resources, setResources] = useState<Resource[]>(API_MODE === 'demo' ? toResources(MOCK_ASSETS) : []);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [envFilter, setEnvFilter] = useState('all');

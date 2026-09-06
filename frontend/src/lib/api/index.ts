@@ -92,9 +92,11 @@ export function getSources() {
 // Assets
 // ----------------------------------------------------------------------------
 export function getAssets(): Promise<Asset[]> {
-  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.assets) ? payload.assets : MOCK_ASSETS,
-  );
+  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.assets)) return payload.assets;
+    throw new Error('Backend returned an invalid assets payload');
+  });
 }
 
 export function getAsset(id: string): Promise<Asset | undefined> {
@@ -105,9 +107,11 @@ export function getAsset(id: string): Promise<Asset | undefined> {
 // Risk cases
 // ----------------------------------------------------------------------------
 export function getRiskCases(): Promise<RiskCase[]> {
-  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.risks) ? payload.risks : MOCK_RISKS,
-  );
+  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.risks)) return payload.risks;
+    throw new Error('Backend returned an invalid risks payload');
+  });
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
@@ -163,7 +167,10 @@ export function getReports() {
 }
 
 export function getCompliance() {
-  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE, 'get', undefined, (payload) => payload.frameworks);
+  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE, 'get', undefined, (payload) => {
+    if (!Array.isArray(payload?.frameworks)) throw new Error('Backend returned an invalid compliance payload');
+    return payload.frameworks;
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -239,6 +246,9 @@ export function getRecommend() {
 }
 
 export function getForecast() {
+  // No live time-series forecast exists yet. Returning an empty series is an
+  // explicit unavailable state, not fixture substitution.
+  if (API_MODE === 'live') return Promise.resolve([]);
   return liveOrFallback('/api/assistant/forecast', [], 'get', undefined, (p) =>
     Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
   );
