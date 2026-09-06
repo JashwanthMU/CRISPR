@@ -246,12 +246,12 @@ def sync_nvd(
     user: AuthUser = Depends(require_security),
 ) -> dict:
     """Enrich explicit asset/CVE mappings using current NVD and EPSS data."""
-    if demo_mode_enabled(user.organization_id):
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    if demo_mode_enabled(organization_id):
         raise HTTPException(
             status_code=409,
             detail="NVD sync writes LIVE records; set CRISPR_DATA_MODE=live",
         )
-    organization_id = user.organization_id if isinstance(user, AuthUser) else None
     assets = {asset["asset_id"] for asset in (
         load_assets(organization_id) if organization_id is not None else load_assets()
     )}
