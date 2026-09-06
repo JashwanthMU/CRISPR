@@ -2,6 +2,7 @@
 // client, interceptor chain and live/demo boundary in lib/api.
 import { API_MODE, httpClient as api } from '../lib/api/client';
 import { MOCK_ASSETS, MOCK_CONTROLS, MOCK_ENTERPRISE, MOCK_FINDINGS, MOCK_OPTIMIZE_RESULT, MOCK_RISKS } from '../utils/mock';
+import { isDemoOrganization } from '../lib/auth';
 
 const demoResponse = (data: any) => Promise.resolve({ data } as any);
 
@@ -13,9 +14,9 @@ const unwrap = (request: Promise<any>, key?: string) =>
 
 export const getRisks = () => API_MODE === 'demo' ? demoResponse(MOCK_RISKS) : unwrap(api.get('/api/risks'), 'risks');
 export const getEnterprise = () => API_MODE === 'demo' ? demoResponse(MOCK_ENTERPRISE) : api.get('/api/risks/enterprise');
-export const getAssets = () => API_MODE === 'demo' ? demoResponse(MOCK_ASSETS) : unwrap(api.get('/api/assets'), 'assets');
+export const getAssets = () => API_MODE === 'demo' && !isDemoOrganization() ? demoResponse(MOCK_ASSETS) : unwrap(api.get('/api/assets'), 'assets');
 export const getAsset = (id: string) => api.get(`/api/assets/${id}`);
-export const getFindings = () => API_MODE === 'demo' ? demoResponse(MOCK_FINDINGS) : unwrap(api.get('/api/findings'), 'findings');
+export const getFindings = () => API_MODE === 'demo' && !isDemoOrganization() ? demoResponse(MOCK_FINDINGS) : unwrap(api.get('/api/findings'), 'findings');
 export const getSources = () => api.get('/api/findings/sources');
 const demoScenario = (p: any) => {
   const before = 18_400_000;
