@@ -6,6 +6,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -167,3 +168,34 @@ def logout(body: RefreshRequest, user: AuthUser = Depends(get_current_user)) -> 
 @router.get("/me", response_model=AuthUser)
 def me(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     return user
+
+
+@router.get("/organizations")
+def organizations(user: AuthUser = Depends(get_current_user)) -> dict:
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT o.organization_id AS id,o.name,o.slug,o.data_mode,m.role
+               FROM organization_members m JOIN organizations o USING(organization_id)
+               WHERE m.user_id=%s ORDER BY o.data_mode,o.name""", (user.user_id,),
+        ).fetchall()
+    return {"organizations": rows, "active_organization_id": user.organization_id}
+
+
+@router.post("/organizations/{organization_id}/switch")
+def switch_organization(
+    organization_id: UUID, user: AuthUser = Depends(get_current_user)
+) -> dict:
+    with get_connection() as connection:
+        selected = connection.execute(
+            """SELECT u.user_id,u.name,u.email,m.role,%s::uuid AS organization_id,
+                      o.name AS organization_name,o.data_mode
+               FROM users u JOIN organization_members m ON m.user_id=u.user_id
+               JOIN organizations o ON o.organization_id=m.organization_id
+               WHERE u.user_id=%s AND m.organization_id=%s""",
+            (organization_id, user.user_id, organization_id),
+        ).fetchone()
+    if not selected:
+        raise HTTPException(status_code=404, detail="Organization membership not found")
+    record_audit_event(organization_id, user.user_id, "auth.organization_switched",
+                       "organization", str(organization_id))
+    return auth_response(selected)

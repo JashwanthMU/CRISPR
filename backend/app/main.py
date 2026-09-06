@@ -35,7 +35,7 @@ from backend.app.api import (
     webhooks,
 )
 from backend.database.connection import database_ready, schema_revision
-from backend.ingestion.store import refresh_demo_sources
+from backend.ingestion.store import DEMO_ORGANIZATION_ID, refresh_demo_sources
 from backend.data_access import LiveDataUnavailable, demo_mode_enabled
 
 docs_enabled = os.getenv("API_DOCS_ENABLED", "false").lower() == "true"
@@ -48,8 +48,8 @@ async def lifespan(application: FastAPI):
     if not ready:
         raise RuntimeError(f"Database is not ready: {reason}. Run 'alembic upgrade head'.")
     ensure_default_security_user()
-    if demo_mode_enabled() and os.getenv("DEMO_AUTO_SEED", "false").lower() == "true":
-        refresh_demo_sources()
+    # The isolated demo tenant is always kept usable; live tenants never read it.
+    refresh_demo_sources(DEMO_ORGANIZATION_ID)
     application.state.database_ready = True
     yield
 

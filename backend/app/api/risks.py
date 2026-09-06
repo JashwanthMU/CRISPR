@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from backend.app.auth import AuthUser, require_security
-from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode
+from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode, set_active_organization
 from backend.database.connection import get_connection
 
 from backend.risk_engine.likelihood import calculate_likelihood
@@ -19,6 +19,8 @@ def _load_assets(organization_id: UUID | None = None) -> list[dict]:
 
 
 def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
+    if organization_id is not None:
+        set_active_organization(organization_id)
     """
     Risk cases are derived from real scanner findings (data/demo/vulnerabilities.json),
     not hand-typed numbers. One risk case per CVE/vulnerability finding.
@@ -92,6 +94,8 @@ def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
 
 
 def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organization_id: UUID | None = None) -> dict:
+    if organization_id is not None:
+        set_active_organization(organization_id)
     asset = next((a for a in assets if a["asset_id"] == inp["asset_id"]), None)
     if asset is None:
         raise HTTPException(status_code=404, detail=f"Asset {inp['asset_id']} not found")

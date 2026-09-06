@@ -203,7 +203,7 @@ def _answer_budget(question: str, organization_id=None) -> tuple[str, dict]:
 
 
 def _answer_forecast(question: str, organization_id=None) -> tuple[str, dict]:
-    require_demo_mode("Assumption-based risk projection")
+    require_demo_mode("Assumption-based risk projection", organization_id)
     base = risk_tools.get_enterprise_summary(organization_id).get("total_eal_inr", 0)
     forecast = forecast_eal(base, horizon_days=90, step_days=15,
                             daily_growth_rate=DEFAULT_DAILY_GROWTH_RATE)
@@ -217,7 +217,7 @@ def _answer_forecast(question: str, organization_id=None) -> tuple[str, dict]:
 
 
 def _answer_anomalies(question: str, organization_id=None) -> tuple[str, dict]:
-    require_demo_mode("Fixture-based anomaly detection")
+    require_demo_mode("Fixture-based anomaly detection", organization_id)
     detection = detect_anomalies(include_llm_summary=False)
     flagged = detection["anomalies"]
     if flagged:

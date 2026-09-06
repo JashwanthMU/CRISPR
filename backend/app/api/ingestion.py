@@ -133,7 +133,7 @@ def ingest_live_assets(
     body: AssetIngestionRequest,
     user: AuthUser = Depends(require_security),
 ) -> dict:
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(status_code=409, detail="Live asset ingestion requires CRISPR_DATA_MODE=live")
     records = []
     for asset in body.assets:
@@ -156,7 +156,7 @@ def ingest_live_control_postures(
     body: ControlPostureIngestionRequest,
     user: AuthUser = Depends(require_security),
 ) -> dict:
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(status_code=409, detail="Live control-posture ingestion requires CRISPR_DATA_MODE=live")
     known_assets = {asset["asset_id"] for asset in load_assets(user.organization_id)}
     unknown = sorted({row.asset_id for row in body.postures} - known_assets)
@@ -179,7 +179,7 @@ def ingest_incident_frequencies(
     user: AuthUser = Depends(require_security),
 ) -> dict:
     """Ingest auditable annual probabilities; KEV scores are never accepted here."""
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(status_code=409, detail="Frequency ingestion requires CRISPR_DATA_MODE=live")
     for row in body.assessments:
         if row.valid_until <= row.observed_at:
@@ -228,11 +228,11 @@ def list_incident_frequencies(
 
 @router.post("/refresh")
 def refresh_sources(
-    _: AuthUser = Depends(require_security),
+    user: AuthUser = Depends(require_security),
 ) -> dict:
-    if not demo_mode_enabled():
+    if not demo_mode_enabled(user.organization_id):
         raise HTTPException(status_code=409, detail="Demo fixture refresh is disabled in live mode")
-    counts = refresh_demo_sources()
+    counts = refresh_demo_sources(user.organization_id)
     return {
         "status": "completed",
         "records_processed": sum(counts.values()),
@@ -246,7 +246,7 @@ def sync_nvd(
     user: AuthUser = Depends(require_security),
 ) -> dict:
     """Enrich explicit asset/CVE mappings using current NVD and EPSS data."""
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(
             status_code=409,
             detail="NVD sync writes LIVE records; set CRISPR_DATA_MODE=live",
@@ -336,7 +336,7 @@ def refresh_nvd(
     user: AuthUser = Depends(require_security),
 ) -> dict:
     """Refresh NVD and EPSS fields for already mapped LIVE CVE findings."""
-    if demo_mode_enabled():
+    if demo_mode_enabled(user.organization_id):
         raise HTTPException(
             status_code=409,
             detail="NVD refresh requires CRISPR_DATA_MODE=live",

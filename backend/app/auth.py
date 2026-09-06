@@ -23,6 +23,7 @@ TOKEN_ISSUER = "crispr-api"
 TOKEN_AUDIENCE = "crispr-web"
 TOKEN_LIFETIME_MINUTES = int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "30"))
 DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
+DEMO_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000002")
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -83,6 +84,8 @@ class AuthUser(BaseModel):
     email: EmailStr
     role: UserRole
     organization_id: UUID = DEFAULT_ORGANIZATION_ID
+    organization_name: str | None = None
+    data_mode: str = "LIVE"
 
 
 def create_token(user: dict) -> str:
@@ -107,7 +110,9 @@ def create_token(user: dict) -> str:
 def authenticate_user(email: str, password: str) -> dict | None:
     with get_connection() as connection:
         user = connection.execute(
-            "SELECT * FROM users WHERE email = %s", (email.lower(),)
+            """SELECT u.*,o.name AS organization_name,o.data_mode
+               FROM users u JOIN organizations o ON o.organization_id=u.organization_id
+               WHERE u.email = %s""", (email.lower(),)
         ).fetchone()
     if not user or not verify_password(password, user["password_hash"]):
         return None
@@ -147,8 +152,12 @@ def get_current_user(
     try:
         with get_connection() as connection:
             user = connection.execute(
-                "SELECT user_id, name, email, role, organization_id FROM users WHERE user_id = %s",
-                (user_id,),
+                """SELECT u.user_id,u.name,u.email,m.role,%s::uuid AS organization_id,
+                          o.name AS organization_name,o.data_mode
+                   FROM users u JOIN organization_members m ON m.user_id=u.user_id
+                   JOIN organizations o ON o.organization_id=m.organization_id
+                   WHERE u.user_id=%s AND m.organization_id=%s""",
+                (token_organization_id, user_id, token_organization_id),
             ).fetchone()
     except OperationalError as error:
         raise HTTPException(
@@ -157,8 +166,8 @@ def get_current_user(
         ) from error
     if not user:
         raise unauthorized
-    if user["organization_id"] != token_organization_id:
-        raise unauthorized
+    from backend.data_access import set_active_organization
+    set_active_organization(token_organization_id)
     return AuthUser.model_validate(user)
 
 
@@ -191,6 +200,11 @@ def ensure_default_security_user() -> None:
                    VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
                 (DEFAULT_ORGANIZATION_ID, existing["user_id"]),
             )
+            connection.execute(
+                """INSERT INTO organization_members(organization_id,user_id,role)
+                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+                (DEMO_ORGANIZATION_ID, existing["user_id"]),
+            )
             return
         user = connection.execute(
             """
@@ -205,4 +219,9 @@ def ensure_default_security_user() -> None:
             """INSERT INTO organization_members(organization_id,user_id,role)
                VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
             (DEFAULT_ORGANIZATION_ID, row["user_id"]),
+        )
+        connection.execute(
+            """INSERT INTO organization_members(organization_id,user_id,role)
+               VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+            (DEMO_ORGANIZATION_ID, row["user_id"]),
         )

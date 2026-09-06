@@ -72,6 +72,9 @@ def _greedy_select_with_overlap(
     return selected_controls
 
 def optimize_budget(budget_inr: float, minimum_marginal_rosi: float = 0.0, organization_id=None) -> dict:
+    if organization_id is not None:
+        from backend.data_access import set_active_organization
+        set_active_organization(organization_id)
     if budget_inr < 0:
         raise ValueError("budget_inr cannot be negative")
     assets = get_demo_assets(organization_id)
