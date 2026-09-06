@@ -37,6 +37,8 @@ def _demo_rows(filename: str) -> list[dict]:
 
 
 def load_assets(organization_id=None) -> list[dict]:
+    if demo_mode_enabled():
+        return _demo_rows("assets.json")
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM assets"
@@ -61,6 +63,22 @@ def load_assets(organization_id=None) -> list[dict]:
 
 
 def load_findings(source_type: str | None = None, organization_id=None) -> list[dict]:
+    filenames = {
+        "VULNERABILITY_SCANNER": "vulnerabilities.json",
+        "BUG_BOUNTY": "bug_bounty.json",
+        "EDR": "edr_events.json",
+        "XDR": "xdr_events.json",
+        "SIEM": "siem_events.json",
+        "IAM": "iam.json",
+        "THREAT_INTEL": "threat_intel.json",
+    }
+    if demo_mode_enabled():
+        if source_type:
+            return _demo_rows(filenames[source_type]) if source_type in filenames else []
+        result = []
+        for filename in filenames.values():
+            result.extend(_demo_rows(filename))
+        return result
     query = "SELECT payload FROM findings"
     parameters = []
     conditions = []
@@ -87,15 +105,6 @@ def load_findings(source_type: str | None = None, organization_id=None) -> list[
     except (PsycopgError, RuntimeError) as error:
         if not demo_mode_enabled():
             raise LiveDataUnavailable("Live findings are unavailable") from error
-        filenames = {
-            "VULNERABILITY_SCANNER": "vulnerabilities.json",
-            "BUG_BOUNTY": "bug_bounty.json",
-            "EDR": "edr_events.json",
-            "XDR": "xdr_events.json",
-            "SIEM": "siem_events.json",
-            "IAM": "iam.json",
-            "THREAT_INTEL": "threat_intel.json",
-        }
         if source_type:
             return _demo_rows(filenames[source_type]) if source_type in filenames else []
         result = []
@@ -105,6 +114,10 @@ def load_findings(source_type: str | None = None, organization_id=None) -> list[
 
 
 def load_control_posture(asset_id: str, organization_id=None) -> dict:
+    if demo_mode_enabled():
+        from backend.controls.effectiveness import DEMO_CONTROLS
+
+        return DEMO_CONTROLS.get(asset_id, {})
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM control_postures WHERE asset_id = %s AND data_origin = %s"
@@ -130,6 +143,8 @@ def load_control_posture(asset_id: str, organization_id=None) -> dict:
 
 def load_control_catalog(organization_id=None) -> list[dict]:
     """Load approved control costs; live mode never uses the demo cost catalogue."""
+    if demo_mode_enabled():
+        return _demo_rows("control_catalog.json")
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM control_catalog WHERE data_origin = %s"
