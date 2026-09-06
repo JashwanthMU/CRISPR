@@ -1,6 +1,8 @@
 """Durable PostgreSQL worker for external connector synchronization."""
 
 import os
+import hashlib
+import json
 import socket
 import time
 from datetime import datetime, timezone
@@ -9,6 +11,7 @@ from uuid import UUID, uuid4
 from psycopg.types.json import Jsonb
 
 from backend.connectors.github import GitHubConnector
+from backend.connectors.generic_http import GenericHTTPConnector
 from backend.database.connection import get_connection
 from backend.repositories.platform import get_integration, set_integration_state
 from backend.repositories.platform import enqueue_sync
@@ -134,9 +137,72 @@ def sync_github(job: dict) -> dict:
     return {"items_received": received, "items_written": written}
 
 
+def sync_generic_http(job: dict) -> dict:
+    payload, org_id = job["payload"], job["organization_id"]
+    integration_id, run_id = UUID(payload["integration_id"]), UUID(payload["sync_run_id"])
+    integration = get_integration(org_id, integration_id, include_secret=True)
+    if not integration or not integration.get("encrypted_credentials"):
+        raise RuntimeError("Integration credentials are missing")
+    connector = GenericHTTPConnector(integration["config"], decrypt_credentials(integration["encrypted_credentials"]))
+    config, cursor = integration["config"], integration.get("cursor")
+    high_watermark = (cursor or {}).get("value")
+    last_opaque_cursor = cursor
+    received = written = 0
+    with get_connection() as db:
+        db.execute("UPDATE sync_runs SET status='RUNNING',started_at=NOW(),cursor_before=%s WHERE sync_run_id=%s",
+                   (Jsonb(cursor), run_id))
+    pages = 0
+    while True:
+        pages += 1
+        if pages > int(config.get("max_pages_per_sync", 100)):
+            raise RuntimeError("Connector exceeded max_pages_per_sync; refusing an unbounded synchronization")
+        page = connector.fetch_findings(cursor)
+        received += len(page.items)
+        with get_connection() as db:
+            for item in page.items:
+                external_id = item.get(config["external_id_field"])
+                observed_at = item.get(config["observed_at_field"])
+                if external_id is None or observed_at is None:
+                    raise RuntimeError("Connector item is missing its configured external ID or observation time")
+                if high_watermark is None or str(observed_at) > str(high_watermark):
+                    high_watermark = observed_at
+                db.execute(
+                    """INSERT INTO telemetry_events(organization_id,source_name,external_event_id,event_type,
+                         asset_id,severity,observed_at,payload) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                       ON CONFLICT(organization_id,source_name,external_event_id) DO UPDATE SET
+                         event_type=EXCLUDED.event_type,asset_id=EXCLUDED.asset_id,severity=EXCLUDED.severity,
+                         observed_at=EXCLUDED.observed_at,payload=EXCLUDED.payload,ingested_at=NOW()""",
+                    (org_id, integration["name"], str(external_id),
+                     str(item.get(config["event_type_field"], "external_event")),
+                     item.get(config["asset_id_field"]), item.get(config["severity_field"]),
+                     observed_at, Jsonb(item)),
+                )
+                written += 1
+        cursor = page.next_cursor
+        if cursor:
+            last_opaque_cursor = cursor
+        if not cursor:
+            break
+    saved_cursor = ({"value": high_watermark} if config.get("cursor_strategy", "observed_at") == "observed_at"
+                    else last_opaque_cursor)
+    with get_connection() as db:
+        db.execute("""UPDATE sync_runs SET status='SUCCEEDED',items_received=%s,items_written=%s,cursor_after=%s,
+                      completed_at=NOW() WHERE sync_run_id=%s""", (received, written, Jsonb(saved_cursor), run_id))
+    set_integration_state(org_id, integration_id, status="connected", last_sync_at=datetime.now(timezone.utc),
+                          last_error=None, cursor=saved_cursor)
+    return {"items_received": received, "items_written": written, "record_type": "telemetry_event"}
+
+
 def process(job: dict) -> dict:
     if job["job_type"] == "integration.sync":
-        return sync_github(job)
+        integration = get_integration(job["organization_id"], UUID(job["payload"]["integration_id"]))
+        if not integration:
+            raise RuntimeError("Integration not found")
+        if integration["provider"] == "github":
+            return sync_github(job)
+        if integration["provider"] == "generic_http":
+            return sync_generic_http(job)
+        raise RuntimeError(f"Unsupported integration provider: {integration['provider']}")
     if job["job_type"] == "risk.analysis":
         from backend.services.risk_pipeline import run_and_persist_analysis
 
@@ -145,6 +211,46 @@ def process(job: dict) -> dict:
             job["organization_id"], UUID(requested_by) if requested_by else None
         )
         return {"snapshot_id": result["snapshot_id"], "summary": result["enterprise"]}
+    if job["job_type"] == "business_risk.simulate":
+        from backend.financial_engine.events import EventPortfolio, RiskEvent, simulate_events
+
+        with get_connection() as db:
+            rows = db.execute(
+                """SELECT event_key,category,annual_probability,mean_loss_inr,
+                          loss_coefficient_of_variation,frequency_evidence,loss_evidence,
+                          shock_group,control_probability_reduction,control_evidence
+                   FROM business_risk_events WHERE organization_id=%s AND active=TRUE
+                     AND observed_at<=NOW() AND valid_until>NOW()
+                   ORDER BY event_key,observed_at DESC""", (job["organization_id"],),
+            ).fetchall()
+        # Only the newest valid assessment for each stable event key is used.
+        latest = {}
+        for row in rows:
+            latest.setdefault(row["event_key"], row)
+        events = [RiskEvent(
+            event_id=row["event_key"], category=row["category"],
+            annual_probability=float(row["annual_probability"]), mean_loss_inr=float(row["mean_loss_inr"]),
+            loss_coefficient_of_variation=float(row["loss_coefficient_of_variation"]),
+            frequency_evidence=row["frequency_evidence"], loss_evidence=row["loss_evidence"],
+            shock_group=row["shock_group"],
+            control_probability_reduction=float(row["control_probability_reduction"]),
+            control_evidence=row["control_evidence"],
+        ) for row in latest.values()]
+        if not events:
+            raise RuntimeError("No current evidenced business risk events exist")
+        inputs = [event.model_dump(mode="json") for event in events]
+        input_hash = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+        result = simulate_events(EventPortfolio(events=events,
+            iterations=int(job["payload"].get("iterations", 10000)),
+            seed=int(job["payload"].get("seed", 42))))
+        run_id = uuid4()
+        with get_connection() as db:
+            db.execute(
+                """INSERT INTO business_risk_runs(run_id,organization_id,job_id,input_hash,result)
+                   VALUES (%s,%s,%s,%s,%s)""",
+                (run_id, job["organization_id"], job["job_id"], input_hash, Jsonb(result)),
+            )
+        return {"run_id": str(run_id), "input_hash": input_hash, "result": result}
     if job["job_type"] == "model.validation":
         from ml.incident_prediction.governance import validate_runtime
 

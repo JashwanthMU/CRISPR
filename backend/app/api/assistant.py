@@ -15,7 +15,8 @@ from ai.tools import risk_tools, scenario_tools
 from ml.anomaly_detection.detector import detect_anomalies
 from ml.forecasting.trend import DEFAULT_DAILY_GROWTH_RATE, forecast_eal
 from backend.app.auth import AuthUser, require_security
-from backend.data_access import require_demo_mode
+from backend.data_access import require_demo_mode, demo_mode_enabled
+from backend.services.telemetry import detect_rate_anomalies
 
 router = APIRouter()
 
@@ -68,6 +69,14 @@ def forecast(
 
 
 @router.get("/anomalies")
-def anomalies(include_llm_summary: bool = Query(True), user: AuthUser = Depends(require_security)):
-    require_demo_mode("Fixture-based anomaly detection")
-    return detect_anomalies(include_llm_summary=include_llm_summary)
+def anomalies(
+    include_llm_summary: bool = Query(True),
+    event_type: str = Query("authentication_failure", min_length=1, max_length=120),
+    lookback_days: int = Query(14, ge=2, le=365),
+    recent_hours: int = Query(24, ge=1, le=168),
+    threshold_z: float = Query(3.0, ge=1, le=10),
+    user: AuthUser = Depends(require_security),
+):
+    if demo_mode_enabled():
+        return detect_anomalies(include_llm_summary=include_llm_summary)
+    return detect_rate_anomalies(user.organization_id, event_type, lookback_days, recent_hours, threshold_z)

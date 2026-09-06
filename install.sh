@@ -135,6 +135,7 @@ admin_password="$(get_env SECURITY_ADMIN_PASSWORD)"
 prompt_value ACCESS_TOKEN_LIFETIME_MINUTES "Access-token lifetime minutes" "30" true
 prompt_value ALLOW_PUBLIC_REPORTER_REGISTRATION "Allow public reporter registration (true/false)" "false" true
 prompt_secret INTEGRATION_ENCRYPTION_KEY "Integration credential encryption key" true generate_fernet_key
+prompt_value ALLOW_INSECURE_CONNECTOR_HTTP "Allow plain HTTP connectors (test networks only; true/false)" "false" true
 
 info "Runtime mode"
 prompt_value CRISPR_DATA_MODE "Data mode (live/demo)" "live" true

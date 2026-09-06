@@ -1,14 +1,15 @@
-"""Compliance mapping API. Member 5."""
-from fastapi import APIRouter
+"""Compliance mapping backed by organization evidence in live mode."""
+from fastapi import APIRouter, Depends
+from backend.app.auth import AuthUser, require_security
 from backend.compliance.mapper import get_compliance_summary, get_gaps, COMPLIANCE_SCORES
-from backend.data_access import require_demo_mode
+from backend.data_access import demo_mode_enabled
+from backend.services.compliance import compliance_result
 
 router = APIRouter()
 
 @router.get("")
-def compliance_summary():
-    require_demo_mode("Compliance scores")
-    summary = get_compliance_summary()
+def compliance_summary(user: AuthUser = Depends(require_security)):
+    summary = get_compliance_summary() if demo_mode_enabled() else compliance_result(user.organization_id)["frameworks"]
     avg = round(sum(s["score"] for s in summary) / len(summary), 1) if summary else 0
     return {
         "frameworks": summary,
@@ -18,9 +19,8 @@ def compliance_summary():
     }
 
 @router.get("/gaps")
-def compliance_gaps():
-    require_demo_mode("Compliance gaps")
-    gaps = get_gaps()
+def compliance_gaps(user: AuthUser = Depends(require_security)):
+    gaps = get_gaps() if demo_mode_enabled() else compliance_result(user.organization_id)["gaps"]
     total_impact = sum(g["impact_inr"] for g in gaps)
     return {
         "gaps": gaps,
@@ -30,6 +30,7 @@ def compliance_gaps():
     }
 
 @router.get("/scores")
-def raw_scores():
-    require_demo_mode("Compliance scores")
-    return COMPLIANCE_SCORES
+def raw_scores(user: AuthUser = Depends(require_security)):
+    if demo_mode_enabled():
+        return COMPLIANCE_SCORES
+    return {row["framework"]: row["score"] for row in compliance_result(user.organization_id)["frameworks"]}
