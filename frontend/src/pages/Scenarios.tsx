@@ -50,6 +50,10 @@ export default function Scenarios() {
   const [backup, setBackup] = useState(false);
   const [deliveryResult, setDeliveryResult] = useState<DeliveryResult | null>(null);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [annualProbabilityPct, setAnnualProbabilityPct] = useState(18);
+  const [lossMagnitudeLakh, setLossMagnitudeLakh] = useState(200);
+  const [potentialReductionLakh, setPotentialReductionLakh] = useState(31);
+  const [deliveryError, setDeliveryError] = useState('');
 
   useEffect(() => {
     getPresets().then((response) => setPresets(response?.data ?? []));
@@ -88,14 +92,19 @@ export default function Scenarios() {
 
   const simulateDelivery = async () => {
     setDeliveryLoading(true);
+    setDeliveryError('');
     try {
       const { data } = await api.post('/api/scenarios/delivery-risk', {
         planned_days: plannedDays, likely_days: likelyDays, absence_days: absenceDays,
         availability_pct: availability, capability_status: capability, backup_available: backup,
-        annual_incident_probability: 0.18, loss_magnitude_inr: 20_000_000,
-        potential_risk_reduction_inr: 3_100_000, realized_risk_reduction_inr: 0,
+        annual_incident_probability: annualProbabilityPct / 100,
+        loss_magnitude_inr: lossMagnitudeLakh * 100_000,
+        potential_risk_reduction_inr: potentialReductionLakh * 100_000,
+        realized_risk_reduction_inr: 0,
       });
       setDeliveryResult(data);
+    } catch (error: any) {
+      setDeliveryError(error?.response?.data?.detail ?? error.message ?? 'Delivery-risk calculation failed');
     } finally { setDeliveryLoading(false); }
   };
 
@@ -317,26 +326,34 @@ export default function Scenarios() {
       </div>
 
       <div className="card">
-        <div className="card-title">Remediation Delivery Risk</div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 0 }}>Model schedule overrun, staff availability, capability and backup coverage. This records operational capacity—not medical details.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label>Planned duration (days)<input className="input-field" type="number" min="1" value={plannedDays} onChange={(e) => setPlannedDays(Number(e.target.value))} /></label>
-            <label>Likely duration (days)<input className="input-field" type="number" min="1" value={likelyDays} onChange={(e) => setLikelyDays(Number(e.target.value))} /></label>
-            <label>Unexpected absence (days)<input className="input-field" type="number" min="0" value={absenceDays} onChange={(e) => setAbsenceDays(Number(e.target.value))} /></label>
-            <label>Availability (%)<input className="input-field" type="number" min="1" max="100" value={availability} onChange={(e) => setAvailability(Number(e.target.value))} /></label>
-            <label>Capability<select className="input-field" value={capability} onChange={(e) => setCapability(e.target.value)}><option value="READY">Ready</option><option value="READY_WITH_REVIEW">Ready with review</option><option value="TRAINING_REQUIRED">Training required</option><option value="SPECIALIST_REQUIRED">Specialist required</option><option value="UNKNOWN">Unknown</option></select></label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}><input type="checkbox" checked={backup} onChange={(e) => setBackup(e.target.checked)} /> Qualified backup available</label>
-            <button className="btn-primary" onClick={simulateDelivery} disabled={deliveryLoading}>{deliveryLoading ? 'CALCULATING…' : 'CALCULATE DELIVERY IMPACT'}</button>
-          </div>
+        <div className="card-title" style={{ marginBottom: 4 }}>Remediation Delivery Risk</div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0 0 18px' }}>Model schedule overrun, staff availability, capability and backup coverage. This records operational capacity—not medical details.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(500px, 1.15fr) minmax(380px, 0.85fr)', gap: 24, alignItems: 'start' }}>
           <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+              {[
+                ['Planned duration', 'days', plannedDays, setPlannedDays, 1, 730],
+                ['Likely duration', 'days', likelyDays, setLikelyDays, 1, 730],
+                ['Unexpected absence', 'days', absenceDays, setAbsenceDays, 0, 365],
+                ['Availability', '%', availability, setAvailability, 1, 100],
+                ['Annual incident probability', '%', annualProbabilityPct, setAnnualProbabilityPct, 0.01, 100],
+                ['Loss magnitude', '₹ lakh', lossMagnitudeLakh, setLossMagnitudeLakh, 1, 100000],
+                ['Potential risk reduction', '₹ lakh', potentialReductionLakh, setPotentialReductionLakh, 0, 100000],
+              ].map(([label, unit, value, setter, min, max]) => <div key={String(label)}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>{String(label)} ({String(unit)})</label>
+                <input className="input-field" style={{ width: '100%' }} type="number" min={Number(min)} max={Number(max)} value={Number(value)} onChange={(e) => (setter as (n: number) => void)(Number(e.target.value))} />
+              </div>)}
+              <div><label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Capability</label><select className="input-field" style={{ width: '100%' }} value={capability} onChange={(e) => setCapability(e.target.value)}><option value="READY">Ready</option><option value="READY_WITH_REVIEW">Ready with review</option><option value="TRAINING_REQUIRED">Training required</option><option value="SPECIALIST_REQUIRED">Specialist required</option><option value="UNKNOWN">Unknown</option></select></div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 27, fontSize: '0.8125rem' }}><input type="checkbox" checked={backup} onChange={(e) => setBackup(e.target.checked)} /> Qualified backup available</label>
+            </div>
+            <button className="btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={simulateDelivery} disabled={deliveryLoading}>{deliveryLoading ? 'CALCULATING…' : 'CALCULATE DELIVERY IMPACT'}</button>
+            {deliveryError && <div style={{ color: 'var(--sev-critical)', fontSize: '0.75rem', marginTop: 10 }}>{deliveryError}</div>}
+          </div>
+          <div style={{ minHeight: 230 }}>
             {deliveryResult ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="card"><div className="card-title">Forecast duration</div><strong>{deliveryResult.forecast_days} days</strong></div>
-              <div className="card"><div className="card-title">Additional exposure</div><strong>{deliveryResult.additional_exposure_days} days</strong></div>
-              <div className="card"><div className="card-title">Delay-attributable loss</div><strong>{formatRupees(deliveryResult.delay_attributable_loss_inr)}</strong></div>
-              <div className="card"><div className="card-title">Risk reduction at risk</div><strong>{formatRupees(deliveryResult.risk_reduction_at_risk_inr)}</strong></div>
+              {[['Forecast duration', `${deliveryResult.forecast_days} days`], ['Additional exposure', `${deliveryResult.additional_exposure_days} days`], ['Delay-attributable loss', formatRupees(deliveryResult.delay_attributable_loss_inr)], ['Risk reduction at risk', formatRupees(deliveryResult.risk_reduction_at_risk_inr)]].map(([label, value]) => <div key={label} style={{ padding: 16, border: '1px solid var(--bg-border)', borderRadius: 8, background: 'var(--bg-elevated)' }}><div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>{label}</div><strong style={{ fontSize: '1.125rem' }}>{value}</strong></div>)}
               <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident probability through forecast completion: {(deliveryResult.forecast_period_probability * 100).toFixed(2)}%</div>
-            </div> : <div className="empty-state">Enter the planned and likely delivery conditions to calculate the company’s additional expected loss.</div>}
+            </div> : <div className="empty-state" style={{ minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Enter delivery conditions and calculate the company’s additional expected loss.</div>}
           </div>
         </div>
       </div>

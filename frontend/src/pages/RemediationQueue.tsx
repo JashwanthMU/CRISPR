@@ -139,8 +139,10 @@ export default function RemediationQueue() {
             </tr>
           </thead>
           <tbody>
-            {scenarios.map((s) => (
-              <tr key={s.id}>
+            {scenarios.map((s) => {
+              const realized = s.status === 'VERIFIED' ? s.riskReductionInr : (s.realizedRiskReductionInr ?? 0);
+              const atRisk = Math.max(0, s.riskReductionInr - realized);
+              return <tr key={s.id}>
                 <td style={{ maxWidth: 260 }}>
                   <div style={{ fontFamily: 'monospace', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{s.ticketKey ?? `REM-${s.id.slice(-6).toUpperCase()}`}</div>
                   <div style={{ fontWeight: 600 }}>{s.title}</div>
@@ -151,7 +153,12 @@ export default function RemediationQueue() {
                 </td>
                 <td style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{s.affectedResource}</td>
                 <td>{s.estimatedEffort}</td>
-                <td style={{ color: 'var(--sev-low)', fontWeight: 700 }}>{formatRupees(s.riskReductionInr)}</td>
+                <td>
+                  <div style={{ color: realized > 0 ? 'var(--sev-low)' : 'var(--text-primary)', fontWeight: 700 }}>{formatRupees(realized)} realized</div>
+                  <div style={{ color: ['AT_RISK', 'BLOCKED'].includes(s.status) ? 'var(--sev-critical)' : 'var(--text-muted)', fontSize: '0.6875rem' }}>
+                    {formatRupees(atRisk)} {['AT_RISK', 'BLOCKED'].includes(s.status) ? 'at risk' : 'potential'}
+                  </div>
+                </td>
                 <td>{s.owner?.name ?? '—'}</td>
                 <td><div style={{ fontSize: '0.6875rem', fontWeight: 700 }}>{(s.capabilityStatus ?? 'READY').replace(/_/g, ' ')}</div><div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{s.openDeliveryIssues ? `${s.openDeliveryIssues} open issue` : s.backupOwner ? `Backup: ${s.backupOwner.name}` : 'No open issues'}</div></td>
                 <td>
@@ -177,8 +184,8 @@ export default function RemediationQueue() {
                     )}
                   </div>
                 </td>
-              </tr>
-            ))}
+              </tr>;
+            })}
           </tbody>
         </table>
       </div>
