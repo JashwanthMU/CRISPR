@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, BadgeIcon, Lock, Clock } from 'lucide-react';
 import { formatRupees } from '../utils/format';
 import { getPresets, getScenarios } from '../services/api';
+import api from '../lib/api';
 
 interface SimResult {
   beforeEal: number;
@@ -16,6 +17,14 @@ interface Preset {
   cost_inr: number;
   reduction_inr: number;
   rosi_pct: number | null;
+}
+
+interface DeliveryResult {
+  forecast_days: number;
+  additional_exposure_days: number;
+  delay_attributable_loss_inr: number;
+  risk_reduction_at_risk_inr: number;
+  forecast_period_probability: number;
 }
 
 const iconForPreset = (id: string) => {
@@ -33,6 +42,14 @@ export default function Scenarios() {
   const [result, setResult] = useState<SimResult | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [simulating, setSimulating] = useState(false);
+  const [plannedDays, setPlannedDays] = useState(7);
+  const [likelyDays, setLikelyDays] = useState(30);
+  const [absenceDays, setAbsenceDays] = useState(0);
+  const [availability, setAvailability] = useState(100);
+  const [capability, setCapability] = useState('READY');
+  const [backup, setBackup] = useState(false);
+  const [deliveryResult, setDeliveryResult] = useState<DeliveryResult | null>(null);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
 
   useEffect(() => {
     getPresets().then((response) => setPresets(response?.data ?? []));
@@ -68,6 +85,19 @@ export default function Scenarios() {
   };
 
   const applyPreset = (preset: Preset) => void runWithParams(preset.params);
+
+  const simulateDelivery = async () => {
+    setDeliveryLoading(true);
+    try {
+      const { data } = await api.post('/api/scenarios/delivery-risk', {
+        planned_days: plannedDays, likely_days: likelyDays, absence_days: absenceDays,
+        availability_pct: availability, capability_status: capability, backup_available: backup,
+        annual_incident_probability: 0.18, loss_magnitude_inr: 20_000_000,
+        potential_risk_reduction_inr: 3_100_000, realized_risk_reduction_inr: 0,
+      });
+      setDeliveryResult(data);
+    } finally { setDeliveryLoading(false); }
+  };
 
   const diff = result ? result.afterEal - result.beforeEal : 0;
   const diffGood = diff < 0;
@@ -283,6 +313,31 @@ export default function Scenarios() {
               )}
             </div>
           );})}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">Remediation Delivery Risk</div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 0 }}>Model schedule overrun, staff availability, capability and backup coverage. This records operational capacity—not medical details.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <label>Planned duration (days)<input className="input-field" type="number" min="1" value={plannedDays} onChange={(e) => setPlannedDays(Number(e.target.value))} /></label>
+            <label>Likely duration (days)<input className="input-field" type="number" min="1" value={likelyDays} onChange={(e) => setLikelyDays(Number(e.target.value))} /></label>
+            <label>Unexpected absence (days)<input className="input-field" type="number" min="0" value={absenceDays} onChange={(e) => setAbsenceDays(Number(e.target.value))} /></label>
+            <label>Availability (%)<input className="input-field" type="number" min="1" max="100" value={availability} onChange={(e) => setAvailability(Number(e.target.value))} /></label>
+            <label>Capability<select className="input-field" value={capability} onChange={(e) => setCapability(e.target.value)}><option value="READY">Ready</option><option value="READY_WITH_REVIEW">Ready with review</option><option value="TRAINING_REQUIRED">Training required</option><option value="SPECIALIST_REQUIRED">Specialist required</option><option value="UNKNOWN">Unknown</option></select></label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}><input type="checkbox" checked={backup} onChange={(e) => setBackup(e.target.checked)} /> Qualified backup available</label>
+            <button className="btn-primary" onClick={simulateDelivery} disabled={deliveryLoading}>{deliveryLoading ? 'CALCULATING…' : 'CALCULATE DELIVERY IMPACT'}</button>
+          </div>
+          <div>
+            {deliveryResult ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="card"><div className="card-title">Forecast duration</div><strong>{deliveryResult.forecast_days} days</strong></div>
+              <div className="card"><div className="card-title">Additional exposure</div><strong>{deliveryResult.additional_exposure_days} days</strong></div>
+              <div className="card"><div className="card-title">Delay-attributable loss</div><strong>{formatRupees(deliveryResult.delay_attributable_loss_inr)}</strong></div>
+              <div className="card"><div className="card-title">Risk reduction at risk</div><strong>{formatRupees(deliveryResult.risk_reduction_at_risk_inr)}</strong></div>
+              <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident probability through forecast completion: {(deliveryResult.forecast_period_probability * 100).toFixed(2)}%</div>
+            </div> : <div className="empty-state">Enter the planned and likely delivery conditions to calculate the company’s additional expected loss.</div>}
+          </div>
         </div>
       </div>
     </div>

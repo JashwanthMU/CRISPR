@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Inbox, GitPullRequest, UserPlus, CheckCircle2 } from 'lucide-react';
+import { Inbox, GitPullRequest, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import OpenPrModal from '../components/codesecurity/OpenPrModal';
@@ -9,12 +9,14 @@ import type { RemediationScenario, ScenarioStatus } from '../types';
 import api from '../lib/api';
 import { API_MODE } from '../lib/api';
 import { REMEDIATION_SCENARIOS } from '../demo/fixtures';
+import DeliveryIssueModal, { DeliveryIssueInput } from '../components/remediation/DeliveryIssueModal';
 
 const STATUS_LABEL: Record<ScenarioStatus, string> = {
   NOT_STARTED: 'Not Started',
   IN_PROGRESS: 'In Progress',
   PR_OPENED: 'PR Opened',
   RESOLVED: 'Resolved',
+  BLOCKED: 'Blocked', AT_RISK: 'At Risk', VERIFIED: 'Verified',
 };
 
 const STATUS_COLOR: Record<ScenarioStatus, string> = {
@@ -22,6 +24,7 @@ const STATUS_COLOR: Record<ScenarioStatus, string> = {
   IN_PROGRESS: TOKENS.secondaryBlue,
   PR_OPENED: TOKENS.primaryBlue,
   RESOLVED: TOKENS.success,
+  BLOCKED: TOKENS.critical, AT_RISK: TOKENS.sevHigh, VERIFIED: TOKENS.success,
 };
 
 const normalizeItem = (item: any): RemediationScenario => ({
@@ -33,11 +36,19 @@ const normalizeItem = (item: any): RemediationScenario => ({
   riskReductionInr: Number(item.riskReductionInr ?? item.risk_reduction_inr ?? 0),
   repository: item.repository ?? item.metadata?.repository,
   branch: item.branch ?? item.metadata?.branch,
+  ticketKey: item.ticketKey ?? item.ticket_key ?? `REM-${String(item.id).slice(-6).toUpperCase()}`,
+  plannedDueAt: item.plannedDueAt ?? item.planned_due_at,
+  forecastDueAt: item.forecastDueAt ?? item.forecast_due_at,
+  capabilityStatus: item.capabilityStatus ?? item.capability_status ?? 'READY',
+  backupOwner: item.backupOwner ?? item.backup_owner,
+  realizedRiskReductionInr: Number(item.realizedRiskReductionInr ?? item.realized_risk_reduction_inr ?? 0),
+  openDeliveryIssues: Number(item.openDeliveryIssues ?? 0),
 });
 
 export default function RemediationQueue() {
   const [scenarios, setScenarios] = useState<RemediationScenario[]>(API_MODE === 'demo' ? REMEDIATION_SCENARIOS : []);
   const [prTarget, setPrTarget] = useState<RemediationScenario | null>(null);
+  const [issueTarget, setIssueTarget] = useState<RemediationScenario | null>(null);
 
   useEffect(() => {
     if (API_MODE === 'demo') return;
@@ -86,7 +97,13 @@ export default function RemediationQueue() {
     toast.success('Marked resolved', s.title);
   };
 
-  const totalRiskReduction = scenarios.filter((s) => s.status !== 'RESOLVED').reduce((a, s) => a + s.riskReductionInr, 0);
+  const totalRiskReduction = scenarios.filter((s) => !['RESOLVED', 'VERIFIED'].includes(s.status)).reduce((a, s) => a + Math.max(0, s.riskReductionInr - (s.realizedRiskReductionInr ?? 0)), 0);
+  const reportIssue = async (issue: DeliveryIssueInput) => {
+    if (!issueTarget) return;
+    if (API_MODE !== 'demo') await api.post(`/api/remediation/${issueTarget.id}/issues`, issue);
+    setScenarios((prev) => prev.map((s) => s.id === issueTarget.id ? { ...s, status: 'AT_RISK', openDeliveryIssues: (s.openDeliveryIssues ?? 0) + 1 } : s));
+    toast.warning('Delivery issue reported', 'The ticket forecast and risk reduction are now at risk.');
+  };
 
   return (
     <div className="page-container page-stack">
@@ -100,7 +117,7 @@ export default function RemediationQueue() {
       </div>
 
       <div className="responsive-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <KPICard title="Open Items" value={scenarios.filter((s) => s.status !== 'RESOLVED').length} accentColor={TOKENS.sevHigh} icon={<Inbox size={16} />} />
+        <KPICard title="Open Items" value={scenarios.filter((s) => !['RESOLVED', 'VERIFIED'].includes(s.status)).length} accentColor={TOKENS.sevHigh} icon={<Inbox size={16} />} />
         <KPICard title="In Progress" value={scenarios.filter((s) => s.status === 'IN_PROGRESS').length} accentColor={TOKENS.secondaryBlue} icon={<Inbox size={16} />} />
         <KPICard title="Resolved" value={scenarios.filter((s) => s.status === 'RESOLVED').length} accentColor={TOKENS.success} icon={<CheckCircle2 size={16} />} />
         <KPICard title="Pending Risk Reduction" value={formatRupees(totalRiskReduction)} accentColor={TOKENS.critical} icon={<Inbox size={16} />} />
@@ -110,12 +127,13 @@ export default function RemediationQueue() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Scenario</th>
+              <th>Ticket / Scenario</th>
               <th>Priority</th>
               <th>Affected Resource</th>
               <th>Effort</th>
               <th>Risk Reduction</th>
               <th>Owner</th>
+              <th>Delivery Risk</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -124,6 +142,7 @@ export default function RemediationQueue() {
             {scenarios.map((s) => (
               <tr key={s.id}>
                 <td style={{ maxWidth: 260 }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{s.ticketKey ?? `REM-${s.id.slice(-6).toUpperCase()}`}</div>
                   <div style={{ fontWeight: 600 }}>{s.title}</div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{s.finding}</div>
                 </td>
@@ -134,11 +153,13 @@ export default function RemediationQueue() {
                 <td>{s.estimatedEffort}</td>
                 <td style={{ color: 'var(--sev-low)', fontWeight: 700 }}>{formatRupees(s.riskReductionInr)}</td>
                 <td>{s.owner?.name ?? '—'}</td>
+                <td><div style={{ fontSize: '0.6875rem', fontWeight: 700 }}>{(s.capabilityStatus ?? 'READY').replace(/_/g, ' ')}</div><div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{s.openDeliveryIssues ? `${s.openDeliveryIssues} open issue` : s.backupOwner ? `Backup: ${s.backupOwner.name}` : 'No open issues'}</div></td>
                 <td>
                   <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: STATUS_COLOR[s.status] }}>{STATUS_LABEL[s.status]}</span>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
+                    {s.status !== 'RESOLVED' && s.status !== 'VERIFIED' && <button className="icon-btn" title="Report delivery issue" onClick={() => setIssueTarget(s)}><AlertTriangle size={13} /></button>}
                     {s.status === 'NOT_STARTED' && (
                       <button className="icon-btn" title="Assign" onClick={() => assign(s)}>
                         <UserPlus size={13} />
@@ -176,6 +197,7 @@ export default function RemediationQueue() {
           resourceLabel={prTarget.affectedResource}
         />
       )}
+      {issueTarget && <DeliveryIssueModal open={!!issueTarget} ticketTitle={issueTarget.title} onClose={() => setIssueTarget(null)} onSubmit={reportIssue} />}
     </div>
   );
 }

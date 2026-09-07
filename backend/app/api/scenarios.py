@@ -1,12 +1,27 @@
 """Scenario simulation API. Member 5."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from backend.app.auth import AuthUser, require_security
 from typing import Optional
 from backend.scenario_engine.simulator import simulate_enterprise, PRESET_SCENARIOS
 from backend.data_access import load_assets
+from backend.services.delivery_risk import calculate_delivery_risk
 
 router = APIRouter()
+
+
+class DeliveryScenarioRequest(BaseModel):
+    planned_days: int = Field(default=7, ge=1, le=730)
+    likely_days: int = Field(default=30, ge=1, le=730)
+    absence_days: int = Field(default=0, ge=0, le=365)
+    availability_pct: float = Field(default=100, gt=0, le=100)
+    capability_status: str = Field(default="READY", pattern="^(READY|READY_WITH_REVIEW|TRAINING_REQUIRED|SPECIALIST_REQUIRED|UNKNOWN)$")
+    annual_incident_probability: float = Field(default=0.18, gt=0, le=1)
+    loss_magnitude_inr: float = Field(default=20_000_000, gt=0)
+    potential_risk_reduction_inr: float = Field(default=3_100_000, ge=0)
+    realized_risk_reduction_inr: float = Field(default=0, ge=0)
+    backup_available: bool = False
 
 
 def _load_assets(organization_id=None) -> list:
@@ -112,6 +127,12 @@ def compare_scenarios(
         "winner": winner,
         "difference_lakh": round((r1["reduction_inr"] - r2["reduction_inr"]) / 100_000, 2),
     }
+
+
+@router.post("/delivery-risk")
+def run_delivery_scenario(body: DeliveryScenarioRequest, user: AuthUser = Depends(require_security)) -> dict:
+    """Model delay loss from availability, estimate and capability evidence."""
+    return calculate_delivery_risk(**body.model_dump())
 
 @router.get("/{scenario_id}")
 def run_preset(scenario_id: str, user: AuthUser = Depends(require_security)):
