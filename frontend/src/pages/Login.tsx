@@ -5,6 +5,8 @@ import { AuthSession, getSession, setSession } from '../lib/auth';
 import { getWorkspace, setWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from '../lib/workspace';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || '';
+const DEMO_EMAIL = (import.meta as any).env?.VITE_SIH_DEMO_EMAIL || '';
+const DEMO_PASSWORD = (import.meta as any).env?.VITE_SIH_DEMO_PASSWORD || '';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,6 +17,15 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [workspace, chooseWorkspace] = useState<Workspace>(() => getWorkspace());
+
+  const selectDemoWorkspace = (selectedWorkspace: Workspace) => {
+    chooseWorkspace(selectedWorkspace);
+    if (DEMO_EMAIL && DEMO_PASSWORD) {
+      setEmail(DEMO_EMAIL);
+      setPassword(DEMO_PASSWORD);
+    }
+    setError('');
+  };
 
   if (getSession()) return <Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />;
 
@@ -81,16 +92,21 @@ export default function Login() {
 
             <form onSubmit={submit}>
               {SIH_WORKSPACE_ENABLED && <fieldset style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
-                <legend style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Select workspace</legend>
+                <legend style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Select demo workspace</legend>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {([
                     ['executive', 'Executive', 'Financial risk and decisions', BarChart3],
                     ['technical', 'Technical', 'Security operations and evidence', ShieldCheck],
                   ] as const).map(([value, label, description, Icon]) => {
                     const selected = workspace === value;
-                    return <button key={value} type="button" onClick={() => chooseWorkspace(value)} aria-pressed={selected} style={{ minHeight: 82, padding: 12, textAlign: 'left', background: selected ? 'var(--bg-elevated)' : 'var(--color-bg)', border: `1px solid ${selected ? 'var(--accent-blue)' : 'var(--bg-border)'}`, borderRadius: 6, cursor: 'pointer' }}>
+                    return <button key={value} type="button" onClick={() => selectDemoWorkspace(value)} aria-pressed={selected} style={{ minHeight: 128, padding: 12, textAlign: 'left', background: selected ? 'var(--bg-elevated)' : 'var(--color-bg)', border: `1px solid ${selected ? 'var(--accent-blue)' : 'var(--bg-border)'}`, borderRadius: 6, cursor: 'pointer' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: selected ? 'var(--accent-blue)' : 'var(--text-primary)', fontWeight: 700, fontSize: '0.8125rem' }}><Icon size={16} /> {label}</span>
                       <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.6875rem', lineHeight: 1.35 }}>{description}</span>
+                      <span style={{ display: 'block', marginTop: 10, color: 'var(--text-secondary)', fontSize: '0.6875rem', lineHeight: 1.5 }}>
+                        <strong>Demo email:</strong> {DEMO_EMAIL || 'Not configured'}<br />
+                        <strong>Password:</strong> {DEMO_PASSWORD ? '••••••••' : 'Not configured'}
+                      </span>
+                      <span style={{ display: 'block', marginTop: 5, color: selected ? 'var(--accent-blue)' : 'var(--text-muted)', fontSize: '0.6875rem', fontWeight: 600 }}>{selected ? '✓ Selected and credentials filled' : 'Select and fill credentials'}</span>
                     </button>;
                   })}
                 </div>

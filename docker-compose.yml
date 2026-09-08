@@ -57,6 +57,8 @@ services:
         VITE_API_URL: ""
         VITE_API_MODE: live
         VITE_SIH_WORKSPACE: "true"
+        VITE_SIH_DEMO_EMAIL: ${SECURITY_ADMIN_EMAIL:?Set SECURITY_ADMIN_EMAIL in .env}
+        VITE_SIH_DEMO_PASSWORD: ${SECURITY_ADMIN_PASSWORD:?Set SECURITY_ADMIN_PASSWORD in .env}
     ports: ["8716:80"]
     depends_on:
       backend:
