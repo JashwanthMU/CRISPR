@@ -8,13 +8,15 @@ import {
   SIDEBAR_COLLAPSED_WIDTH,
 } from '../../lib/uiStore';
 import { toast } from '../../lib/toastStore';
-import { NAV_GROUPS } from './navConfig';
+import { EXECUTIVE_NAV_GROUPS, NAV_GROUPS, TECHNICAL_NAV_GROUPS } from './navConfig';
 import SidebarGroup from './SidebarGroup';
 import SidebarItem from './SidebarItem';
 import SidebarResizer from './SidebarResizer';
 import OrganizationSelector from './OrganizationSelector';
 import { CrisprMark } from '../../assets/branding/CrisprMark';
 import { BRAND } from '../../config/branding';
+import WorkspaceSelector from './WorkspaceSelector';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
 
 /**
  * Vertical enterprise navigation rail (Wiz/Google-Cloud-Console style).
@@ -35,6 +37,8 @@ export default function Sidebar() {
   const expandedGroups = useUiStore((s) => s.expandedGroups);
 
   const effectiveWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
+  const workspace = getWorkspace();
+  const navGroups = SIH_WORKSPACE_ENABLED ? (workspace === 'executive' ? EXECUTIVE_NAV_GROUPS : TECHNICAL_NAV_GROUPS) : NAV_GROUPS;
 
   return (
     <>
@@ -51,7 +55,7 @@ export default function Sidebar() {
           type="button"
           className="sidebar-brand"
           onClick={() => {
-            navigate('/security');
+            navigate(SIH_WORKSPACE_ENABLED && workspace === 'executive' ? '/executive' : '/security');
             closeMobileNav();
           }}
           aria-label={`${BRAND.name} — go to Security Dashboard`}
@@ -75,11 +79,13 @@ export default function Sidebar() {
 
         <OrganizationSelector collapsed={collapsed} />
 
+        {SIH_WORKSPACE_ENABLED && <WorkspaceSelector collapsed={collapsed} />}
+
         <div className="sidebar-divider" />
 
         {/* Navigation */}
         <nav className="sidebar-nav" aria-label="Primary">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <SidebarGroup
               key={group.id}
               id={group.id}

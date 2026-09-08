@@ -36,6 +36,7 @@ import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
 import { API_MODE } from './lib/api';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from './lib/workspace';
 
 function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
   if (API_MODE === 'demo') return <>{children}</>;
@@ -70,7 +71,8 @@ function Shell() {
     <>
       <AppShell>
         <Routes>
-          <Route path="/" element={<Navigate to="/security" replace />} />
+          <Route path="/" element={<Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />} />
+          <Route path="/executive" element={<FinancialDashboard />} />
           <Route path="/security" element={<SecurityDashboard />} />
           <Route path="/financial" element={<FinancialDashboard />} />
 

@@ -6,18 +6,20 @@ import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
 import SeverityBadge from '../components/common/SeverityBadge';
 import { activateOnEnter } from '../utils/a11y';
 import type { AttackPathNode } from '../types';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 
 export default function AttackPaths() {
   const [activePathId, setActivePathId] = useState(ATTACK_PATHS[0].id);
   const [selectedNode, setSelectedNode] = useState<AttackPathNode | null>(null);
 
   const activePath = ATTACK_PATHS.find((p) => p.id === activePathId) ?? ATTACK_PATHS[0];
+  const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
 
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Waypoints size={22} color="var(--color-primary-blue)" /> Attack Paths
+          <Waypoints size={22} color="var(--color-primary-blue)" /> {executiveView ? 'Attack Path Overview' : 'Attack Paths'}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Trace exploitable routes from the internet to your most sensitive resources
@@ -44,21 +46,21 @@ export default function AttackPaths() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-        <div className="card">
+      <div style={{ display: 'grid', gridTemplateColumns: executiveView ? '1fr' : '1fr 320px', gap: 16 }}>
+        {!executiveView && <div className="card">
           <div className="card-title">{activePath.title}</div>
           <AttackPathGraph path={activePath} height={380} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />
           <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
             Drag to pan · scroll buttons to zoom · click a node to inspect · red edges indicate an exploitable transition
           </div>
-        </div>
+        </div>}
         <div className="card">
           <div className="card-title">Node Details</div>
           <NodeDetailPanel node={selectedNode} />
         </div>
       </div>
 
-      <div className="card">
+      {!executiveView && <div className="card">
         <div className="card-title">Path Summary</div>
         <table className="data-table">
           <thead>
@@ -82,7 +84,7 @@ export default function AttackPaths() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   );
 }

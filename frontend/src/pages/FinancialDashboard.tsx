@@ -8,6 +8,7 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaCh
 import { getCompliance, getControls, getEnterprise, getForecast, getGaps, getRisks, optimize } from '../services/api';
 import { formatRupees, formatLakh, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
+import { SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 
 const FINANCIAL_SUGGESTIONS = [
   'What is our total financial cyber exposure?',
@@ -104,8 +105,8 @@ export default function FinancialDashboard() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">Cyber Risk Financial Dashboard</h1>
-        <p className="page-subtitle">Board-level financial exposure · NovaPay Financial Services</p>
+        <h1 className="page-title">{SIH_WORKSPACE_ENABLED ? 'Executive Cyber Risk Overview' : 'Cyber Risk Financial Dashboard'}</h1>
+        <p className="page-subtitle">Financial exposure, business impact, investment decisions and regulatory posture</p>
       </div>
 
       {loadError && (
