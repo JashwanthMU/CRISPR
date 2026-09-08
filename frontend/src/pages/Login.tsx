@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
+import { BarChart3, Eye, EyeOff, KeyRound, Mail, ShieldCheck } from 'lucide-react';
 import { AuthSession, getSession, setSession } from '../lib/auth';
+import { getWorkspace, setWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from '../lib/workspace';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || '';
 
@@ -13,8 +14,9 @@ export default function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [workspace, chooseWorkspace] = useState<Workspace>(() => getWorkspace());
 
-  if (getSession()) return <Navigate to="/security" replace />;
+  if (getSession()) return <Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -37,8 +39,12 @@ export default function Login() {
       if (session.user.role !== 'SECURITY') {
         throw new Error('This console is restricted to the security team.');
       }
+      if (SIH_WORKSPACE_ENABLED) setWorkspace(workspace);
       setSession(session);
-      const destination = (location.state as { from?: string } | null)?.from || '/security';
+      const requestedDestination = (location.state as { from?: string } | null)?.from;
+      const destination = SIH_WORKSPACE_ENABLED
+        ? (workspace === 'executive' ? '/executive' : '/security')
+        : requestedDestination || '/security';
       navigate(destination, { replace: true });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to sign in');
@@ -71,9 +77,24 @@ export default function Login() {
         <section className="reference-login-form-area" aria-labelledby="login-title">
           <div className="reference-login-form-wrap">
             <h2 id="login-title">Welcome back</h2>
-            <p className="reference-login-intro">Enter your credentials to access the security operations console.</p>
+            <p className="reference-login-intro">{SIH_WORKSPACE_ENABLED ? 'Choose your workspace, then enter your credentials.' : 'Enter your credentials to access the security operations console.'}</p>
 
             <form onSubmit={submit}>
+              {SIH_WORKSPACE_ENABLED && <fieldset style={{ border: 0, padding: 0, margin: '0 0 18px' }}>
+                <legend style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Select workspace</legend>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {([
+                    ['executive', 'Executive', 'Financial risk and decisions', BarChart3],
+                    ['technical', 'Technical', 'Security operations and evidence', ShieldCheck],
+                  ] as const).map(([value, label, description, Icon]) => {
+                    const selected = workspace === value;
+                    return <button key={value} type="button" onClick={() => chooseWorkspace(value)} aria-pressed={selected} style={{ minHeight: 82, padding: 12, textAlign: 'left', background: selected ? 'var(--bg-elevated)' : 'var(--color-bg)', border: `1px solid ${selected ? 'var(--accent-blue)' : 'var(--bg-border)'}`, borderRadius: 6, cursor: 'pointer' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: selected ? 'var(--accent-blue)' : 'var(--text-primary)', fontWeight: 700, fontSize: '0.8125rem' }}><Icon size={16} /> {label}</span>
+                      <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.6875rem', lineHeight: 1.35 }}>{description}</span>
+                    </button>;
+                  })}
+                </div>
+              </fieldset>}
               <div className="reference-login-field">
                 <label htmlFor="email">Email address</label>
                 <div className="reference-login-input">
@@ -93,7 +114,7 @@ export default function Login() {
               </div>
               {error && <div className="reference-login-error" role="alert">{error}</div>}
               <button className="reference-login-submit" type="submit" disabled={submitting}>
-                <span>{submitting ? 'Signing in…' : 'Sign in'}</span>
+                <span>{submitting ? 'Signing in…' : SIH_WORKSPACE_ENABLED ? `Open ${workspace === 'executive' ? 'Executive' : 'Technical'} Workspace` : 'Sign in'}</span>
               </button>
             </form>
           </div>
