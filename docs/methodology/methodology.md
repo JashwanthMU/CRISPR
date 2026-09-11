@@ -240,7 +240,7 @@ Implemented in `backend/optimizer/knapsack.py`.
 
 ### 7.1 Problem Formulation
 
-CRISPR treats security investment as a **Binary Integer Linear Programming** (BILP) problem:
+CRISPR treats security investment as a budget-constrained control-selection problem. The deployed solver recomputes each candidate's marginal benefit against the residual risk after controls already selected:
 
 ```
 Maximise:   Σ risk_reduction_inr[i] × x[i]
@@ -252,10 +252,7 @@ Where `x[i] = 1` means control `i` is selected for implementation.
 
 ### 7.2 Solver Strategy
 
-1. **Primary:** PuLP CBC mixed-integer solver (exact optimal solution)
-2. **Fallback:** Greedy knapsack (sort by `reduction_inr / cost_inr` ratio, pick greedily while budget allows)
-
-The greedy fallback ensures the system is always functional even without the PuLP dependency installed — important for environments without build tools.
+The deployed `greedy_dynamic` solver repeatedly simulates every affordable remaining control, selects the highest marginal risk-reduction-per-rupee candidate, then recalculates residual risk. This prevents overlapping controls from claiming the same full benefit. It is deterministic and budget-safe, but it is a heuristic and is not presented as a proof of global optimality.
 
 ### 7.3 Control Catalogue
 

@@ -65,7 +65,7 @@ The strongest demonstration is the **Authentication API (`A003`)**:
 - Evidence confidence is capped at **94%**.
 - Business criticality is **96/100**.
 - Control posture includes only **58% MFA coverage**.
-- Calibrated incident likelihood is **21%**.
+- Annual incident frequency comes from explicit evidence (or a clearly labelled SIH demo assumption); the CVE model is used only for exploitation prioritization.
 - Loss magnitude is **₹3.80 crore**.
 - Expected Annual Loss is **₹79.8 lakh**.
 - Risk score is **87/100**.
@@ -110,12 +110,12 @@ missing evidence produces an explicit error instead of fixture substitution.
 - Checksum-verified XGBoost CVE prioritization with governed runtime validation.
 - Isolation Forest detection of unusual failed-login rates.
 - Deterministic 90-day linear EAL forecast.
-- SHAP-style explanation format with a future XGBoost/SHAP integration point.
+- Real TreeSHAP explanations computed against the deployed XGBoost model.
 
 ### Decision support
 
 - MFA, emergency patching, segmentation, EDR expansion, and patch-delay simulations.
-- PuLP 0-1 knapsack optimizer with a greedy fallback.
+- Dynamic marginal-benefit optimizer that recomputes overlapping control effects.
 - Compliance mapping for ISO 27001, NIST CSF, CIS Controls, RBI CSF, and SEBI CSCRF.
 - Control costs, risk reduction, remaining budget, and ROSI output.
 
@@ -620,7 +620,7 @@ CRISPR/
 │   ├── financial_engine/       # Loss magnitude and EAL
 │   ├── ingestion/              # JSON loading and database upserts
 │   ├── normalization/          # Unified finding conversion
-│   ├── optimizer/              # PuLP/greedy investment optimizer
+│   ├── optimizer/              # Dynamic marginal-benefit investment optimizer
 │   ├── risk_engine/            # Likelihood and drivers
 │   ├── scenario_engine/        # What-if simulations
 │   ├── repositories/           # PostgreSQL persistence operations

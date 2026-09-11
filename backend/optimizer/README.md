@@ -9,10 +9,7 @@
 
 The Budget Optimizer answers: **"Given ₹X budget, which controls give the maximum cyber risk reduction?"**
 
-It solves a **0-1 knapsack problem** — each control is either fully selected or not. The goal is to maximise total `risk_reduction_inr` without exceeding `budget_inr`.
-
-Primary solver: **PuLP integer programming (CBC)**  
-Fallback: **Greedy (bang-per-buck ratio ranking)**
+It performs budget-constrained control selection. Each control is either selected or not, and the deployed `greedy_dynamic` solver recomputes marginal risk reduction after every selection so overlapping controls cannot claim the same full benefit.
 
 ---
 
@@ -58,20 +55,9 @@ print('Solver:', r['solver'])
 
 ---
 
-## How PuLP is used
+## How the deployed solver works
 
-```python
-prob = LpProblem("CRISPR_Optimizer", LpMaximize)
-x = {c["id"]: LpVariable(c["id"], cat="Binary") for c in CONTROLS}
-
-# Objective: maximise risk reduction
-prob += lpSum(x[c["id"]] * c["risk_reduction_inr"] for c in CONTROLS)
-
-# Constraint: stay within budget
-prob += lpSum(x[c["id"]] * c["cost_inr"] for c in CONTROLS) <= budget_inr
-```
-
-If PuLP is not installed or the solver fails, `_greedy_select()` kicks in automatically — the API still returns a valid result.
+For every affordable candidate, CRISPR simulates the portfolio with that candidate added, measures incremental EAL reduction, and selects the best marginal reduction-per-rupee. It repeats until no beneficial affordable control remains. The response identifies the solver as `greedy_dynamic`; this deterministic heuristic does not claim global optimality.
 
 ---
 

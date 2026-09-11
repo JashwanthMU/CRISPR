@@ -5,6 +5,7 @@ import pytest
 from backend.app.api.ingestion import FrequencyIngestionRequest
 from backend.financial_engine.loss_calculator import calculate_eal
 from backend.scenario_engine import risk_service
+from backend.risk_engine.likelihood import calculate_likelihood
 
 
 def test_frequency_request_requires_bounded_probability_and_evidence():
@@ -61,6 +62,18 @@ def test_eal_rejects_invalid_probability_and_exposes_formula():
     result = calculate_eal(0.25, {"total_inr": 400})
     assert result["eal_inr"] == 100
     assert result["eal_calculation"]["formula"] == "annual_incident_probability * loss_magnitude_inr"
+
+
+def test_demo_frequency_is_explicit_and_not_a_kev_model_probability(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("The CVE model must not supply annual incident frequency")
+
+    monkeypatch.setattr("ml.incident_prediction.model.predict_incident", fail_if_called)
+    result = calculate_likelihood(9.8, True, 30, True, 0.4, True)
+    assert 0 < result["incident_probability"] <= 1
+    assert result["calculation"]["source_type"] == "scenario_assumption"
+    assert result["calculation"]["approved_for_live_use"] is False
+    assert "KEV" not in result["likelihood_semantics"]
 
 
 def test_live_downtime_uses_supplied_hours_without_criticality_discount(monkeypatch):

@@ -128,7 +128,7 @@ export function getRiskCases(): Promise<RiskCase[]> {
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
-  return liveOrFallback(`/api/risks/${id}`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
+  return liveOrFallback(`/api/risks/${id}?explain=true`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
 }
 
 // ----------------------------------------------------------------------------

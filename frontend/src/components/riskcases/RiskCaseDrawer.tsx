@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import Drawer from '../common/Drawer';
 import SeverityBadge from '../common/SeverityBadge';
@@ -9,6 +9,7 @@ import { formatLakh, formatRupees, riskColor } from '../../utils/format';
 import { ATTACK_PATHS } from '../../demo/fixtures';
 import { toast } from '../../lib/toastStore';
 import type { RiskCase } from '../../types';
+import { getRiskCase } from '../../lib/api';
 
 interface Props {
   riskCase: RiskCase | null;
@@ -33,7 +34,23 @@ function severityFromScore(score: number): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW
 
 export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
   const [tab, setTab] = useState('overview');
+  const [explainedRisk, setExplainedRisk] = useState<RiskCase | null>(null);
+  const [explanationLoading, setExplanationLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !riskCase) return;
+    let active = true;
+    setExplainedRisk(null);
+    setExplanationLoading(true);
+    getRiskCase(riskCase.asset_id)
+      .then((value) => { if (active && value) setExplainedRisk(value); })
+      .finally(() => { if (active) setExplanationLoading(false); });
+    return () => { active = false; };
+  }, [open, riskCase?.asset_id]);
+
   if (!riskCase) return null;
+
+  const detail = explainedRisk ?? riskCase;
 
   const severity = riskCase.severity ?? severityFromScore(riskCase.risk_score);
   const matchingPath = ATTACK_PATHS.find((p) => p.riskCaseId === riskCase.asset_id);
@@ -127,14 +144,39 @@ export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
       )}
 
       {tab === 'evidence' && (
-        <div className="terminal-window" style={{ height: 'auto' }}>
-          <div className="terminal-line-info">// source findings backing this risk case</div>
-          {riskCase.sources.map((s, i) => (
-            <div key={i} className="terminal-line-ok">
-              [OK] {s} — corroborating evidence validated
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="terminal-window" style={{ height: 'auto' }}>
+            <div className="terminal-line-info">// source findings backing this risk case</div>
+            {(riskCase.sources ?? []).map((s, i) => (
+              <div key={i} className="terminal-line-ok">[OK] {s} — corroborating evidence validated</div>
+            ))}
+            <div className="terminal-line-result">Confidence: {riskCase.confidence_pct}%</div>
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <div className="card-title">Financial Frequency Evidence</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Annual incident probability: <strong style={{ color: 'var(--text-primary)' }}>{Math.round((detail.annual_frequency?.probability ?? detail.likelihood) * 1000) / 10}%</strong><br />
+              Source: {detail.annual_frequency?.semantics ?? 'Frequency evidence not returned'}
             </div>
-          ))}
-          <div className="terminal-line-result">Confidence: {riskCase.confidence_pct}%</div>
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <div className="card-title">CVE Exploitation Prioritization · SHAP</div>
+            {explanationLoading && <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading explanation…</div>}
+            {!explanationLoading && detail.model_contributions?.top_contributors?.map((item) => (
+              <div key={item.feature} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '5px 0', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>{item.feature.replace(/_/g, ' ')}</span>
+                <strong style={{ color: item.shap_value >= 0 ? 'var(--sev-critical)' : 'var(--sev-low)' }}>
+                  {item.shap_value >= 0 ? '+' : ''}{item.shap_value.toFixed(4)}
+                </strong>
+              </div>
+            ))}
+            {!explanationLoading && !detail.model_contributions && (
+              <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No deployed-model explanation is available for this record.</div>
+            )}
+            {detail.model_contributions?.note && <div style={{ marginTop: 8, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>{detail.model_contributions.note}</div>}
+          </div>
         </div>
       )}
 

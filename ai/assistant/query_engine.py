@@ -149,7 +149,7 @@ def _answer_risk_drivers(question: str, organization_id=None) -> tuple[str, dict
     ) or "control weakness and exposure"
     answer = (
         f"{row.get('asset_name')} carries an EAL of {format_inr(row.get('eal_inr', 0))} "
-        f"with {format_pct(likelihood_pct)} incident likelihood and control effectiveness of "
+        f"with {format_pct(likelihood_pct)} annual incident probability and control effectiveness of "
         f"{format_pct(ce)} . Main risk drivers: {driver_lines}."
     )
     return answer, {"risk_case": row}

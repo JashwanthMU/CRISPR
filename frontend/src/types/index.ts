@@ -155,6 +155,24 @@ export interface RiskCase {
   lastUpdated?: string;
   severity?: Severity;
   exposure?: 'INTERNET' | 'INTERNAL' | 'ISOLATED';
+  exploitation_priority?: {
+    score?: number | null;
+    ranking_score?: number | null;
+    tier?: string | null;
+    model?: string | null;
+    model_version?: string | null;
+    semantics: string;
+  };
+  annual_frequency?: {
+    probability: number;
+    semantics: string;
+    evidence?: Record<string, unknown>;
+  };
+  model_contributions?: {
+    base_value: number;
+    note: string;
+    top_contributors: Array<{ feature: string; shap_value: number }>;
+  } | null;
 }
 
 // ----------------------------------------------------------------------------

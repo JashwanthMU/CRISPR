@@ -12,7 +12,7 @@ Member 5 owns 3 of the 7 API routers in this folder.
 | File | Router prefix | Description |
 |---|---|---|
 | `scenarios.py` | `/api/scenarios` | What-if scenario simulation |
-| `optimization.py` | `/api/optimize` | Budget optimizer (PuLP knapsack) |
+| `optimization.py` | `/api/optimize` | Budget optimizer with dynamic marginal risk reduction |
 | `compliance.py` | `/api/compliance` | Framework scores and compliance gaps |
 
 **Do NOT edit** (owned by other members):
