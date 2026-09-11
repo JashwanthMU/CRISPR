@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IndianRupee, TrendingUp, Wallet, Percent } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
+import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import FinancialBreakdownBar from '../components/charts/FinancialBreakdownBar';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
 import { getCompliance, getControls, getEnterprise, getForecast, getGaps, getRisks, optimize } from '../services/api';
@@ -18,6 +19,13 @@ const LOSS_LABELS: Record<string, string> = {
   regulatory_cost: 'Regulatory (RBI/DPDP)',
   reputation_cost: 'Reputation',
 };
+
+const EXECUTIVE_SUGGESTIONS = [
+  'What is our highest financial cyber risk?',
+  'Explain our expected annual loss and P95 Cyber VaR.',
+  'How should we invest a ₹1 crore security budget?',
+  'Which action gives us the best risk reduction?',
+];
 
 function complianceColor(score: number) {
   if (score < 75) return TOKENS.critical;
@@ -396,6 +404,7 @@ export default function FinancialDashboard() {
         </div>
       </div>
 
+      <AIAdvisorChat theme="financial" suggestions={EXECUTIVE_SUGGESTIONS} />
 
     </div>
   );

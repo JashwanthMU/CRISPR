@@ -9,6 +9,7 @@ import SourceStatusDot from '../components/common/SourceStatusDot';
 import SourcePill from '../components/common/SourcePill';
 import RiskDonut from '../components/charts/RiskDonut';
 import InteractiveTrendChart from '../components/charts/InteractiveTrendChart';
+import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import RiskPostureCard from '../components/dashboard/RiskPostureCard';
 import FindingsSummary from '../components/dashboard/FindingsSummary';
 import SecurityPipeline from '../components/dashboard/SecurityPipeline';
@@ -22,6 +23,13 @@ import { formatLakh, sourceColor, sourceLabel, TOKENS } from '../utils/format';
 import { activateOnEnter } from '../utils/a11y';
 import type { Finding, RiskCase } from '../types';
 import { SkeletonCard } from '../components/common/Skeleton';
+
+const SECURITY_SUGGESTIONS = [
+  'What is our top security risk?',
+  'Why is Auth API high risk?',
+  'Which CVEs are exploited in the wild?',
+  'What if we implement MFA?',
+];
 
 const TREND_SERIES = [
   { key: 'enterpriseRisk', label: 'Enterprise Risk', color: TOKENS.critical },
@@ -346,6 +354,7 @@ export default function SecurityDashboard() {
         </div>
       </div>
 
+      <AIAdvisorChat theme="security" suggestions={SECURITY_SUGGESTIONS} />
 
       <RiskCaseDrawer riskCase={activeCase} open={!!activeCase} onClose={() => setActiveCase(null)} />
     </div>
