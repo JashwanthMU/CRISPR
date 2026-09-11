@@ -341,7 +341,7 @@ export function getThreatActors() {
 
 export function getAttackPaths() {
   return liveOrFallback("/api/attack-paths", [], "get", undefined, (p) =>
-    Array.isArray(p) ? p : Array.isArray(p?.attack_paths) ? p.attack_paths : []
+    Array.isArray(p) ? p : Array.isArray(p?.paths) ? p.paths : Array.isArray(p?.attack_paths) ? p.attack_paths : []
   );
 }
 

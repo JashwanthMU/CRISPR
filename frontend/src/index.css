@@ -3154,3 +3154,8 @@ html:not([lang='en']) .pipeline-stage > div:not(.pipeline-node):not(.pipeline-co
     max-width: 100%;
   }
 }
+@media (max-width: 900px) {
+  .attack-path-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
