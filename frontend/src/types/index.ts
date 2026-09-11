@@ -289,7 +289,7 @@ export interface AttackPath {
 // ----------------------------------------------------------------------------
 // Remediation scenarios (new, camelCase — separate from legacy "Scenarios" what-if sim)
 // ----------------------------------------------------------------------------
-export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'RESOLVED';
+export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'BLOCKED' | 'AT_RISK' | 'RESOLVED' | 'VERIFIED';
 
 export interface RemediationScenario {
   id: string;
@@ -305,6 +305,13 @@ export interface RemediationScenario {
   repository?: string;
   branch?: string;
   version?: number;
+  ticketKey?: string;
+  plannedDueAt?: string;
+  forecastDueAt?: string;
+  capabilityStatus?: 'READY' | 'READY_WITH_REVIEW' | 'TRAINING_REQUIRED' | 'SPECIALIST_REQUIRED' | 'UNKNOWN';
+  backupOwner?: Owner;
+  realizedRiskReductionInr?: number;
+  openDeliveryIssues?: number;
 }
 
 // ----------------------------------------------------------------------------

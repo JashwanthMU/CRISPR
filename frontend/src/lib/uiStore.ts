@@ -68,7 +68,7 @@ export interface OrgOption {
 }
 
 export const ORG_OPTIONS: OrgOption[] = [
-  { id: 'novapay', name: 'NovaPay Financial Services' },
+  { id: 'crispr', name: 'CRISPR Demo Organization' },
   { id: 'demo-org', name: 'Demo Organization' },
   { id: 'development', name: 'Development' },
   { id: 'production', name: 'Production' },
@@ -107,7 +107,7 @@ export const useUiStore = createStore<UiState>({
   aiDrawerOpen: false,
   openPopover: null,
   expandedGroups: readLocalStorage(LS_EXPANDED_GROUPS, DEFAULT_EXPANDED_GROUPS),
-  selectedOrgId: readLocalStorage(LS_ORG, 'novapay'),
+  selectedOrgId: readLocalStorage(LS_ORG, 'crispr'),
   drawer: { kind: null, id: null },
   filters: {
     timeRange: '6m',

@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 
@@ -17,6 +18,7 @@ interface Props {
  * expand/collapse behavior only applies once the sidebar itself is expanded.
  */
 export default function SidebarGroup({ id, title, collapsed, expanded, onToggle, children }: Props) {
+  const { t } = useLanguage();
   if (collapsed) {
     return <div className="sidebar-group-collapsed">{children}</div>;
   }
@@ -30,7 +32,7 @@ export default function SidebarGroup({ id, title, collapsed, expanded, onToggle,
         aria-expanded={expanded}
         aria-controls={`sidebar-group-${id}`}
       >
-        <span>{title}</span>
+        <span>{t(title)}</span>
         <ChevronDown size={13} className={`sidebar-group-chevron${expanded ? ' expanded' : ''}`} />
       </button>
       <div id={`sidebar-group-${id}`} className={`sidebar-group-body${expanded ? ' expanded' : ''}`}>

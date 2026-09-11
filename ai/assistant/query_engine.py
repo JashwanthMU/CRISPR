@@ -45,7 +45,7 @@ TASK_BY_INTENT = {
 }
 
 SYSTEM_PROMPT = (
-    "You are CRISPR, the AI Risk Advisor for NovaPay Financial Services. "
+    "You are CRISPR, the AI Risk Advisor for the current organization. "
     "You explain cyber risk results to executives. STRICT RULES: "
     "Use ONLY the rupee figures and percentages provided in ENGINE DATA. "
     "Never invent, round differently, extrapolate, or estimate any number. "
@@ -55,7 +55,7 @@ SYSTEM_PROMPT = (
 GENERAL_SYSTEM_PROMPT = (
     "You are CRISPR, a concise cybersecurity advisor. Answer the user's general "
     "cybersecurity question accurately in plain language, including what it is, why "
-    "it matters, and the main mitigation. Do not claim knowledge of NovaPay's current "
+    "it matters, and the main mitigation. Do not claim knowledge of the organization’s current "
     "systems or risk figures. Never invent financial figures. Keep the answer under 140 words."
 )
 
@@ -72,7 +72,7 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
     normalized = question.lower().strip()
     if normalized in {"hi", "hii", "hello", "hey", "good morning", "good afternoon", "good evening"}:
         return (
-            "Hello! Ask me about NovaPay's live risk posture, scenarios, investments, "
+            "Hello! Ask me about the organization’s live risk posture, scenarios, investments, "
             "or any general cybersecurity concept.",
             {},
             "template",

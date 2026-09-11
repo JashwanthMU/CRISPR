@@ -36,6 +36,7 @@ import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
 import { API_MODE } from './lib/api';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from './lib/workspace';
 
 function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
   if (API_MODE === 'demo') return <>{children}</>;
@@ -70,27 +71,28 @@ function Shell() {
     <>
       <AppShell>
         <Routes>
-          <Route path="/" element={<Navigate to="/security" replace />} />
+          <Route path="/" element={<Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />} />
+          <Route path="/executive" element={<FinancialDashboard />} />
           <Route path="/security" element={<SecurityDashboard />} />
           <Route path="/financial" element={<FinancialDashboard />} />
 
           <Route path="/findings" element={<Findings />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/risks" element={<Risks />} />
-          <Route path="/attack-paths" element={<DemoOnly feature="Attack paths"><AttackPaths /></DemoOnly>} />
+          <Route path="/attack-paths" element={<AttackPaths />} />
           <Route path="/resources" element={<Resources />} />
 
           <Route path="/vulnerabilities" element={<Vulnerabilities />} />
-          <Route path="/secrets" element={<DemoOnly feature="Secret scanning"><Secrets /></DemoOnly>} />
+          <Route path="/secrets" element={<Secrets />} />
           <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
           <Route path="/cloud-security" element={<CloudSecurity />} />
           <Route path="/identity-security" element={<IdentitySecurity />} />
-          <Route path="/code-security" element={<DemoOnly feature="Code-security findings"><CodeSecurity /></DemoOnly>} />
-          <Route path="/code-security/repositories/:id" element={<DemoOnly feature="Repository details"><RepositoryDetail /></DemoOnly>} />
-          <Route path="/code-security/sca" element={<DemoOnly feature="SCA and SBOM findings"><ScaSbom /></DemoOnly>} />
+          <Route path="/code-security" element={<CodeSecurity />} />
+          <Route path="/code-security/repositories/:id" element={<RepositoryDetail />} />
+          <Route path="/code-security/sca" element={<ScaSbom />} />
 
           <Route path="/scenarios" element={<Scenarios />} />
-          <Route path="/recommendations" element={<DemoOnly feature="Generated recommendations"><Recommendations /></DemoOnly>} />
+          <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/remediation-queue" element={<RemediationQueue />} />
           <Route path="/investments" element={<Investments />} />
 
@@ -123,7 +125,8 @@ function ProtectedShell() {
     return () => window.removeEventListener('crispr:auth-changed', update);
   }, []);
 
-  return authenticated ? <Shell /> : <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!authenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return <Shell />;
 }
 
 export default function App() {

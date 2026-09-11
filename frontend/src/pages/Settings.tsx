@@ -1,10 +1,13 @@
+import { useLanguage } from '../lib/i18n';
+import LanguageSelector from '../components/common/LanguageSelector';
 import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { toast } from '../lib/toastStore';
 import api from '../lib/api';
 
 export default function Settings() {
-  const [orgName, setOrgName] = useState('NovaPay Financial Services');
+  const { t } = useLanguage();
+  const [orgName, setOrgName] = useState('CRISPR Demo Organization');
   const apiMode: 'demo' | 'live' = (import.meta as any).env?.VITE_API_MODE === 'demo' ? 'demo' : 'live';
   const [notifyCritical, setNotifyCritical] = useState(true);
   const [notifyWeekly, setNotifyWeekly] = useState(true);
@@ -40,43 +43,49 @@ export default function Settings() {
     <div className="page-container page-stack" style={{ maxWidth: 760 }}>
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <SettingsIcon size={22} color="var(--color-primary-blue)" /> Settings
+          <SettingsIcon size={22} color="var(--color-primary-blue)" /> {t("Settings")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          Workspace, data source, and notification preferences
+          {t("Workspace, data source, and notification preferences")}
         </p>
       </div>
 
       <div className="card">
-        <div className="card-title">Organization</div>
-        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Organization name</label>
+        <div className="card-title">{t("Display language")}</div>
+        <LanguageSelector />
+        <p className="language-help">{t("Language changes apply immediately and are saved in this browser.")}</p>
+      </div>
+
+      <div className="card">
+        <div className="card-title">{t("Organization")}</div>
+        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>{t("Organization name")}</label>
         <input className="input-field" style={{ width: '100%', marginBottom: 16 }} value={orgName} onChange={(e) => setOrgName(e.target.value)} />
 
-        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>Data source mode</label>
+        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 6 }}>{t("Data source mode")}</label>
         <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
           <span className="btn-primary" style={{ textTransform: 'capitalize' }}>{apiMode}</span>
         </div>
         <p style={{ fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
-          Demo mode uses the deterministic fixture dataset. Live mode calls the NovaPay backend at the configured API URL
+          Demo mode uses the deterministic fixture dataset. Live mode calls the configured backend API URL
           with errors shown explicitly. Data mode is selected at build/deployment time and cannot be changed in the browser.
         </p>
       </div>
 
       <div className="card">
-        <div className="card-title">Notifications</div>
+        <div className="card-title">{t("Notifications")}</div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, cursor: 'pointer' }}>
           <input type="checkbox" checked={notifyCritical} onChange={(e) => setNotifyCritical(e.target.checked)} />
-          <span style={{ fontSize: '0.8125rem' }}>Notify me immediately on new CRITICAL findings</span>
+          <span style={{ fontSize: '0.8125rem' }}>{t("Notify me immediately on new CRITICAL findings")}</span>
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <input type="checkbox" checked={notifyWeekly} onChange={(e) => setNotifyWeekly(e.target.checked)} />
-          <span style={{ fontSize: '0.8125rem' }}>Send a weekly risk digest via Slack</span>
+          <span style={{ fontSize: '0.8125rem' }}>{t("Send a weekly risk digest via Slack")}</span>
         </label>
       </div>
 
       <div>
         <button className="btn-primary" onClick={save}>
-          Save changes
+          {t("Save changes")}
         </button>
       </div>
     </div>

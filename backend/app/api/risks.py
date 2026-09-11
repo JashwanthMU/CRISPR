@@ -1,3 +1,4 @@
+from functools import lru_cache
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -244,12 +245,25 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
     }
 
 
-def _all_risks(organization_id: UUID | None = None) -> list[dict]:
+def _compute_all_risks(organization_id: UUID | None = None) -> list[dict]:
     assets = _load_assets(organization_id)
     risk_inputs = _load_risk_inputs(organization_id)
     risks = [compute_risk(inp, assets, organization_id=organization_id) for inp in risk_inputs]
     risks.sort(key=lambda x: x["eal_inr"], reverse=True)
     return risks
+
+
+@lru_cache(maxsize=4)
+def _cached_demo_risks(organization_id: UUID) -> tuple[dict, ...]:
+    return tuple(_compute_all_risks(organization_id))
+
+
+def _all_risks(organization_id: UUID | None = None) -> list[dict]:
+    # Bundled demo evidence is immutable during a running process. Reusing its
+    # calculated rows keeps concurrent dashboard requests below the UI timeout.
+    if organization_id is not None and demo_mode_enabled(organization_id):
+        return list(_cached_demo_risks(organization_id))
+    return _compute_all_risks(organization_id)
 
 
 def _aggregate_asset_risks(risks: list[dict]) -> list[dict]:
@@ -326,6 +340,7 @@ def calculate_enterprise_summary(organization_id: UUID | None = None):
 
     return {
         "enterprise_risk_score": enterprise_risk_score,
+        "current_spend_inr": 12_000_000 if demo_mode_enabled(organization_id) else None,
         "total_eal_inr": total_eal,
         "total_eal_lakh": round(total_eal / 100_000, 2),
         "var_95_inr": mc["var_95"],

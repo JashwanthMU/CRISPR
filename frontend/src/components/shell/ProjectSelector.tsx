@@ -46,6 +46,8 @@ export default function ProjectSelector() {
         onClick={() => togglePopover('project')}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={current.name}
+        title={current.name}
       >
         <Layers size={14} />
         <span>{current.name}</span>

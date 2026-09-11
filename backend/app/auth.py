@@ -181,47 +181,35 @@ def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 def ensure_default_security_user() -> None:
-    """Create the configured security administrator once without rotating its password."""
+    """Create configured security users once without rotating existing passwords."""
     from uuid import uuid4
 
-    email = os.getenv("SECURITY_ADMIN_EMAIL", "").strip().lower()
-    if not email:
+    accounts = [
+        ("CRISPR Security Team", os.getenv("SECURITY_ADMIN_EMAIL", ""), os.getenv("SECURITY_ADMIN_PASSWORD", "")),
+        ("CRISPR Executive", os.getenv("SIH_EXECUTIVE_EMAIL", ""), os.getenv("SIH_EXECUTIVE_PASSWORD", "")),
+        ("CRISPR Technical Team", os.getenv("SIH_TECHNICAL_EMAIL", ""), os.getenv("SIH_TECHNICAL_PASSWORD", "")),
+    ]
+    configured = [(name, email.strip().lower(), password) for name, email, password in accounts if email.strip() or password]
+    if not configured or not configured[0][1]:
         raise RuntimeError("SECURITY_ADMIN_EMAIL must be set")
-    password = os.getenv("SECURITY_ADMIN_PASSWORD", "")
-    if len(password) < 12:
-        raise RuntimeError("SECURITY_ADMIN_PASSWORD must be at least 12 characters")
+    for _, email, password in configured:
+        if not email:
+            raise RuntimeError("Every configured security user must have an email")
+        if len(password) < 12:
+            raise RuntimeError(f"Password for {email} must be at least 12 characters")
     with get_connection() as connection:
-        existing = connection.execute(
-            "SELECT user_id FROM users WHERE email=%s", (email,)
-        ).fetchone()
-        if existing:
+      for name, email, password in configured:
+        existing = connection.execute("SELECT user_id FROM users WHERE email=%s", (email,)).fetchone()
+        if not existing:
             connection.execute(
-                """INSERT INTO organization_members(organization_id,user_id,role)
-                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
-                (DEFAULT_ORGANIZATION_ID, existing["user_id"]),
+                """INSERT INTO users (user_id, name, email, password_hash, role, organization_id)
+                   VALUES (%s, %s, %s, %s, 'SECURITY', %s) ON CONFLICT (email) DO NOTHING""",
+                (uuid4(), name, email, hash_password(password), DEFAULT_ORGANIZATION_ID),
             )
-            connection.execute(
-                """INSERT INTO organization_members(organization_id,user_id,role)
-                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
-                (DEMO_ORGANIZATION_ID, existing["user_id"]),
-            )
-            return
-        user = connection.execute(
-            """
-            INSERT INTO users (user_id, name, email, password_hash, role, organization_id)
-            VALUES (%s, %s, %s, %s, 'SECURITY', %s)
-            ON CONFLICT (email) DO NOTHING
-            """,
-            (uuid4(), "NovaPay Security Team", email, hash_password(password), DEFAULT_ORGANIZATION_ID),
-        )
         row = connection.execute("SELECT user_id FROM users WHERE email=%s", (email,)).fetchone()
-        connection.execute(
-            """INSERT INTO organization_members(organization_id,user_id,role)
-               VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
-            (DEFAULT_ORGANIZATION_ID, row["user_id"]),
-        )
-        connection.execute(
-            """INSERT INTO organization_members(organization_id,user_id,role)
-               VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
-            (DEMO_ORGANIZATION_ID, row["user_id"]),
-        )
+        for organization_id in (DEFAULT_ORGANIZATION_ID, DEMO_ORGANIZATION_ID):
+            connection.execute(
+                """INSERT INTO organization_members(organization_id,user_id,role)
+                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+                (organization_id, row["user_id"]),
+            )

@@ -9,7 +9,7 @@
 export const BRAND = {
   name: 'CRISPR',
   tagline: 'Security Intelligence Platform',
-  organization: 'NovaPay Financial Services',
+  organization: 'CRISPR Demo Organization',
   colorPrimary: '#1a73e8',
   colorSecondary: '#1557b0', // dark blue — #4285F4 is not part of the strict CRISPR palette
 } as const;

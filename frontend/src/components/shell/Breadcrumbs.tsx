@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
@@ -23,6 +24,7 @@ interface Crumb {
  * genuine, clickable link back to that path.
  */
 export default function Breadcrumbs() {
+  const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -43,7 +45,7 @@ export default function Breadcrumbs() {
   }, [location.pathname]);
 
   return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
+    <nav className="breadcrumb" aria-label={t("Breadcrumb")}>
       <button type="button" className="breadcrumb-root" onClick={() => navigate('/security')}>
         {BRAND.name}
       </button>
@@ -52,11 +54,11 @@ export default function Breadcrumbs() {
           <ChevronRight size={13} className="sep" aria-hidden="true" />
           {c.path ? (
             <button type="button" className="breadcrumb-link" onClick={() => navigate(c.path!)}>
-              {c.label}
+              {t(c.label)}
             </button>
           ) : (
             <span className="breadcrumb-current" aria-current="page" style={{ textTransform: 'capitalize' }}>
-              {c.label}
+              {t(c.label)}
             </span>
           )}
         </span>

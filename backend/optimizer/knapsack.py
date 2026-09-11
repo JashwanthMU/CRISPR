@@ -79,13 +79,23 @@ def optimize_budget(budget_inr: float, minimum_marginal_rosi: float = 0.0, organ
         raise ValueError("budget_inr cannot be negative")
     assets = get_demo_assets(organization_id)
     controls = load_control_catalog(organization_id=organization_id)
-    selected = _greedy_select_with_overlap(
-        budget_inr,
-        assets,
-        controls,
-        minimum_marginal_rosi=minimum_marginal_rosi,
-        organization_id=organization_id,
-    )
+    if demo_mode_enabled(organization_id) and all(c.get("risk_reduction_inr") is not None for c in controls):
+        remaining = budget_inr
+        selected = []
+        for control in sorted(controls, key=lambda c: c["risk_reduction_inr"] / c["cost_inr"], reverse=True):
+            reduction, cost = control["risk_reduction_inr"], control["cost_inr"]
+            marginal_rosi = (reduction - cost) / cost
+            if cost <= remaining and marginal_rosi >= minimum_marginal_rosi:
+                selected.append({**control, "marginal_rosi": round(marginal_rosi, 4)})
+                remaining -= cost
+    else:
+        selected = _greedy_select_with_overlap(
+            budget_inr,
+            assets,
+            controls,
+            minimum_marginal_rosi=minimum_marginal_rosi,
+            organization_id=organization_id,
+        )
     
     spent = sum(c["cost_inr"] for c in selected)
     total_reduction = sum(c.get("risk_reduction_inr", 0) for c in selected)

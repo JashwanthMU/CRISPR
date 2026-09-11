@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Link2 } from 'lucide-react';
@@ -13,6 +14,7 @@ import type { Finding, RiskCase } from '../types';
 import { SkeletonTable } from '../components/common/Skeleton';
 
 export default function Findings() {
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [findings, setFindings] = useState<Finding[] | null>(null);
   const [risks, setRisks] = useState<RiskCase[]>([]);
@@ -121,11 +123,11 @@ export default function Findings() {
     <div className="page-container page-stack">
       <div className="animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 className="page-title">Findings Explorer</h1>
+          <h1 className="page-title">{t("Findings Explorer")}</h1>
           <p className="page-subtitle">All raw findings correlated across every connected source</p>
         </div>
         <button className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => toast.success('Export started', 'findings.csv')}>
-          <Download size={14} /> Export
+          <Download size={14} /> {t("Export")}
         </button>
       </div>
 

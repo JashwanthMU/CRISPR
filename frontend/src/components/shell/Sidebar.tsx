@@ -8,13 +8,15 @@ import {
   SIDEBAR_COLLAPSED_WIDTH,
 } from '../../lib/uiStore';
 import { toast } from '../../lib/toastStore';
-import { NAV_GROUPS } from './navConfig';
+import { EXECUTIVE_NAV_GROUPS, NAV_GROUPS, TECHNICAL_NAV_GROUPS } from './navConfig';
 import SidebarGroup from './SidebarGroup';
 import SidebarItem from './SidebarItem';
 import SidebarResizer from './SidebarResizer';
 import OrganizationSelector from './OrganizationSelector';
 import { CrisprMark } from '../../assets/branding/CrisprMark';
 import { BRAND } from '../../config/branding';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
+import SidebarTooltip from './SidebarTooltip';
 
 /**
  * Vertical enterprise navigation rail (Wiz/Google-Cloud-Console style).
@@ -33,8 +35,11 @@ export default function Sidebar() {
   const width = useUiStore((s) => s.sidebarWidth);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const expandedGroups = useUiStore((s) => s.expandedGroups);
+  const visuallyCollapsed = collapsed && !mobileNavOpen;
 
-  const effectiveWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
+  const effectiveWidth = visuallyCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
+  const workspace = getWorkspace();
+  const navGroups = SIH_WORKSPACE_ENABLED ? (workspace === 'executive' ? EXECUTIVE_NAV_GROUPS : TECHNICAL_NAV_GROUPS) : NAV_GROUPS;
 
   return (
     <>
@@ -42,54 +47,50 @@ export default function Sidebar() {
         <div className="mobile-nav-overlay" onClick={closeMobileNav} aria-hidden="true" />
       )}
       <aside
-        className={`app-sidebar${collapsed ? ' sidebar-collapsed' : ''}${mobileNavOpen ? ' mobile-nav-open' : ''}`}
+        className={`app-sidebar${visuallyCollapsed ? ' sidebar-collapsed' : ''}${mobileNavOpen ? ' mobile-nav-open' : ''}`}
         style={{ width: effectiveWidth }}
         aria-label="Primary navigation"
       >
         {/* Brand header */}
+        <SidebarTooltip label={`${BRAND.name} — ${BRAND.tagline}`} enabled={visuallyCollapsed}>
         <button
           type="button"
           className="sidebar-brand"
           onClick={() => {
-            navigate('/security');
+            navigate(SIH_WORKSPACE_ENABLED && workspace === 'executive' ? '/executive' : '/security');
             closeMobileNav();
           }}
           aria-label={`${BRAND.name} — go to Security Dashboard`}
-          title={collapsed ? BRAND.name : undefined}
         >
-          {collapsed ? <CrisprMark size={40} /> : <CrisprMark size={28} />}
-          {!collapsed && (
+          {visuallyCollapsed ? <CrisprMark size={40} /> : <CrisprMark size={28} />}
+          {!visuallyCollapsed && (
             <span className="sidebar-brand-text">
               <span className="sidebar-brand-name">{BRAND.name}</span>
               <span className="sidebar-brand-tagline">{BRAND.tagline}</span>
             </span>
           )}
-          {collapsed && (
-            <span className="nav-tooltip" role="tooltip">
-              {BRAND.name} — {BRAND.tagline}
-            </span>
-          )}
         </button>
+        </SidebarTooltip>
 
         <div className="sidebar-divider" />
 
-        <OrganizationSelector collapsed={collapsed} />
+        <OrganizationSelector collapsed={visuallyCollapsed} />
 
         <div className="sidebar-divider" />
 
         {/* Navigation */}
         <nav className="sidebar-nav" aria-label="Primary">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <SidebarGroup
               key={group.id}
               id={group.id}
               title={group.title}
-              collapsed={collapsed}
+              collapsed={visuallyCollapsed}
               expanded={expandedGroups[group.id] ?? true}
               onToggle={toggleNavGroup}
             >
               {group.items.map((item) => (
-                <SidebarItem key={item.to} to={item.to} label={item.label} icon={item.icon} collapsed={collapsed} />
+                <SidebarItem key={item.to} to={item.to} label={item.label} icon={item.icon} collapsed={visuallyCollapsed} />
               ))}
             </SidebarGroup>
           ))}
@@ -97,32 +98,32 @@ export default function Sidebar() {
 
         {/* Bottom utility rail */}
         <div className="sidebar-footer">
+          <SidebarTooltip label="Help" enabled={visuallyCollapsed}>
           <button
             type="button"
             className="sidebar-utility-btn"
             onClick={() => toast.info('CRISPR Docs', 'Documentation portal would open in a new tab.')}
             aria-label="Help and documentation"
-            title={collapsed ? 'Help' : undefined}
           >
             <HelpCircle size={17} strokeWidth={1.8} />
-            {!collapsed && <span>Help</span>}
-            {collapsed && <span className="nav-tooltip" role="tooltip">Help</span>}
+            {!visuallyCollapsed && <span>Help</span>}
           </button>
+          </SidebarTooltip>
+          <SidebarTooltip label="Expand sidebar" enabled={visuallyCollapsed}>
           <button
             type="button"
             onClick={toggleSidebar}
             className="sidebar-utility-btn sidebar-collapse-btn"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-            title={collapsed ? 'Expand sidebar' : undefined}
+            aria-label={visuallyCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!visuallyCollapsed}
           >
-            {collapsed ? <ChevronsRight size={17} strokeWidth={1.8} /> : <ChevronsLeft size={17} strokeWidth={1.8} />}
-            {!collapsed && <span>Collapse</span>}
-            {collapsed && <span className="nav-tooltip" role="tooltip">Expand sidebar</span>}
+            {visuallyCollapsed ? <ChevronsRight size={17} strokeWidth={1.8} /> : <ChevronsLeft size={17} strokeWidth={1.8} />}
+            {!visuallyCollapsed && <span>Collapse</span>}
           </button>
+          </SidebarTooltip>
         </div>
 
-        {!collapsed && <SidebarResizer currentWidth={width} />}
+        {!visuallyCollapsed && <SidebarResizer currentWidth={width} />}
       </aside>
     </>
   );

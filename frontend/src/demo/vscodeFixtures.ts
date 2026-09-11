@@ -80,7 +80,7 @@ def run_analysis():
   'src/core/config.py': `from pydantic import BaseSettings
 
 class Settings(BaseSettings):
-    ORG_ID: str = "novapay"
+    ORG_ID: str = "crispr-demo"
     ENV: str = "production"
     RISK_ENGINE_VERSION: str = "2.4.0"
 

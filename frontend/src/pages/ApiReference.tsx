@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useState } from 'react';
 import { Terminal as TerminalIcon, Copy, Check } from 'lucide-react';
 import { toast } from '../lib/toastStore';
@@ -17,10 +18,11 @@ const ENDPOINTS = [
   { method: 'GET',  path: '/api/compliance/gaps', description: 'Top compliance gaps with financial impact in ₹' },
 ];
 
-const CURL_EXAMPLE = `curl -X GET "https://api.crispr.novapay.io/api/risks" \\
+const CURL_EXAMPLE = `curl -X GET "https://api.example.com/api/risks" \\
   -H "Authorization: Bearer $CRISPR_API_KEY"`;
 
 export default function ApiReference() {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
@@ -64,7 +66,7 @@ export default function ApiReference() {
             <tr>
               <th>Method</th>
               <th>Path</th>
-              <th>Description</th>
+              <th>{t("Description")}</th>
             </tr>
           </thead>
           <tbody>

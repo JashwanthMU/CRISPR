@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import ComplianceRadar from '../components/charts/ComplianceRadar';
 import ProgressBar from '../components/common/ProgressBar';
@@ -25,6 +26,7 @@ function priorityColor(p: string) {
 }
 
 export default function Compliance() {
+  const { t } = useLanguage();
   const [compliance, setCompliance] = useState<any[]>(API_MODE === 'demo' ? MOCK_COMPLIANCE : []);
   const [gaps, setGaps] = useState<any[]>(API_MODE === 'demo' ? MOCK_GAPS : []);
   const [error, setError] = useState('');
@@ -39,7 +41,7 @@ export default function Compliance() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">Compliance Dashboard</h1>
+        <h1 className="page-title">{t("Compliance Dashboard")}</h1>
         <p className="page-subtitle">Regulatory framework posture and financial impact of open gaps</p>
       </div>
       {error && <div className="card empty-state">Live compliance data unavailable: {error}</div>}

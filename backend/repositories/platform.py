@@ -66,9 +66,10 @@ def toggle_policy(org_id: UUID, policy_id: UUID, expected_version: int) -> dict 
 def list_remediation(org_id: UUID, limit: int, offset: int) -> list[dict]:
     with get_connection() as db:
         return db.execute(
-            """SELECT remediation_id AS id,title,finding_id,asset_id,priority,status,owner,
+            """SELECT remediation_id AS id,ticket_key,title,finding_id,asset_id,priority,status,owner,backup_owner,
                       recommended_fix AS "recommendedFix",risk_reduction_inr AS "riskReductionInr",
-                      metadata,version,created_at,updated_at
+                      realized_risk_reduction_inr AS "realizedRiskReductionInr",planned_due_at,forecast_due_at,
+                      estimated_effort_hours,remaining_effort_hours,capability_status,metadata,version,created_at,updated_at
                FROM remediation_items WHERE organization_id=%s
                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
             (org_id, limit, offset),
@@ -79,16 +80,21 @@ def create_remediation(org_id: UUID, user_id: UUID, body: dict) -> dict:
     item_id = uuid4()
     with get_connection() as db:
         row = db.execute(
-            """INSERT INTO remediation_items(remediation_id,organization_id,title,finding_id,asset_id,
-                      priority,status,owner,recommended_fix,risk_reduction_inr,metadata,created_by)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-               RETURNING remediation_id AS id,title,finding_id,asset_id,priority,status,owner,
+            """INSERT INTO remediation_items(remediation_id,organization_id,ticket_key,title,finding_id,asset_id,
+                      priority,status,owner,backup_owner,recommended_fix,risk_reduction_inr,
+                      realized_risk_reduction_inr,planned_due_at,forecast_due_at,estimated_effort_hours,
+                      remaining_effort_hours,capability_status,metadata,created_by)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               RETURNING remediation_id AS id,ticket_key,title,finding_id,asset_id,priority,status,owner,backup_owner,
                          recommended_fix AS "recommendedFix",risk_reduction_inr AS "riskReductionInr",
-                         metadata,version,created_at,updated_at""",
+                         realized_risk_reduction_inr AS "realizedRiskReductionInr",planned_due_at,forecast_due_at,
+                         estimated_effort_hours,remaining_effort_hours,capability_status,metadata,version,created_at,updated_at""",
             (
-                item_id, org_id, body["title"], body.get("finding_id"), body.get("asset_id"),
-                body["priority"], body.get("status", "NOT_STARTED"), Jsonb(body.get("owner")),
-                body.get("recommended_fix"), body.get("risk_reduction_inr"),
+                item_id, org_id, body.get("ticket_key"), body["title"], body.get("finding_id"), body.get("asset_id"),
+                body["priority"], body.get("status", "NOT_STARTED"), Jsonb(body.get("owner")), Jsonb(body.get("backup_owner")),
+                body.get("recommended_fix"), body.get("risk_reduction_inr"), body.get("realized_risk_reduction_inr", 0),
+                body.get("planned_due_at"), body.get("forecast_due_at"), body.get("estimated_effort_hours"),
+                body.get("remaining_effort_hours"), body.get("capability_status", "UNKNOWN"),
                 Jsonb(body.get("metadata", {})), user_id,
             ),
         ).fetchone()
@@ -108,12 +114,16 @@ def update_remediation(
             return previous, None
         current = db.execute(
             """UPDATE remediation_items SET status=COALESCE(%s,status),owner=COALESCE(%s,owner),
+                      realized_risk_reduction_inr=CASE WHEN %s='VERIFIED' THEN COALESCE(risk_reduction_inr,0)
+                                                       WHEN %s IN ('BLOCKED','AT_RISK') THEN 0
+                                                       ELSE realized_risk_reduction_inr END,
                       version=version+1,updated_at=NOW()
                WHERE organization_id=%s AND remediation_id=%s AND version=%s
-               RETURNING remediation_id AS id,title,finding_id,asset_id,priority,status,owner,
+               RETURNING remediation_id AS id,ticket_key,title,finding_id,asset_id,priority,status,owner,backup_owner,
                          recommended_fix AS "recommendedFix",risk_reduction_inr AS "riskReductionInr",
-                         metadata,version,created_at,updated_at""",
-            (status, Jsonb(owner) if owner else None, org_id, item_id, expected_version),
+                         realized_risk_reduction_inr AS "realizedRiskReductionInr",planned_due_at,forecast_due_at,
+                         estimated_effort_hours,remaining_effort_hours,capability_status,metadata,version,created_at,updated_at""",
+            (status, Jsonb(owner) if owner else None, status, status, org_id, item_id, expected_version),
         ).fetchone()
         return previous, current
 

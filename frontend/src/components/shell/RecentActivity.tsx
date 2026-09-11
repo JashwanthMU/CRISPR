@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History, GitBranch, ScanSearch, AlertTriangle, ShieldAlert, UserCheck, FileCheck2, Circle } from 'lucide-react';
 import { useUiStore, togglePopover, closePopover } from '../../lib/uiStore';
 import { useDemoStore } from '../../demo/demoStore';
 import type { TimelineEvent } from '../../types';
+import { httpClient } from '../../lib/api';
 
 const KIND_ICON: Record<TimelineEvent['kind'], typeof Circle> = {
   info: GitBranch,
@@ -43,10 +44,22 @@ function timeAgo(iso: string): string {
  */
 export default function RecentActivity() {
   const openPopover = useUiStore((s) => s.openPopover);
-  const timeline = useDemoStore((s) => s.timeline);
+  const demoTimeline = useDemoStore((s) => s.timeline);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>(demoTimeline);
   const open = openPopover === 'activity';
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!open) return;
+    httpClient.get('/api/audit-events', { params: { limit: 12 } }).then(({ data }) => {
+      const events = Array.isArray(data?.audit_events) ? data.audit_events : [];
+      setTimeline(events.map((event: any) => ({
+        id: String(event.id), timestamp: event.created_at, label: String(event.action).replace(/[._]/g, ' '),
+        detail: [event.resource_type, event.resource_id].filter(Boolean).join(' · '), kind: 'info' as const,
+      })));
+    }).catch(() => setTimeline([]));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,7 +86,7 @@ export default function RecentActivity() {
   };
 
   return (
-    <div className="topbar-popover-wrap" ref={ref}>
+    <div className="topbar-popover-wrap mobile-header-secondary" ref={ref}>
       <button
         type="button"
         className="icon-btn"

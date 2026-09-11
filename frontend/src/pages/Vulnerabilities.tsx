@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Bug } from 'lucide-react';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
@@ -42,6 +43,7 @@ async function getGlobalCves(page: number, pageSize: number, days: number): Prom
 }
 
 export default function Vulnerabilities() {
+  const { t } = useLanguage();
   const [vulns, setVulns] = useState<Vulnerability[] | null>(null);
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
@@ -147,7 +149,7 @@ export default function Vulnerabilities() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Bug size={22} color="var(--color-critical)" /> Vulnerabilities
+          <Bug size={22} color="var(--color-critical)" /> {t("Vulnerabilities")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           CVE-level vulnerability inventory correlated across scanners and threat intelligence

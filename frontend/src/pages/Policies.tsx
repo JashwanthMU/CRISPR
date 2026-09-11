@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useState, useEffect } from 'react';
 import { FileText, ToggleLeft, ToggleRight } from 'lucide-react';
 import { toast } from '../lib/toastStore';
@@ -15,6 +16,7 @@ interface Policy {
 }
 
 export default function Policies() {
+  const { t } = useLanguage();
   const demoPolicies: Policy[] = [
     { id: 'demo-policy-1', name: 'Critical vulnerabilities require remediation', description: 'Blocks release when an exploitable critical finding is open.', framework: 'PCI DSS 4.0', enabled: true, severity: 'CRITICAL', version: 1 },
     { id: 'demo-policy-2', name: 'Privileged accounts require MFA', description: 'Requires MFA for administrators and production access.', framework: 'RBI CSF', enabled: true, severity: 'HIGH', version: 1 },
@@ -48,7 +50,7 @@ export default function Policies() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <FileText size={22} color="var(--color-primary-blue)" /> Policies
+          <FileText size={22} color="var(--color-primary-blue)" /> {t("Policies")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Guardrails enforced automatically across pipelines, cloud, and identity
@@ -61,8 +63,8 @@ export default function Policies() {
             <tr>
               <th>Policy</th>
               <th>Framework</th>
-              <th>Severity</th>
-              <th>Status</th>
+              <th>{t("Severity")}</th>
+              <th>{t("Status")}</th>
             </tr>
           </thead>
           <tbody>

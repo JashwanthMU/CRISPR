@@ -37,7 +37,7 @@ calculations or storage.
 
 ## Deployment order
 
-1. Run `alembic upgrade head` (revision `0007_organization_data_modes`).
+1. Run `alembic upgrade head` (revision `0008_remediation_delivery_risk`).
 2. Configure live mode and secrets with `./install.sh` or `.env`.
 3. Add GitHub/`generic_http`, or post normalized canonical evidence.
 4. Run calculations and inspect jobs at `/api/analysis/jobs/{job_id}`.

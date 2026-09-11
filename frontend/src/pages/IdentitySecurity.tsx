@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { UserCog } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
@@ -6,9 +7,9 @@ import { getAssets } from '../lib/api';
 
 const IDENTITY_RISKS = [
   { identity: 'svc-payments-deploy', type: 'Service Account', privilege: 'Admin', mfa: false, risk: 'CRITICAL' },
-  { identity: 'r.verma@novapay.com', type: 'Human — Platform Infra', privilege: 'Cluster Admin', mfa: true, risk: 'MEDIUM' },
+  { identity: 'r.verma@example.com', type: 'Human — Platform Infra', privilege: 'Cluster Admin', mfa: true, risk: 'MEDIUM' },
   { identity: 'svc-ci-runner', type: 'Service Account', privilege: 'AssumeRole (S3, EC2, RDS)', mfa: false, risk: 'HIGH' },
-  { identity: 'a.mehta@novapay.com', type: 'Human — Payments', privilege: 'Production DB Write', mfa: true, risk: 'LOW' },
+  { identity: 'a.mehta@example.com', type: 'Human — Payments', privilege: 'Production DB Write', mfa: true, risk: 'LOW' },
   { identity: 'svc-auth-legacy', type: 'Service Account', privilege: 'IAM PassRole', mfa: false, risk: 'HIGH' },
 ];
 
@@ -17,6 +18,7 @@ import { TOKENS } from '../utils/format';
 const RISK_COLOR: Record<string, string> = { CRITICAL: TOKENS.critical, HIGH: TOKENS.sevHigh, MEDIUM: TOKENS.warning, LOW: TOKENS.success };
 
 export default function IdentitySecurity() {
+  const { t } = useLanguage();
   const [assets, setAssets] = useState<any[]>([]);
   const mfaPercent = (asset: any) => {
     if (typeof asset.controls?.mfa_coverage === 'number') return Math.round(asset.controls.mfa_coverage * 100);
@@ -34,7 +36,7 @@ export default function IdentitySecurity() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <UserCog size={22} color="var(--color-primary-blue)" /> Identity Security
+          <UserCog size={22} color="var(--color-primary-blue)" /> {t("Identity Security")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Privileged access review, MFA coverage, and over-privileged identity detection
@@ -54,10 +56,10 @@ export default function IdentitySecurity() {
           <thead>
             <tr>
               <th>Identity</th>
-              <th>Type</th>
+              <th>{t("Type")}</th>
               <th>Privilege</th>
               <th>MFA</th>
-              <th>Risk</th>
+              <th>{t("Risk")}</th>
             </tr>
           </thead>
           <tbody>

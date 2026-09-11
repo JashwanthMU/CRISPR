@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { Plug, RefreshCw, Settings2, Power, PlugZap } from 'lucide-react';
 import { INTEGRATIONS } from '../demo/fixtures';
@@ -24,6 +25,7 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
 };
 
 export default function Integrations() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<Integration[]>(API_MODE === 'demo' ? INTEGRATIONS.map((i) => ({ ...i })) : []);
 
   useEffect(() => {
@@ -114,7 +116,7 @@ export default function Integrations() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Plug size={22} color="var(--color-primary-blue)" /> Integrations
+          <Plug size={22} color="var(--color-primary-blue)" /> {t("Integrations")}
         </h1>
         <p className="page-subtitle">
           {connectedCount} of {items.length} sources connected · manage ingestion across code, cloud, identity, and threat intelligence

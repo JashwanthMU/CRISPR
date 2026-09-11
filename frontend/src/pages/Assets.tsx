@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Globe, Lock, AlertTriangle } from 'lucide-react';
 import RiskScoreBadge from '../components/common/RiskScoreBadge';
@@ -17,6 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Assets() {
+  const { t } = useLanguage();
   const [assets, setAssets] = useState<any[]>(API_MODE === 'demo' ? MOCK_ASSETS : []);
   const [risks, setRisks] = useState<any[]>(API_MODE === 'demo' ? MOCK_RISKS : []);
   const [findings, setFindings] = useState<any[]>(API_MODE === 'demo' ? MOCK_FINDINGS : []);
@@ -52,9 +54,9 @@ export default function Assets() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">Asset Inventory</h1>
+        <h1 className="page-title">{t("Asset Inventory")}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          Business-context-enriched inventory of NovaPay's critical assets
+          Business-context-enriched inventory of the organization’s critical assets
         </p>
       </div>
 
@@ -234,9 +236,9 @@ export default function Assets() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Severity</th>
+                          <th>{t("Severity")}</th>
                           <th>Title</th>
-                          <th>Status</th>
+                          <th>{t("Status")}</th>
                         </tr>
                       </thead>
                       <tbody>

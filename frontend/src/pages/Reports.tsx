@@ -1,9 +1,11 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { ScrollText, Download, Plus } from 'lucide-react';
 import api from '../lib/api';
 import { API_MODE, getReports } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { SkeletonTable } from '../components/common/Skeleton';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 
 interface ReportItem {
   id: string;
@@ -15,6 +17,8 @@ interface ReportItem {
 }
 
 export default function Reports() {
+  const { t } = useLanguage();
+  const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
   const [reports, setReports] = useState<ReportItem[] | null>(null);
 
   useEffect(() => {
@@ -76,10 +80,10 @@ export default function Reports() {
       <div className="animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <ScrollText size={22} color="var(--color-primary-blue)" /> Reports
+            <ScrollText size={22} color="var(--color-primary-blue)" /> {executiveView ? 'Executive & Regulatory Reports' : SIH_WORKSPACE_ENABLED ? 'Technical Reports' : 'Reports'}
           </h1>
           <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-            Board-ready and compliance reports generated from live risk data
+            {executiveView ? 'Board, financial exposure, investment and regulatory reporting' : 'Evidence-based operational and compliance reports generated from current risk data'}
           </p>
         </div>
         <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={generateNew}>
@@ -97,7 +101,7 @@ export default function Reports() {
                 <th>Report</th>
                 <th>Generated</th>
                 <th>Format</th>
-                <th>Actions</th>
+                <th>{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -107,7 +111,7 @@ export default function Reports() {
                     <div style={{ fontWeight: 600 }}>{r.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
                   </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{r.generated}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(r.generated).toLocaleString()}</td>
                   <td>{r.format}</td>
                   <td>
                     <button
