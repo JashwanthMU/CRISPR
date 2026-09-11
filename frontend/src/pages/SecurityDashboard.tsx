@@ -321,7 +321,7 @@ export default function SecurityDashboard() {
                 </div>
               ))}
             </div>
-            <RiskDonut data={sources} height={180} />
+            <RiskDonut data={sources} height={190} />
           </div>
         </div>
       </div>
