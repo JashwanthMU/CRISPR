@@ -24,6 +24,10 @@ jobs:
       AUTH_SECRET: unit-test-signing-material-not-for-deployment
       SECURITY_ADMIN_EMAIL: security-test@example.com
       SECURITY_ADMIN_PASSWORD: unit-test-password
+      SIH_EXECUTIVE_EMAIL: executive@crispr.demo
+      SIH_EXECUTIVE_PASSWORD: yourbestpassword
+      SIH_TECHNICAL_EMAIL: technical@crispr.demo
+      SIH_TECHNICAL_PASSWORD: yourworstpassword
       POSTGRES_DB: crispr_test
       POSTGRES_USER: crispr_test
       POSTGRES_PASSWORD: unit-test-postgres-password
