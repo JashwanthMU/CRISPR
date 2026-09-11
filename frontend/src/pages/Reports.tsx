@@ -34,8 +34,11 @@ export default function Reports() {
   const loadReports = () => api.get('/api/reports').then((res) => setReports(res.data.reports));
 
   const generateNew = async () => {
+    const reportName = executiveView
+      ? `Executive Cyber Risk Report — ${new Date().toISOString().slice(0, 10)}`
+      : `Technical Security Operations Report — ${new Date().toISOString().slice(0, 10)}`;
     if (API_MODE === 'demo') {
-      const report: ReportItem = { id: `demo-${Date.now()}`, name: `Findings Digest — ${new Date().toISOString().slice(0, 10)}`, generated: new Date().toISOString(), format: 'JSON', status: 'READY' };
+      const report: ReportItem = { id: `demo-${Date.now()}`, name: reportName, generated: new Date().toISOString(), format: 'PDF', status: 'READY' };
       setReports((current) => [report, ...(current ?? [])]);
       toast.success('Demo report generated', 'The report is available for download.');
       return;
@@ -43,8 +46,8 @@ export default function Reports() {
     toast.info('Generating report…');
     try {
       await api.post('/api/reports', {
-        report_type: 'FINDINGS_DIGEST',
-        name: `Findings Digest — ${new Date().toISOString().slice(0, 10)}`,
+        report_type: executiveView ? 'RISK_SUMMARY' : 'FINDINGS_DIGEST',
+        name: reportName,
         format: 'JSON',
       });
       await loadReports();
@@ -54,22 +57,12 @@ export default function Reports() {
     }
   };
 
-  const downloadReport = async (reportId: string, name: string) => {
+  const downloadReport = async (_reportId: string, name: string) => {
     try {
-      toast.info('Preparing download...');
-      const res = API_MODE === 'demo' ? { data: { report_id: reportId, name, mode: 'DEMO', generated_at: new Date().toISOString() } } : await api.get(`/api/reports/${reportId}`);
-      
-      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${name}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success('Download complete', `${name}.json`);
+      toast.info('Preparing professional PDF…');
+      const { downloadDashboardPdf } = await import('../lib/reportPdf');
+      await downloadDashboardPdf(executiveView ? 'executive' : 'technical', name);
+      toast.success('PDF download complete', `${name}.pdf`);
     } catch (e) {
       toast.error('Download failed');
     }
@@ -112,7 +105,7 @@ export default function Reports() {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
                   </td>
                   <td style={{ color: 'var(--text-muted)' }}>{new Date(r.generated).toLocaleString()}</td>
-                  <td>{r.format}</td>
+                  <td>PDF</td>
                   <td>
                     <button
                       className="btn-secondary"
