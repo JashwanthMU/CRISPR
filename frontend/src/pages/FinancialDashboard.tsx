@@ -35,6 +35,7 @@ export default function FinancialDashboard() {
   const [actions, setActions] = useState<any[]>([]);
   const [forecast, setForecast] = useState<any[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [selectedAssetId, setSelectedAssetId] = useState('A003');
   const [budget, setBudget] = useState(10000000); // ₹100L default
@@ -72,6 +73,7 @@ export default function FinancialDashboard() {
       } else {
         setLoadError(null);
       }
+      setLoading(false);
     });
   }, []);
 
@@ -125,28 +127,28 @@ export default function FinancialDashboard() {
       <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard
           title={t("Expected Annual Loss")}
-          value={enterprise ? formatLakh(enterprise.total_eal_lakh) : 'Unavailable'}
+          value={loading ? 'Loading…' : enterprise ? formatLakh(enterprise.total_eal_lakh) : 'Unavailable'}
           subtitle="Total cyber exposure this year"
           icon={<IndianRupee size={16} />}
           accentColor={TOKENS.critical}
         />
         <KPICard
           title={t("P95 Cyber VaR")}
-          value={enterprise ? formatRupees(enterprise.var_95_inr) : 'Unavailable'}
+          value={loading ? 'Loading…' : enterprise ? formatRupees(enterprise.var_95_inr) : 'Unavailable'}
           subtitle="Worst-case annual scenario"
           icon={<TrendingUp size={16} />}
           accentColor={TOKENS.sevHigh}
         />
         <KPICard
           title={t("Current Security Spend")}
-          value={currentSpend == null ? 'Not supplied' : `${formatRupees(currentSpend)}/yr`}
+          value={loading ? 'Loading…' : currentSpend == null ? 'Not supplied' : `${formatRupees(currentSpend)}/yr`}
           subtitle={enterprise ? `vs. ${formatLakh(enterprise.total_eal_lakh)} annual loss exposure` : 'Awaiting verified financial inputs'}
           icon={<Wallet size={16} />}
           accentColor={TOKENS.primaryBlue}
         />
         <KPICard
           title={t("Optimal ROSI")}
-          value={bestAction ? `${bestAction.rosi_pct}%` : 'Unavailable'}
+          value={loading ? 'Loading…' : bestAction ? `${bestAction.rosi_pct}%` : 'Unavailable'}
           subtitle={bestAction ? `Top action: ${bestAction.name}` : 'Awaiting verified control catalogue'}
           icon={<Percent size={16} />}
           accentColor={TOKENS.success}
