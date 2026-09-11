@@ -114,7 +114,18 @@ function addFooter(doc: jsPDF, generatedAt: string, workspace: WorkspaceReport) 
   }
 }
 
-function executiveReport(doc: jsPDF, data: AnyRecord) {
+function frameworkVersion(name: unknown): string {
+  const value = String(name ?? 'Framework');
+  const normalized = value.toUpperCase();
+  if (normalized.includes('ISO')) return 'ISO/IEC 27001:2022';
+  if (normalized.includes('NIST')) return 'NIST CSF 2.0';
+  if (normalized.includes('CIS')) return 'CIS Controls v8.1';
+  if (normalized.includes('SEBI')) return 'SEBI CSCRF 2024';
+  if (normalized.includes('RBI')) return 'RBI IT Governance / Cyber Security Requirements';
+  return value;
+}
+
+function executiveReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
   const enterprise = data.enterprise ?? {};
   const risks = rows(data.risks, 'risks').sort((a, b) => Number(b.eal_inr) - Number(a.eal_inr));
   const compliance = rows(data.compliance, 'frameworks').length ? rows(data.compliance, 'frameworks') : rows(data.compliance);
@@ -124,8 +135,8 @@ function executiveReport(doc: jsPDF, data: AnyRecord) {
   y = kpis(doc, [
     ['Enterprise risk score', String(enterprise.enterprise_risk_score ?? 'N/A')],
     ['Expected annual loss', inr(enterprise.total_eal_inr)],
-    ['P95 cyber value at risk', inr(enterprise.var_95_inr)],
-    ['Current security spend', enterprise.current_spend_inr == null ? 'Not supplied' : inr(enterprise.current_spend_inr)],
+    ['P95 annual loss', inr(enterprise.var_95_inr)],
+    ['P99 annual loss', inr(enterprise.var_99_inr)],
   ], y);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
@@ -140,17 +151,31 @@ function executiveReport(doc: jsPDF, data: AnyRecord) {
   ]));
   y = section(doc, '3. Compliance and regulatory exposure', y);
   y = table(doc, y, ['Framework', 'Score', 'Status / gap', 'Financial impact'], (gaps.length ? gaps : compliance).slice(0, 10).map(r => [
-    r.framework ?? r.name ?? 'Framework', r.score == null ? 'N/A' : percent(r.score), r.requirement ?? r.gap ?? r.status ?? 'Current assessment', inr(r.financial_impact_inr ?? r.impact_inr ?? 0),
+    frameworkVersion(r.framework ?? r.name), r.score == null ? 'N/A' : percent(r.score), r.requirement ?? r.gap ?? r.status ?? 'Current assessment', inr(r.financial_impact_inr ?? r.impact_inr ?? 0),
   ]));
   y = section(doc, '4. Investment priorities', y);
-  table(doc, y, ['Control / initiative', 'Cost', 'Risk reduction', 'ROSI'], controls.slice(0, 10).map(r => {
+  y = table(doc, y, ['Control / initiative', 'Cost', 'Risk reduction', 'ROSI'], controls.slice(0, 10).map(r => {
     const cost = Number(r.cost_inr ?? 0);
     const reduction = Number(r.risk_reduction_inr ?? 0);
     return [r.name ?? r.control_name ?? r.control_id ?? 'Control', inr(cost), inr(reduction), cost ? percent(((reduction - cost) / cost) * 100) : 'N/A'];
   }));
+  y = section(doc, '5. Methodology, provenance and reproducibility', y);
+  const methodology = enterprise.financial_methodology ?? {};
+  const simulation = enterprise.monte_carlo_methodology ?? {};
+  table(doc, y, ['Evidence field', 'Recorded value'], [
+    ['Data snapshot', generatedAt],
+    ['CVE model', enterprise.top_risk?.exploitation_priority?.model_version ?? enterprise.top_risk?.model_used ?? 'Not available'],
+    ['CVE model purpose', 'Exploitation prioritization only; excluded from EAL'],
+    ['Financial formula', methodology.formula ?? 'EAL = annual incident probability x loss magnitude'],
+    ['Frequency source', methodology.frequency_source ?? 'Not supplied'],
+    ['Monte Carlo iterations / seed', `${simulation.iterations ?? 'N/A'} / ${simulation.seed ?? 'N/A'}`],
+    ['Annual loss distribution', simulation.loss_distribution ?? simulation.distribution ?? 'See risk-engine configuration'],
+    ['P95 tail mean', inr(enterprise.tail_value_at_risk_95_inr)],
+    ['Current security spend', enterprise.current_spend_inr == null ? 'Not supplied' : inr(enterprise.current_spend_inr)],
+  ]);
 }
 
-function technicalReport(doc: jsPDF, data: AnyRecord) {
+function technicalReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
   const enterprise = data.enterprise ?? {};
   const findings = rows(data.findings, 'findings');
   const assets = rows(data.assets, 'assets');
@@ -173,17 +198,28 @@ function technicalReport(doc: jsPDF, data: AnyRecord) {
     r.severity ?? 'N/A', r.title ?? r.name ?? r.finding ?? r.finding_id ?? 'Finding', r.asset_name ?? r.asset_id ?? 'Unknown', r.source_type ?? r.source ?? 'Unknown', r.status ?? 'OPEN',
   ]));
   y = section(doc, '3. Active risk cases', y);
-  y = table(doc, y, ['Asset / case', 'Risk score', 'EAL', 'Primary driver'], risks.slice(0, 12).map(r => [
-    r.asset_name ?? r.name ?? r.asset_id ?? 'Unknown', Number(r.risk_score ?? 0).toFixed(1), inr(r.eal_inr ?? Number(r.eal_lakh ?? 0) * 100_000), r.top_driver ?? r.risk_driver ?? r.business_service ?? 'See finding evidence',
+  y = table(doc, y, ['Asset / case', 'Risk score', 'CVE priority', 'Annual probability', 'EAL'], risks.slice(0, 12).map(r => [
+    r.asset_name ?? r.name ?? r.asset_id ?? 'Unknown', Number(r.risk_score ?? 0).toFixed(1), r.exploitation_priority?.score == null ? 'N/A' : percent(Number(r.exploitation_priority.score) * 100), percent(Number(r.annual_frequency?.probability ?? r.likelihood ?? 0) * 100), inr(r.eal_inr ?? Number(r.eal_lakh ?? 0) * 100_000),
   ]));
   y = section(doc, '4. Remediation and verification status', y);
   y = table(doc, y, ['Ticket', 'Priority', 'Owner', 'Status', 'Potential reduction'], remediations.slice(0, 15).map(r => [
     r.ticket_key ?? r.id ?? 'Ticket', r.priority ?? 'N/A', r.owner_name ?? r.owner ?? 'Unassigned', r.status ?? 'OPEN', inr(r.risk_reduction_inr ?? r.potential_risk_reduction_inr ?? 0),
   ]));
   y = section(doc, '5. Data source health', y);
-  table(doc, y, ['Integration', 'Provider', 'Status', 'Items ingested', 'Last synchronization'], integrations.slice(0, 15).map(r => [
+  y = table(doc, y, ['Integration', 'Provider', 'Status', 'Items ingested', 'Last synchronization'], integrations.slice(0, 15).map(r => [
     r.name ?? r.provider ?? 'Source', r.provider ?? 'N/A', r.status ?? 'Unknown', String(r.items_ingested ?? 0), r.last_sync_at ? new Date(r.last_sync_at).toLocaleString() : 'Not synchronized',
   ]));
+  y = section(doc, '6. Engine and evidence traceability', y);
+  const methodology = enterprise.financial_methodology ?? {};
+  const simulation = enterprise.monte_carlo_methodology ?? {};
+  table(doc, y, ['Field', 'Value'], [
+    ['Data snapshot', generatedAt],
+    ['CVE model version', enterprise.top_risk?.exploitation_priority?.model_version ?? enterprise.top_risk?.model_used ?? 'Not available'],
+    ['Model semantics', 'CISA KEV-membership prioritization; not annual incident probability'],
+    ['Frequency evidence', methodology.frequency_source ?? 'Not supplied'],
+    ['P95 / P99 annual loss', `${inr(enterprise.var_95_inr)} / ${inr(enterprise.var_99_inr)}`],
+    ['Monte Carlo iterations / seed', `${simulation.iterations ?? 'N/A'} / ${simulation.seed ?? 'N/A'}`],
+  ]);
 }
 
 export async function downloadDashboardPdf(workspace: WorkspaceReport, reportName: string): Promise<void> {
@@ -196,7 +232,7 @@ export async function downloadDashboardPdf(workspace: WorkspaceReport, reportNam
   const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
   addBrandHeader(doc, workspace === 'executive' ? 'Executive Cyber Risk Report' : 'Technical Security Operations Report', `${reportName} | Current organization scope | Evidence-based snapshot`);
-  if (workspace === 'executive') executiveReport(doc, data); else technicalReport(doc, data);
+  if (workspace === 'executive') executiveReport(doc, data, generatedAt); else technicalReport(doc, data, generatedAt);
   addFooter(doc, generatedAt, workspace);
   doc.setProperties({ title: reportName, subject: workspace === 'executive' ? 'Executive cyber-risk and financial exposure' : 'Technical security operations and evidence', author: 'CRISPR Security Intelligence Platform', creator: 'CRISPR' });
   doc.save(`${safeName(reportName)}-${new Date().toISOString().slice(0, 10)}.pdf`);
