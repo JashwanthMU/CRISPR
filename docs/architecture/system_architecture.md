@@ -79,12 +79,12 @@ graph TB
         LLM[LLM Client — Optional]
         FORE[EAL Forecaster]
         ANOM[Anomaly Detector]
-        ML[Incident Predictor]
-        SHAP[Explainability — SHAP-style]
+        ML[CVE Exploitation-Priority Model]
+        SHAP[Per-record SHAP Explainability]
     end
 
     subgraph OPT["Layer 5 — Investment Optimizer"]
-        KNAP[Knapsack Optimizer — PuLP + Greedy]
+        KNAP[Dynamic Marginal Greedy Optimizer]
         SIM[Scenario Simulator]
         COMP[Compliance Mapper]
     end
@@ -300,16 +300,12 @@ graph TD
     subgraph opt["optimizer/knapsack.py"]
         CAT["CONTROLS Catalogue — 7 controls:\n  MFA: cost ₹15L → reduces ₹48.6L\n  Patching: cost ₹8L → reduces ₹31L\n  Segmentation: cost ₹30L → reduces ₹38.7L\n  EDR expand: cost ₹20L → reduces ₹25L\n  Cloud hardening: cost ₹15L → reduces ₹18L\n  Backup: cost ₹6L → reduces ₹9L\n  Training: cost ₹3L → reduces ₹5L"]
 
-        PULP["PuLP ILP Solver (primary)\nMaximize Σ risk_reduction_inr × x_i\nSubject to: Σ cost_inr × x_i ≤ budget\nx_i ∈ {0, 1} — binary selection"]
+        GREED["Dynamic marginal greedy solver\nRecompute residual EAL for every candidate\nSelect best affordable marginal reduction\nRepeat until no beneficial candidate remains"]
 
-        GREED["Greedy Fallback\nSort by reduction/cost ratio\nPick while budget remaining"]
-
-        OUT["Output:\n  selected_controls: list\n  spent_inr, remaining_inr\n  total_reduction_inr\n  total_risk_reduction_pct\n  rosi = (reduction - spent) / spent\n  solver: 'pulp' | 'greedy'"]
+        OUT["Output:\n  selected_controls: list\n  spent_inr, remaining_inr\n  total_reduction_inr\n  total_risk_reduction_pct\n  rosi = (reduction - spent) / spent\n  solver: 'greedy_dynamic'"]
     end
 
-    CAT --> PULP
     CAT --> GREED
-    PULP --> OUT
     GREED --> OUT
 ```
 
@@ -679,7 +675,7 @@ graph TD
 | `backend/risk_engine/drivers.py` | Member 3 | Risk factor explanation |
 | `backend/correlation/correlator.py` | Member 2 | Multi-source confidence engine |
 | `backend/normalization/normalizer.py` | Member 2 | Finding validation pipeline |
-| `backend/optimizer/knapsack.py` | Member 5 | PuLP + greedy optimizer |
+| `backend/optimizer/knapsack.py` | Member 5 | Dynamic marginal greedy optimizer |
 | `backend/scenario_engine/simulator.py` | Member 5 | What-if simulation |
 | `backend/compliance/mapper.py` | Member 5 | Framework mapping |
 | `ai/assistant/query_engine.py` | Member 4 | NL intent routing |

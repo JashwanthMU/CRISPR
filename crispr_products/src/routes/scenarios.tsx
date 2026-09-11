@@ -45,7 +45,7 @@ function Scenarios() {
     <Page
       eyebrow="Page 10 · Simulation"
       title="What-if simulator"
-      lede="Change the control state on the left and simulate. The right side recomputes risk score, incident likelihood and expected annual loss from the same engine used on the risk page."
+      lede="Change the control state on the left and simulate. The right side recomputes risk score, the disclosed annual-frequency assumption and expected annual loss from the same engine used on the risk page."
       next={{ to: "/budget", label: "₹1 crore budget optimiser" }}
     >
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
@@ -96,7 +96,7 @@ function Scenarios() {
               <p className="text-xs text-critical">CRITICAL</p>
             </div>
             <dl className="mt-6 space-y-3 text-sm">
-              <Row k="Incident likelihood" v={`${RISK_CASE.likelihood}%`} />
+              <Row k="Annual-frequency assumption" v={`${RISK_CASE.likelihood}%`} />
               <Row k="Expected annual loss" v={`₹${RISK_CASE.ealLakh} L`} />
               <Row k="Open control gaps" v="3" />
             </dl>
@@ -111,7 +111,7 @@ function Scenarios() {
               <p className="text-xs text-muted-foreground">{scenario.score < 40 ? "MEDIUM" : scenario.score < 60 ? "MEDIUM-HIGH" : scenario.score < 80 ? "HIGH" : "CRITICAL"}</p>
             </div>
             <dl className="mt-6 space-y-3 text-sm">
-              <Row k="Incident likelihood" v={<><AnimatedNumber value={scenario.likelihood} decimals={1} duration={0.7} />%</>} />
+              <Row k="Annual-frequency assumption" v={<><AnimatedNumber value={scenario.likelihood} decimals={1} duration={0.7} />%</>} />
               <Row k="Expected annual loss" v={<>₹<AnimatedNumber value={scenario.eal} decimals={1} duration={0.7} /> L</>} />
               <Row
                 k="Annual risk reduction"

@@ -157,8 +157,32 @@ export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
             <div className="card-title">Financial Frequency Evidence</div>
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Annual incident probability: <strong style={{ color: 'var(--text-primary)' }}>{Math.round((detail.annual_frequency?.probability ?? detail.likelihood) * 1000) / 10}%</strong><br />
-              Source: {detail.annual_frequency?.semantics ?? 'Frequency evidence not returned'}
+              Semantics: {detail.annual_frequency?.semantics ?? 'Frequency evidence not returned'}
+              {detail.annual_frequency?.evidence && Object.entries(detail.annual_frequency.evidence).map(([key, value]) => value == null || typeof value === 'object' ? null : (
+                <div key={key}><span style={{ textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}</span>: <strong style={{ color: 'var(--text-primary)' }}>{String(value)}</strong></div>
+              ))}
             </div>
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <div className="card-title">Asset Criticality Components</div>
+            {Object.entries(detail.criticality_breakdown ?? {}).map(([key, item]) => (
+              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '4px 0', fontSize: '0.8125rem' }}>
+                <span style={{ color: 'var(--text-muted)', textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')} ({Math.round(item.weight * 100)}%)</span>
+                <strong>+{item.contribution.toFixed(1)}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="card" style={{ padding: 14 }}>
+            <div className="card-title">Control Effectiveness Evidence</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 8 }}>{detail.control_effectiveness_evidence?.source}</div>
+            {Object.entries(detail.control_effectiveness_evidence?.current_posture ?? {}).map(([key, value]) => (
+              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '3px 0', fontSize: '0.8125rem' }}>
+                <span style={{ textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}</span><strong>{typeof value === 'boolean' ? (value ? 'Enabled' : 'Disabled') : `${Math.round(value * 100)}%`}</strong>
+              </div>
+            ))}
+            {detail.control_effectiveness_evidence?.formula && <div style={{ marginTop: 8, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>{detail.control_effectiveness_evidence.formula}</div>}
           </div>
 
           <div className="card" style={{ padding: 14 }}>

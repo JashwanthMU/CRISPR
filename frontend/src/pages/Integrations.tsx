@@ -34,30 +34,13 @@ export default function Integrations() {
     });
   }, []);
 
-  useEffect(() => {
-    if (API_MODE !== 'demo') return;
-    const connecting = items.filter((i) => i.status === 'connecting');
-    if (connecting.length === 0) return;
-    const timer = setTimeout(() => {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.status === 'connecting'
-            ? { ...i, status: 'connected', lastSync: new Date().toISOString(), itemsIngested: Math.floor(Math.random() * 40) + 5 }
-            : i
-        )
-      );
-      connecting.forEach((i) => toast.success(`${i.name} connected`, 'Initial sync completed successfully.'));
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, [items]);
-
   const connect = (id: string) => {
     if (API_MODE !== 'demo') {
       toast.info('Credential required', 'Configure a GitHub token and organization through the integration configuration endpoint.');
       return;
     }
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connecting' } : i)));
-    toast.info('Connecting…', 'Establishing a secure connection and requesting scopes.');
+    const integration = items.find((item) => item.id === id);
+    toast.info('Demo catalogue entry', `${integration?.name ?? 'This connector'} is not a live adapter in this workspace.`);
   };
 
   const reconnect = async (id: string) => {
@@ -74,11 +57,7 @@ export default function Integrations() {
       }
       return;
     }
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
-    setTimeout(() => {
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connected', lastSync: new Date().toISOString() } : i)));
-      toast.success('Reconnected', 'Sync completed successfully.');
-    }, 1400);
+    toast.info('Demo catalogue entry', 'No external connection or synchronization is performed in the demo workspace.');
   };
 
   const disable = async (id: string) => {
@@ -92,8 +71,7 @@ export default function Integrations() {
       }
       return;
     }
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'disconnected', itemsIngested: 0 } : i)));
-    toast.warning('Integration disabled', 'Ingestion has been paused for this source.');
+    toast.info('Demo catalogue entry', 'Demo source states are fixed evidence and cannot be presented as live operations.');
   };
 
   const testConnection = async (integration: Integration) => {
@@ -106,8 +84,7 @@ export default function Integrations() {
       }
       return;
     }
-    toast.info('Testing connection…');
-    setTimeout(() => toast.success('Connection healthy', `${integration.name} responded in 214ms.`), 1000);
+    toast.info('Demo catalogue entry', `${integration.name} has no external endpoint to test in this workspace.`);
   };
 
   const connectedCount = items.filter((i) => i.status === 'connected' || i.status === 'syncing').length;
@@ -132,6 +109,9 @@ export default function Integrations() {
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>{integration.name}</div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{integration.category.replace('_', ' ')}</div>
+                  <div style={{ marginTop: 3, fontSize: '0.625rem', fontWeight: 700, color: API_MODE === 'demo' ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                    {API_MODE === 'demo' ? 'DEMO DATA' : integration.key === 'github' || integration.key === 'generic_http' ? 'LIVE ADAPTER' : 'PLANNED'}
+                  </div>
                 </div>
               </div>
               <span

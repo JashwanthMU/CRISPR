@@ -398,7 +398,7 @@ When `LLM_ENABLED=false` or the model service is unavailable, deterministic risk
 
 | Module | Current implementation | Training status |
 |---|---|---|
-| Incident prediction | Transparent weighted rule model | No training required |
+| CVE exploitation prioritization | Calibrated XGBoost KEV-membership classifier | Trained artifact; runtime validation required |
 | Anomaly detection | Isolation Forest over synthetic failed-login-rate features derived from SIEM demo signals | Runtime unsupervised fit |
 | Forecasting | Linear EAL drift at 0.77% per day, default 90-day horizon | Not trained |
 | Explainability | Contribution ranking in a SHAP-compatible display shape | Rule-based V1 |

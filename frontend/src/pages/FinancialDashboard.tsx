@@ -123,6 +123,23 @@ export default function FinancialDashboard() {
         </div>
       )}
 
+      {enterprise?.monte_carlo_methodology && (
+        <div className="card" style={{ padding: 16 }}>
+          <div className="card-title">Financial Uncertainty & Simulation Evidence</div>
+          <div className="responsive-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
+            <div><div className="text-label">P95 annual loss</div><strong>{formatRupees(enterprise.var_95_inr)}</strong></div>
+            <div><div className="text-label">P99 annual loss</div><strong>{formatRupees(enterprise.var_99_inr)}</strong></div>
+            <div><div className="text-label">Expected shortfall (95%)</div><strong>{formatRupees(enterprise.tail_value_at_risk_95_inr)}</strong></div>
+            <div><div className="text-label">Evidence source</div><strong>{enterprise.financial_methodology.frequency_source}</strong></div>
+          </div>
+          <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: 1.6 }}>
+            {enterprise.monte_carlo_methodology.iterations?.toLocaleString()} seeded simulations (seed {enterprise.monte_carlo_methodology.seed});{' '}
+            {enterprise.monte_carlo_methodology.occurrence_distribution}; {enterprise.monte_carlo_methodology.loss_distribution} loss with{' '}
+            σ/mean {enterprise.monte_carlo_methodology.loss_standard_deviation_ratio}. Independent asset incidents are assumed.
+          </div>
+        </div>
+      )}
+
       {/* KPI Row */}
       <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard

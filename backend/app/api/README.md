@@ -83,7 +83,7 @@ GET  /api/optimize/controls                  → Full control catalogue
   "total_reduction_inr": 15460000,
   "total_reduction_lakh": 154.6,
   "rosi": 0.88,
-  "solver": "pulp"
+  "solver": "greedy_dynamic"
 }
 ```
 

@@ -162,7 +162,7 @@ function executiveReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
   y = section(doc, '5. Methodology, provenance and reproducibility', y);
   const methodology = enterprise.financial_methodology ?? {};
   const simulation = enterprise.monte_carlo_methodology ?? {};
-  table(doc, y, ['Evidence field', 'Recorded value'], [
+  y = table(doc, y, ['Evidence field', 'Recorded value'], [
     ['Data snapshot', generatedAt],
     ['CVE model', enterprise.top_risk?.exploitation_priority?.model_version ?? enterprise.top_risk?.model_used ?? 'Not available'],
     ['CVE model purpose', 'Exploitation prioritization only; excluded from EAL'],
@@ -173,6 +173,16 @@ function executiveReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
     ['P95 tail mean', inr(enterprise.tail_value_at_risk_95_inr)],
     ['Current security spend', enterprise.current_spend_inr == null ? 'Not supplied' : inr(enterprise.current_spend_inr)],
   ]);
+  y = section(doc, '6. Financial evidence provenance', y);
+  table(doc, y, ['Risk / asset', 'Methodology', 'Source / confidence', 'Evidence / validity'], risks.slice(0, 10).map(r => {
+    const evidence = r.annual_frequency?.evidence ?? {};
+    return [
+      `${r.finding_id ?? 'No finding ID'} / ${r.asset_id ?? 'No asset ID'}`,
+      evidence.methodology ?? r.annual_frequency?.semantics ?? 'Not supplied',
+      `${evidence.source_name ?? evidence.source_type ?? 'Not supplied'} / ${evidence.confidence ?? 'N/A'}`,
+      `${evidence.evidence_reference ?? 'No reference'} / ${evidence.valid_until ?? 'No expiry'}`,
+    ];
+  }));
 }
 
 function technicalReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
@@ -212,7 +222,7 @@ function technicalReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
   y = section(doc, '6. Engine and evidence traceability', y);
   const methodology = enterprise.financial_methodology ?? {};
   const simulation = enterprise.monte_carlo_methodology ?? {};
-  table(doc, y, ['Field', 'Value'], [
+  y = table(doc, y, ['Field', 'Value'], [
     ['Data snapshot', generatedAt],
     ['CVE model version', enterprise.top_risk?.exploitation_priority?.model_version ?? enterprise.top_risk?.model_used ?? 'Not available'],
     ['Model semantics', 'CISA KEV-membership prioritization; not annual incident probability'],
@@ -220,6 +230,16 @@ function technicalReport(doc: jsPDF, data: AnyRecord, generatedAt: string) {
     ['P95 / P99 annual loss', `${inr(enterprise.var_95_inr)} / ${inr(enterprise.var_99_inr)}`],
     ['Monte Carlo iterations / seed', `${simulation.iterations ?? 'N/A'} / ${simulation.seed ?? 'N/A'}`],
   ]);
+  y = section(doc, '7. Finding-to-financial evidence trace', y);
+  table(doc, y, ['Finding', 'Asset', 'Frequency source', 'Confidence / evidence'], risks.slice(0, 15).map(r => {
+    const evidence = r.annual_frequency?.evidence ?? {};
+    return [
+      r.finding_id ?? r.cve_id ?? 'No finding ID',
+      r.asset_id ?? r.asset_name ?? 'Unknown',
+      evidence.source_name ?? evidence.source_type ?? r.annual_frequency?.semantics ?? 'Not supplied',
+      `${evidence.confidence ?? 'N/A'} / ${evidence.evidence_reference ?? 'No reference'}`,
+    ];
+  }));
 }
 
 export async function downloadDashboardPdf(workspace: WorkspaceReport, reportName: string): Promise<void> {

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from backend.app.auth import AuthUser, require_security
 from backend.connectors.nvd import ExternalVulnerabilityDataError, NVDClient
+from backend.connectors.cisa_kev import CISAKEVClient
 from backend.data_access import demo_mode_enabled, load_assets, load_findings
 from backend.database.connection import get_connection
 from backend.services.audit import record_audit_event
@@ -126,6 +127,59 @@ def global_nvd_feed(
         )
     except (ExternalVulnerabilityDataError, ValueError) as error:
         raise HTTPException(status_code=502, detail=f"NVD feed request failed: {error}") from error
+
+
+@router.get("/kev/feed")
+def cisa_kev_feed(_: AuthUser = Depends(require_security)) -> dict:
+    """Read the official CISA KEV catalogue without creating asset findings."""
+    try:
+        return CISAKEVClient().fetch_catalog()
+    except ExternalVulnerabilityDataError as error:
+        raise HTTPException(status_code=502, detail=f"CISA KEV request failed: {error}") from error
+
+
+@router.post("/kev/refresh")
+def refresh_cisa_kev(user: AuthUser = Depends(require_security)) -> dict:
+    """Attach current CISA KEV evidence to existing asset-mapped LIVE CVEs."""
+    if demo_mode_enabled(user.organization_id):
+        raise HTTPException(status_code=409, detail="CISA KEV refresh requires CRISPR_DATA_MODE=live")
+    try:
+        catalog = CISAKEVClient().fetch_catalog()
+    except ExternalVulnerabilityDataError as error:
+        raise HTTPException(status_code=502, detail=f"CISA KEV request failed: {error}") from error
+    findings = load_findings("VULNERABILITY_SCANNER", organization_id=user.organization_id)
+    updated = []
+    for finding in findings:
+        cve = str(finding.get("cve") or "").upper()
+        kev = catalog["items"].get(cve)
+        provenance = dict(finding.get("provenance") or {})
+        provenance["cisa_kev"] = {
+            "source": catalog["source"],
+            "source_url": catalog["source_url"],
+            "catalog_version": catalog["catalog_version"],
+            "fetched_at": catalog["fetched_at"],
+        }
+        updated.append({
+            **finding,
+            "exploited_in_wild": bool(kev),
+            "cisa_kev": kev,
+            "provenance": provenance,
+        })
+    if updated:
+        upsert_findings(updated, data_origin="LIVE", organization_id=user.organization_id)
+    record_audit_event(
+        user.organization_id, user.user_id, "cisa_kev.refreshed", "threat_intelligence",
+        str(catalog["catalog_version"]), {"examined": len(findings), "matched": sum(bool(row.get("cisa_kev")) for row in updated)},
+    )
+    return {
+        "status": "completed",
+        "catalog_version": catalog["catalog_version"],
+        "fetched_at": catalog["fetched_at"],
+        "examined": len(findings),
+        "matched": sum(bool(row.get("cisa_kev")) for row in updated),
+        "source_url": catalog["source_url"],
+        "probability_semantics": "KEV membership is prioritization evidence and is excluded from annual frequency",
+    }
 
 
 @router.post("/assets", status_code=201)

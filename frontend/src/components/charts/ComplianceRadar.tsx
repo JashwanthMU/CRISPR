@@ -7,11 +7,11 @@ interface Props {
 }
 
 const LABELS: Record<string, string> = {
-  ISO_27001: 'ISO 27001',
-  NIST_CSF: 'NIST CSF',
-  CIS_CONTROLS: 'CIS Controls',
-  RBI_CSF: 'RBI CSF',
-  SEBI_CSCRF: 'SEBI CSCRF',
+  ISO_27001: 'ISO 27001:2022',
+  NIST_CSF: 'NIST CSF 2.0',
+  CIS_CONTROLS: 'CIS v8.1',
+  RBI_CSF: 'RBI CSF 2016',
+  SEBI_CSCRF: 'SEBI CSCRF 2024',
 };
 
 export default function ComplianceRadar({ data, height = 280 }: Props) {

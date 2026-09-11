@@ -13,6 +13,8 @@ const ENDPOINTS = [
   { method: 'GET',  path: '/api/scenarios', description: 'Run a custom scenario with control overrides' },
   { method: 'GET',  path: '/api/scenarios/compare', description: 'Compare two scenarios side by side' },
   { method: 'POST', path: '/api/optimize', description: 'Run the budget optimizer for a given spend' },
+  { method: 'GET', path: '/api/ingestion/kev/feed', description: 'Read the official CISA Known Exploited Vulnerabilities catalogue' },
+  { method: 'POST', path: '/api/ingestion/kev/refresh', description: 'Attach current CISA KEV evidence to mapped live CVE findings' },
   { method: 'GET',  path: '/api/optimize/controls', description: 'List all 7 controls with cost and risk reduction' },
   { method: 'GET',  path: '/api/compliance', description: 'Framework scores: ISO 27001, NIST CSF, RBI CSF, SEBI CSCRF' },
   { method: 'GET',  path: '/api/compliance/gaps', description: 'Top compliance gaps with financial impact in ₹' },

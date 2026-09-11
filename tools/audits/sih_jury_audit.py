@@ -360,9 +360,16 @@ comp = get_compliance_summary()
 framework_labels = [f.get("label", f.get("framework", "")) for f in comp]
 print(f"  Frameworks: {framework_labels}\n")
 
-for required in ["ISO 27001", "NIST CSF", "CIS Controls", "RBI CSF", "SEBI CSCRF"]:
-    found = any(required.lower() in lbl.lower() for lbl in framework_labels)
-    check(found, f"Framework: {required}")
+required_frameworks = {
+    "ISO_27001": "ISO/IEC 27001:2022",
+    "NIST_CSF": "NIST Cybersecurity Framework 2.0",
+    "CIS_CONTROLS": "CIS Controls v8.1",
+    "RBI_CSF": "RBI Cyber Security Framework for Banks (2016)",
+    "SEBI_CSCRF": "SEBI Cybersecurity and Cyber Resilience Framework (2024)",
+}
+by_id = {framework.get("framework"): framework.get("label") for framework in comp}
+for framework_id, required_label in required_frameworks.items():
+    check(by_id.get(framework_id) == required_label, f"Framework: {required_label}")
 
 for fw in comp:
     score = fw.get("score", "N/A")

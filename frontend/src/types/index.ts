@@ -85,6 +85,7 @@ export interface Asset {
   is_regulated: boolean;
   value_inr: number;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   control_effectiveness: number;
   controls?: AssetControls;
   environment?: 'production' | 'staging' | 'development';
@@ -141,11 +142,18 @@ export interface RiskCase {
   asset_name: string;
   business_service: string;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   eal_inr: number;
   eal_lakh: number;
   risk_score: number;
   likelihood: number;
   control_effectiveness_pct: number;
+  control_effectiveness_evidence?: {
+    source: string;
+    formula: string;
+    current_posture: Record<string, number | boolean>;
+    calculated_effectiveness: number;
+  };
   sources: SourceType[];
   confidence_pct: number;
   loss_breakdown: LossBreakdown;

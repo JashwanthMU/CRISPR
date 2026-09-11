@@ -7,6 +7,7 @@ import { queryAssistant } from '../../services/api';
 interface Message {
   role: 'user' | 'assistant';
   text: string;
+  references?: Array<{ label: string; path: string }>;
 }
 
 const SUGGESTED_PROMPTS = [
@@ -17,9 +18,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 /**
- * Global, always-available AI assistant — distinct from the per-page
- * AIAdvisorChat (security/financial themed cards already embedded in
- * dashboards). This one lives in the application shell, is reachable from
+ * Global, always-available AI assistant. It lives in the application shell, is reachable from
  * any page via the header's "Ask CRISPR AI" button or Ctrl+/ shortcut area,
  * and answers using the same live demo-engine state (risk score, run count)
  * so its responses are grounded in real, current application state rather
@@ -59,7 +58,13 @@ export default function AIAssistantDrawer() {
     try {
       const res = await queryAssistant(question);
       const answer = res?.data?.answer || res?.data?.response || unavailableAnswer;
-      setMessages((m) => [...m, { role: 'assistant', text: answer }]);
+      const evidence = res?.data?.data ?? {};
+      const risk = evidence.top_risk ?? evidence.risk_case ?? evidence.summary?.top_risk;
+      const references = risk?.asset_id ? [
+        { label: `Risk ${risk.finding_id ?? risk.asset_id}`, path: `/risks?asset=${encodeURIComponent(risk.asset_id)}` },
+        ...(risk.finding_id ? [{ label: `Finding ${risk.finding_id}`, path: `/findings?finding=${encodeURIComponent(risk.finding_id)}` }] : []),
+      ] : [];
+      setMessages((m) => [...m, { role: 'assistant', text: answer, references }]);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', text: unavailableAnswer }]);
     } finally {
@@ -116,6 +121,15 @@ export default function AIAssistantDrawer() {
           {messages.map((m, i) => (
             <div key={i} className={`ai-drawer-message ${m.role}`}>
               {m.text}
+              {!!m.references?.length && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {m.references.map((reference) => (
+                    <button key={reference.path} className="btn-secondary" style={{ padding: '3px 7px', fontSize: '0.6875rem' }} onClick={() => { closeAIDrawer(); navigate(reference.path); }}>
+                      {reference.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {loading && <div className="ai-drawer-message assistant">Analyzing…</div>}

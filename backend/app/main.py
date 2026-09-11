@@ -41,6 +41,33 @@ from backend.data_access import LiveDataUnavailable, demo_mode_enabled
 docs_enabled = os.getenv("API_DOCS_ENABLED", "false").lower() == "true"
 
 
+def engine_health() -> dict:
+    """Report local engine readiness without making external network calls."""
+    from ml.incident_prediction.model import get_model_info
+
+    model = get_model_info()
+    integrity = model.get("artifact_integrity", {})
+    return {
+        "model": {
+            "status": "ready" if model.get("calibrated") and integrity.get("verified") else "degraded",
+            "version": model.get("model_version"),
+            "purpose": "CISA KEV-membership prioritization",
+            "artifact_integrity": integrity.get("verified", False),
+            "direct_eal_use": "not_approved",
+        },
+        "optimizer": {
+            "status": "ready",
+            "solver": "greedy_dynamic",
+            "overlap_handling": "marginal EAL recalculated after each selection",
+        },
+        "external_feeds": {
+            "nvd": {"capability": "manual_sync", "configured": bool(os.getenv("NVD_API_KEY"))},
+            "epss": {"capability": "manual_sync", "configured": True},
+            "cisa_kev": {"capability": "manual_refresh", "configured": True},
+        },
+    }
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     validate_auth_configuration()
@@ -171,6 +198,7 @@ def health_ready():
         "reason": reason,
         "data_mode": "demo" if demo_mode_enabled() else "live",
         "fixture_fallback_enabled": demo_mode_enabled(),
+        "engines": engine_health(),
     }
     return JSONResponse(status_code=200 if ready else 503, content=content)
 
@@ -186,4 +214,5 @@ def health():
         "reason": reason,
         "data_mode": "demo" if demo_mode_enabled() else "live",
         "fixture_fallback_enabled": demo_mode_enabled(),
+        "engines": engine_health(),
     }
