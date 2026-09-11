@@ -4,6 +4,18 @@ const KEY = 'crispr_sih_workspace';
 
 export const SIH_WORKSPACE_ENABLED = (import.meta as any).env?.VITE_SIH_WORKSPACE === 'true';
 
+const EXECUTIVE_EMAIL = ((import.meta as any).env?.VITE_SIH_EXECUTIVE_EMAIL || '').trim().toLowerCase();
+const TECHNICAL_EMAIL = ((import.meta as any).env?.VITE_SIH_TECHNICAL_EMAIL || '').trim().toLowerCase();
+
+/** Resolve the workspace granted to one of the dedicated SIH identities. */
+export function getIdentityWorkspace(email?: string): Workspace | null {
+  if (!SIH_WORKSPACE_ENABLED || !email) return null;
+  const normalized = email.trim().toLowerCase();
+  if (EXECUTIVE_EMAIL && normalized === EXECUTIVE_EMAIL) return 'executive';
+  if (TECHNICAL_EMAIL && normalized === TECHNICAL_EMAIL) return 'technical';
+  return null;
+}
+
 export function getWorkspace(): Workspace {
   if (!SIH_WORKSPACE_ENABLED) return 'technical';
   return localStorage.getItem(KEY) === 'technical' ? 'technical' : 'executive';
