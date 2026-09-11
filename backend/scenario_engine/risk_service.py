@@ -13,10 +13,18 @@ def calculate_baseline(
 ) -> dict:
     ce = calculate_control_effectiveness(controls)
     if demo_mode_enabled():
+        # Use the same likelihood pipeline as the enterprise risk endpoint so
+        # an unchanged scenario has exactly the same financial baseline. The
+        # likelihood helper retains its deterministic rule fallback when the
+        # calibrated demo artifact is unavailable.
         lh_dict = calculate_likelihood(
-            finding.get("cvss", 7.5), finding.get("exploit_in_wild", False),
-            finding.get("patch_age_days", 30), asset.get("internet_facing", False), ce,
-            finding.get("threat_intel_active", False), patch_delay_days=patch_delay_days,
+            cvss=finding.get("cvss", 7.5),
+            exploit_in_wild=finding.get("exploit_in_wild", False),
+            patch_age_days=finding.get("patch_age_days", 30),
+            internet_facing=asset.get("internet_facing", False),
+            control_effectiveness=ce,
+            threat_intel_active=finding.get("threat_intel_active", False),
+            patch_delay_days=patch_delay_days,
             model_features=finding,
         )
     else:

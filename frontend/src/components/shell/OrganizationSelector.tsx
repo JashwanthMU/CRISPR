@@ -4,6 +4,7 @@ import { setSelectedOrg, togglePopover, closePopover, useUiStore } from '../../l
 import { toast } from '../../lib/toastStore';
 import { httpClient } from '../../lib/api/client';
 import { getSession, setSession } from '../../lib/auth';
+import SidebarTooltip from './SidebarTooltip';
 
 interface Props {
   collapsed: boolean;
@@ -64,13 +65,13 @@ export default function OrganizationSelector({ collapsed }: Props) {
 
   return (
     <div className="sidebar-org" ref={ref}>
+      <SidebarTooltip label={current.name} enabled={collapsed}>
       <button
         type="button"
         className="sidebar-org-trigger"
         onClick={() => togglePopover('org')}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={collapsed ? current.name : undefined}
       >
         <Building2 size={16} className="sidebar-org-icon" />
         {!collapsed && (
@@ -82,12 +83,8 @@ export default function OrganizationSelector({ collapsed }: Props) {
           </span>
         )}
         {!collapsed && <ChevronDown size={14} className="sidebar-org-chevron" />}
-        {collapsed && (
-          <span className="nav-tooltip" role="tooltip">
-            {current.name}
-          </span>
-        )}
       </button>
+      </SidebarTooltip>
       {open && (
         <div className="sidebar-org-dropdown" role="listbox">
           {organizations.map((o) => (

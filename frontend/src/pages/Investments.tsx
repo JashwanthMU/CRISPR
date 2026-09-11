@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getControls, optimize } from '../services/api';
@@ -6,6 +7,7 @@ import { formatRupees, TOKENS } from '../utils/format';
 import { API_MODE } from '../lib/api';
 
 export default function Investments() {
+  const { t } = useLanguage();
   const [budgetLakh, setBudgetLakh] = useState(100); // ₹100L default
   const [result, setResult] = useState<any>(API_MODE === 'demo' ? MOCK_OPTIMIZE_RESULT : null);
   const [controls, setControls] = useState<any[]>(API_MODE === 'demo' ? MOCK_CONTROLS : []);
@@ -41,9 +43,9 @@ export default function Investments() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">Where should your next security rupee go?</h1>
+        <h1 className="page-title">{t("Where should your next security rupee go?")}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          NovaPay Investment Optimizer · Maximize risk reduction per rupee spent
+          CRISPR Investment Optimizer · Maximize risk reduction per rupee spent
         </p>
       </div>
       {error && <div className="card empty-state">Live optimization unavailable: {error}</div>}
@@ -158,7 +160,7 @@ export default function Investments() {
               <th>Risk Reduction</th>
               <th>Complexity</th>
               <th>Time</th>
-              <th>Status</th>
+              <th>{t("Status")}</th>
             </tr>
           </thead>
           <tbody>

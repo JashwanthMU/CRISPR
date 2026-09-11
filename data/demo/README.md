@@ -1,7 +1,7 @@
 # Demo data provenance
 
 `assets.json`, `bug_bounty.json`, `iam.json`, `siem_events.json`, `edr_events.json`
-etc. are synthetic - built to tell a coherent NovaPay Financial Services story
+etc. are synthetic and built to tell a coherent financial-services security story
 for the demo, not pulled from a real environment.
 
 `vulnerabilities.json` is a mix:

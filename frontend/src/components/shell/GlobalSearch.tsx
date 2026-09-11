@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '../../lib/i18n';
 import { Search } from 'lucide-react';
 import { openCommandPalette } from '../../lib/uiStore';
 
@@ -9,6 +10,7 @@ import { openCommandPalette } from '../../lib/uiStore';
  * Ctrl/Cmd+K is wired globally in App.tsx.
  */
 export default function GlobalSearch() {
+  const { t } = useLanguage();
   const [focused, setFocused] = useState(false);
 
   return (
@@ -21,11 +23,10 @@ export default function GlobalSearch() {
         openCommandPalette();
       }}
       onBlur={() => setFocused(false)}
-      aria-label="Search assets, findings, CVEs, repositories (Ctrl+K)"
+      aria-label={t('Search assets, findings, CVEs, repositories...')}
     >
       <Search size={15} className="topbar-search-icon" />
-      <span className="topbar-search-placeholder">Search assets, findings, CVEs, repositories...</span>
-      <span className="kbd topbar-search-kbd">Ctrl K</span>
+      <span className="topbar-search-placeholder">{t('Search assets, findings, CVEs, repositories...')}</span>
     </button>
   );
 }

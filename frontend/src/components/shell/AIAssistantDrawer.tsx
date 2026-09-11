@@ -90,7 +90,7 @@ export default function AIAssistantDrawer() {
           {messages.length === 0 && (
             <div className="ai-drawer-empty">
               <Bot size={28} color="var(--color-primary-blue)" />
-              <p>Ask me anything about NovaPay's current security or financial risk posture.</p>
+              <p>Ask me anything about the organization’s current security or financial risk posture.</p>
               <div className="ai-drawer-suggestions">
                 {SUGGESTED_PROMPTS.map((p) => {
                   const Icon = p.icon;

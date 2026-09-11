@@ -83,7 +83,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
       >
         {messages.length === 0 && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', padding: '8px 0' }}>
-            Ask me anything about NovaPay's cyber risk posture — try one of the suggestions below.
+            Ask me anything about the organization’s cyber risk posture — try one of the suggestions below.
           </div>
         )}
         {messages.map((m, i) => (

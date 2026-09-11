@@ -62,7 +62,7 @@ export const getEnterprise = getDashboard;
 
 export function getProjects(): Promise<Project[]> {
   return liveOrFallback('/api/projects', [
-    { id: 'proj-novapay', name: 'NovaPay Financial Services', organization: 'NovaPay', environment: 'production' },
+    { id: 'proj-crispr', name: 'CRISPR Demo Organization', organization: 'CRISPR', environment: 'production' },
   ]);
 }
 
@@ -134,18 +134,43 @@ export function getRiskCase(id: string): Promise<RiskCase | undefined> {
 // ----------------------------------------------------------------------------
 // Repositories / Code Security
 // ----------------------------------------------------------------------------
+function normalizeRepository(row: any): Repository {
+  return {
+    id: String(row.id), name: row.name, provider: row.raw?.provider === 'gitlab' ? 'gitlab' : 'github',
+    defaultBranch: row.defaultBranch ?? 'main', securityScore: Number(row.raw?.securityScore ?? 0),
+    lastScan: row.lastScan ?? new Date(0).toISOString(), criticalIssues: Number(row.raw?.criticalIssues ?? 0),
+    openVulnerabilities: Number(row.raw?.openVulnerabilities ?? 0), secrets: Number(row.raw?.secrets ?? 0),
+    dependencies: Number(row.raw?.dependencies ?? 0), iacIssues: Number(row.raw?.iacIssues ?? 0),
+    owners: Array.isArray(row.raw?.owners) ? row.raw.owners : [],
+    issues: row.raw?.issues ?? { critical: 0, high: 0, medium: 0, low: 0 },
+    language: row.raw?.language, framework: row.raw?.framework,
+  };
+}
+
 export function getRepositories(): Promise<Repository[]> {
-  return liveOrFallback('/api/repositories', REPOSITORIES);
+  return liveOrFallback('/api/repositories', REPOSITORIES, 'get', undefined, (payload) => {
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map(normalizeRepository);
+  });
 }
 
 export function getRepository(id: string): Promise<Repository | undefined> {
-  return liveOrFallback(`/api/repositories/${id}`, REPOSITORIES.find((r) => r.id === id));
+  return liveOrFallback(`/api/repositories/${id}`, REPOSITORIES.find((r) => r.id === id), 'get', undefined, (payload) => payload ? normalizeRepository(payload) : undefined);
 }
 
 export function getScaFindings(repositoryName?: string) {
   const all = SCA_FINDINGS;
   const filtered = repositoryName ? all.filter((f) => f.repository === repositoryName) : all;
-  return liveOrFallback(`/api/sca?repo=${repositoryName ?? ''}`, filtered);
+  return liveOrFallback(`/api/sca?repo=${encodeURIComponent(repositoryName ?? '')}`, filtered, 'get', undefined, (payload) => {
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map((row: any) => ({
+      id: String(row.id), cve: row.cve ?? row.external_id ?? 'Unassigned', severity: row.severity ?? 'MEDIUM',
+      component: row.component ?? 'Unknown', version: row.vulnerable_range ?? 'Unknown', fixedVersion: row.fixedVersion,
+      reachable: Boolean(row.reachable ?? row.raw?.reachable), exploitAvailable: Boolean(row.exploitAvailable ?? row.raw?.exploitAvailable),
+      status: row.state === 'dismissed' || row.state === 'fixed' ? 'FIXED' : row.state === 'in_progress' ? 'IN_PROGRESS' : 'OPEN',
+      repository: row.repository,
+    }));
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -176,7 +201,7 @@ export function getReports() {
     { id: 'rep-1', name: 'Q3 2026 Board Risk Report', generated: '2026-08-01', format: 'PDF' },
     { id: 'rep-2', name: 'RBI CSF Compliance Summary', generated: '2026-07-15', format: 'PDF' },
     { id: 'rep-3', name: 'Weekly Findings Digest', generated: '2026-08-22', format: 'CSV' },
-  ]);
+  ], 'get', undefined, (payload) => Array.isArray(payload?.reports) ? payload.reports : []);
 }
 
 export function getCompliance() {

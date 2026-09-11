@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { ReactNode, useMemo, useState } from 'react';
 import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Rows3, Rows2 } from 'lucide-react';
 
@@ -43,6 +44,7 @@ export default function DataTable<T>({
   defaultSortKey,
   bulkActions,
 }: Props<T>) {
+  const { t } = useLanguage();
   const [sortKey, setSortKey] = useState<string | undefined>(defaultSortKey);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
@@ -96,8 +98,8 @@ export default function DataTable<T>({
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+    <div className="data-table-shell">
+      <div className="data-table-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           {sortedRows.length} record{sortedRows.length === 1 ? '' : 's'}
           {selectable && selected && selected.size > 0 && <span> · {selected.size} selected</span>}
@@ -114,7 +116,7 @@ export default function DataTable<T>({
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
+      <div className="data-table-scroll" style={{ overflowX: 'auto' }}>
         <table className={`data-table density-${density}`}>
           <thead>
             <tr>
@@ -130,7 +132,7 @@ export default function DataTable<T>({
                   onClick={() => col.sortValue && toggleSort(col.key)}
                 >
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    {col.header}
+                    {t(col.header)}
                     {col.sortValue && sortKey === col.key && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
                   </span>
                 </th>
@@ -174,7 +176,7 @@ export default function DataTable<T>({
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={columns.length + (selectable ? 1 : 0)}>
-                  <div className="empty-state">{emptyLabel}</div>
+                  <div className="empty-state">{t(emptyLabel)}</div>
                 </td>
               </tr>
             )}
@@ -183,7 +185,7 @@ export default function DataTable<T>({
       </div>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+        <div className="data-table-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             Page {page + 1} of {totalPages}
           </span>

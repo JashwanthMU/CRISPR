@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -40,6 +41,7 @@ export default function KPICard({
   sparkline,
   navigateTo,
 }: Props) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const trendGood = trendDirection === 'down';
   const isPrimaryBlue = accentColor === 'var(--color-primary-blue)' || accentColor === '#1a73e8';
@@ -64,12 +66,12 @@ export default function KPICard({
       {demo && (
         <span className="demo-badge">
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-warning)' }} />
-          Demo data
+          {t("Demo data")}
         </span>
       )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-          {title}
+          {t(title)}
           {tooltip && <InfoTooltip text={tooltip} />}
         </div>
         {icon && (
@@ -96,7 +98,7 @@ export default function KPICard({
         )}
       </div>
       <div className="kpi-value">
-        {isNumeric ? <CountUp value={value as number} /> : value}
+        {isNumeric ? <CountUp value={value as number} /> : t(value as string)}
         {unit && <span style={{ fontSize: '1.0625rem', color: 'var(--color-text-muted)', fontWeight: 500, marginLeft: 4 }}>{unit}</span>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap', minHeight: 20 }}>
@@ -107,7 +109,7 @@ export default function KPICard({
             {typeof trend === 'number' && trend < 100 ? 'pts' : ''}
           </span>
         )}
-        {subtitle && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{subtitle}</span>}
+        {subtitle && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{t(subtitle)}</span>}
       </div>
       {sparkline && sparkline.length > 1 && (
         <svg width="100%" height={28} viewBox="0 0 100 28" preserveAspectRatio="none" style={{ marginTop: 10, display: 'block' }}>

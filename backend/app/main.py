@@ -50,6 +50,8 @@ async def lifespan(application: FastAPI):
     ensure_default_security_user()
     # The isolated demo tenant is always kept usable; live tenants never read it.
     refresh_demo_sources(DEMO_ORGANIZATION_ID)
+    from backend.app.api.risks import calculate_enterprise_summary
+    calculate_enterprise_summary(DEMO_ORGANIZATION_ID)
     application.state.database_ready = True
     yield
 

@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { ScrollText, Download, Plus } from 'lucide-react';
 import api from '../lib/api';
@@ -16,6 +17,7 @@ interface ReportItem {
 }
 
 export default function Reports() {
+  const { t } = useLanguage();
   const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
   const [reports, setReports] = useState<ReportItem[] | null>(null);
 
@@ -99,7 +101,7 @@ export default function Reports() {
                 <th>Report</th>
                 <th>Generated</th>
                 <th>Format</th>
-                <th>Actions</th>
+                <th>{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +111,7 @@ export default function Reports() {
                     <div style={{ fontWeight: 600 }}>{r.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
                   </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{r.generated}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(r.generated).toLocaleString()}</td>
                   <td>{r.format}</td>
                   <td>
                     <button

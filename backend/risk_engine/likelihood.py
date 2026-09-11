@@ -112,9 +112,15 @@ def calculate_likelihood(
     except Exception:
         if not demo_mode_enabled():
             raise
-        return _rule_based_likelihood_fallback(cvss, exploit_in_wild, patch_age_days, internet_facing, control_effectiveness, threat_intel_active)
+        return _rule_based_likelihood_fallback(
+            cvss, exploit_in_wild, patch_age_days, internet_facing,
+            control_effectiveness, threat_intel_active, patch_delay_days,
+        )
 
-def _rule_based_likelihood_fallback(cvss, exploit_in_wild, patch_age_days, internet_facing, control_effectiveness, threat_intel_active):
+def _rule_based_likelihood_fallback(
+    cvss, exploit_in_wild, patch_age_days, internet_facing,
+    control_effectiveness, threat_intel_active, patch_delay_days=0,
+):
     score = 0.0
     score += (cvss / 10) * 0.25
     score += (0.95 if exploit_in_wild else 0.3) * 0.20
@@ -123,8 +129,16 @@ def _rule_based_likelihood_fallback(cvss, exploit_in_wild, patch_age_days, inter
     score += (1 - control_effectiveness) * 0.15
     score += (0.85 if threat_intel_active else 0.2) * 0.10
     score = round(min(max(score, 0.02), 0.95), 3)
+    probability = _extend_exposure_probability(score, int(patch_delay_days))
     return {
         "ranking_score": score,
-        "incident_probability": score,
-        "calibration_available": False
+        "incident_probability": probability,
+        "calibration_available": False,
+        "likelihood_semantics": "annualized deterministic demo risk proxy",
+        "calculation": {
+            "formula": "weighted CVSS, exploitation, patch age, exposure, controls, and threat intelligence",
+            "probability_before_delay": score,
+            "patch_delay_days": int(patch_delay_days),
+            "delay_formula": "1 - (1 - p) ** (1 + delay_days / 365)",
+        },
     }

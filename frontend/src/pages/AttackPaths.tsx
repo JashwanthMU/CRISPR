@@ -1,19 +1,46 @@
-import { useState } from 'react';
+import { useLanguage } from '../lib/i18n';
+import { useEffect, useState } from 'react';
 import { Waypoints } from 'lucide-react';
-import { ATTACK_PATHS } from '../demo/fixtures';
 import AttackPathGraph from '../components/attackpath/AttackPathGraph';
 import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
 import SeverityBadge from '../components/common/SeverityBadge';
 import { activateOnEnter } from '../utils/a11y';
-import type { AttackPathNode } from '../types';
+import type { AttackPath, AttackPathNode, Severity } from '../types';
 import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
+import { getAttackPaths } from '../lib/api';
+import { toast } from '../lib/toastStore';
 
 export default function AttackPaths() {
-  const [activePathId, setActivePathId] = useState(ATTACK_PATHS[0].id);
+  const { t } = useLanguage();
+  const [paths, setPaths] = useState<AttackPath[]>([]);
+  const [activePathId, setActivePathId] = useState('');
   const [selectedNode, setSelectedNode] = useState<AttackPathNode | null>(null);
 
-  const activePath = ATTACK_PATHS.find((p) => p.id === activePathId) ?? ATTACK_PATHS[0];
+  const activePath = paths.find((p) => p.id === activePathId) ?? paths[0];
   const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
+
+  useEffect(() => {
+    getAttackPaths().then((rows: any[]) => {
+      const normalized: AttackPath[] = rows.map((row, index) => {
+        if (Array.isArray(row.nodes) && Array.isArray(row.edges)) return row as AttackPath;
+        const severity: Severity = Number(row.risk_score ?? 0) >= 80 ? 'CRITICAL' : Number(row.risk_score ?? 0) >= 60 ? 'HIGH' : 'MEDIUM';
+        const startId = `${row.id ?? index}-start`;
+        const targetId = `${row.id ?? index}-target`;
+        return {
+          id: String(row.id ?? `path-${index + 1}`), title: `${row.start ?? 'Entry point'} → ${row.target ?? 'Target'}`, severity,
+          nodes: [
+            { id: startId, label: row.start ?? 'Entry point', type: 'internet', x: 70, y: 100 },
+            { id: targetId, label: row.target ?? 'Target', type: 'database', severity, x: 300, y: 100 },
+          ],
+          edges: [{ id: `${row.id ?? index}-edge`, source: startId, target: targetId, label: 'Exploitable', risky: true }],
+        };
+      });
+      setPaths(normalized);
+      setActivePathId(normalized[0]?.id ?? '');
+    }).catch(() => toast.error('Attack paths unavailable', 'The backend could not calculate attack paths.'));
+  }, []);
+
+  if (!activePath) return <div className="page-container"><div className="card empty-state">No attack paths are currently available.</div></div>;
 
   return (
     <div className="page-container page-stack">
@@ -27,7 +54,7 @@ export default function AttackPaths() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {ATTACK_PATHS.map((p) => (
+        {paths.map((p) => (
           <button
             key={p.id}
             className="chip"
@@ -66,9 +93,9 @@ export default function AttackPaths() {
           <thead>
             <tr>
               <th>Node</th>
-              <th>Type</th>
-              <th>Severity</th>
-              <th>Owner</th>
+              <th>{t("Type")}</th>
+              <th>{t("Severity")}</th>
+              <th>{t("Owner")}</th>
               <th>Environment</th>
             </tr>
           </thead>

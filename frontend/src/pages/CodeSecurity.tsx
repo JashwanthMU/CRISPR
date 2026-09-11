@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useLanguage } from '../lib/i18n';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Code2, Github, Gitlab } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
@@ -7,11 +8,12 @@ import FilterBar from '../components/common/FilterBar';
 import SeverityBadge from '../components/common/SeverityBadge';
 import ProgressBar from '../components/common/ProgressBar';
 import RiskTrendChart from '../components/charts/RiskTrendChart';
-import { REPOSITORIES, CODE_ISSUES } from '../demo/fixtures';
 import { CATEGORY_ICON } from '../config/icons';
 import { activateOnEnter } from '../utils/a11y';
-import type { CodeIssue } from '../types';
+import type { CodeIssue, Repository, SCAFinding } from '../types';
 import { TOKENS } from '../utils/format';
+import { getRepositories, getScaFindings } from '../lib/api';
+import { toast } from '../lib/toastStore';
 
 const SDLC_SCORES = [
   { name: 'OpenSSF Source Code Management', score: 41 },
@@ -28,26 +30,41 @@ const CODE_TREND = [
 ];
 
 export default function CodeSecurity() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [codeIssues, setCodeIssues] = useState<CodeIssue[]>([]);
+
+  useEffect(() => {
+    Promise.all([getRepositories(), getScaFindings()]).then(([repos, findings]) => {
+      setRepositories(repos);
+      setCodeIssues((findings as SCAFinding[]).map((finding) => ({
+        id: finding.id, rule: `${finding.cve}: vulnerable ${finding.component}`, issues: 1,
+        risks: finding.exploitAvailable ? ['public'] : [], severity: finding.severity,
+        repository: finding.repository, branch: repos.find((repo) => repo.name === finding.repository)?.defaultBranch ?? 'main',
+        framework: 'SCA', status: finding.status, category: 'sca',
+      })));
+    }).catch(() => toast.error('Code security unavailable', 'The backend could not load repository security data.'));
+  }, []);
 
   const bySeverity = useMemo(() => {
     const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
-    CODE_ISSUES.forEach((i) => {
+    codeIssues.forEach((i) => {
       counts[i.severity] = (counts[i.severity] ?? 0) + i.issues;
     });
     return counts;
-  }, []);
+  }, [codeIssues]);
 
   const filteredIssues = useMemo(
     () =>
-      CODE_ISSUES.filter((i) => {
+      codeIssues.filter((i) => {
         if (search && !i.rule.toLowerCase().includes(search.toLowerCase()) && !i.repository.toLowerCase().includes(search.toLowerCase())) return false;
         if (severityFilter !== 'all' && i.severity !== severityFilter) return false;
         return true;
       }),
-    [search, severityFilter]
+    [codeIssues, search, severityFilter]
   );
 
   const columns: ColumnDef<CodeIssue>[] = [
@@ -78,8 +95,8 @@ export default function CodeSecurity() {
 
   const orgLogos: Record<string, any> = { github: Github, gitlab: Gitlab };
   const reposByOrg = [
-    { org: 'codesmiths', provider: 'github', count: REPOSITORIES.filter((r) => r.provider === 'github').length },
-    { org: 'codesmiths-infra', provider: 'gitlab', count: REPOSITORIES.filter((r) => r.provider === 'gitlab').length },
+    { org: 'GitHub', provider: 'github', count: repositories.filter((r) => r.provider === 'github').length },
+    { org: 'GitLab', provider: 'gitlab', count: repositories.filter((r) => r.provider === 'gitlab').length },
   ];
 
   return (
@@ -129,11 +146,11 @@ export default function CodeSecurity() {
               <tr>
                 <th>Rule</th>
                 <th>Issues</th>
-                <th>Severity</th>
+                <th>{t("Severity")}</th>
               </tr>
             </thead>
             <tbody>
-              {CODE_ISSUES.slice(0, 6).map((i) => (
+              {codeIssues.slice(0, 6).map((i) => (
                 <tr
                   key={i.id}
                   tabIndex={0}
@@ -208,17 +225,17 @@ export default function CodeSecurity() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Repository</th>
+              <th>{t("Repository")}</th>
               <th>Provider</th>
               <th>Security Score</th>
               <th>Critical</th>
               <th>Open Vulnerabilities</th>
-              <th>Secrets</th>
+              <th>{t("Secrets")}</th>
               <th>Last Scan</th>
             </tr>
           </thead>
           <tbody>
-            {REPOSITORIES.map((r) => {
+            {repositories.map((r) => {
               const Icon = orgLogos[r.provider] ?? Github;
               return (
                 <tr

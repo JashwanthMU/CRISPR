@@ -1,21 +1,14 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IndianRupee, TrendingUp, Wallet, Percent } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
 import FinancialBreakdownBar from '../components/charts/FinancialBreakdownBar';
-import AIAdvisorChat from '../components/common/AIAdvisorChat';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, Legend } from 'recharts';
 import { getCompliance, getControls, getEnterprise, getForecast, getGaps, getRisks, optimize } from '../services/api';
 import { formatRupees, formatLakh, TOKENS } from '../utils/format';
 import { toast } from '../lib/toastStore';
 import { SIH_WORKSPACE_ENABLED } from '../lib/workspace';
-
-const FINANCIAL_SUGGESTIONS = [
-  'What is our total financial cyber exposure?',
-  'What should we do with ₹1 crore budget?',
-  'What if we delay patching by 30 days?',
-  'Which business service has highest exposure?',
-];
 
 const LOSS_LABELS: Record<string, string> = {
   downtime_loss: 'Business Downtime',
@@ -33,6 +26,7 @@ function complianceColor(score: number) {
 }
 
 export default function FinancialDashboard() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [enterprise, setEnterprise] = useState<any>(null);
   const [risks, setRisks] = useState<any[]>([]);
@@ -48,14 +42,15 @@ export default function FinancialDashboard() {
   const [optimizing, setOptimizing] = useState(false);
 
   useEffect(() => {
-    Promise.all([getEnterprise(), getRisks(), getCompliance(), getGaps(), getControls(), getForecast()]).then(([e, r, c, g, controls, trend]) => {
-      if (e?.data) setEnterprise(e.data);
-      if (r?.data) setRisks(r.data);
-      if (c?.data) setCompliance(c.data);
-      if (g?.data) setGaps(g.data);
-      if (controls?.data) {
+    Promise.allSettled([getEnterprise(), getRisks(), getCompliance(), getGaps(), getControls(), getForecast()]).then((results) => {
+      const [enterpriseResult, risksResult, complianceResult, gapsResult, controlsResult, trendResult] = results;
+      if (enterpriseResult.status === 'fulfilled' && enterpriseResult.value?.data) setEnterprise(enterpriseResult.value.data);
+      if (risksResult.status === 'fulfilled' && risksResult.value?.data) setRisks(risksResult.value.data);
+      if (complianceResult.status === 'fulfilled' && complianceResult.value?.data) setCompliance(complianceResult.value.data);
+      if (gapsResult.status === 'fulfilled' && gapsResult.value?.data) setGaps(gapsResult.value.data);
+      if (controlsResult.status === 'fulfilled' && controlsResult.value?.data) {
         setActions(
-          controls.data
+          controlsResult.value.data
             .map((control: any) => ({
               ...control,
               savings_inr: control.risk_reduction_inr,
@@ -67,12 +62,16 @@ export default function FinancialDashboard() {
             .slice(0, 3),
         );
       }
-      if (trend?.data) {
-        setForecast(trend.data.map((point: any) => ({ day: point.day, current: point.eal_inr / 100_000 })));
+      if (trendResult.status === 'fulfilled' && trendResult.value?.data) {
+        setForecast(trendResult.value.data.map((point: any) => ({ day: point.day, current: point.eal_inr / 100_000 })));
       }
-    }).catch((error) => {
-      const detail = error?.response?.data?.detail;
-      setLoadError(typeof detail === 'string' ? detail : 'Financial risk data is currently unavailable.');
+      const coreFailure = enterpriseResult.status === 'rejected' ? enterpriseResult.reason : risksResult.status === 'rejected' ? risksResult.reason : null;
+      if (coreFailure) {
+        const detail = coreFailure?.response?.data?.detail;
+        setLoadError(typeof detail === 'string' ? detail : 'Financial risk data is currently unavailable.');
+      } else {
+        setLoadError(null);
+      }
     });
   }, []);
 
@@ -105,16 +104,13 @@ export default function FinancialDashboard() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">{SIH_WORKSPACE_ENABLED ? 'Executive Cyber Risk Overview' : 'Cyber Risk Financial Dashboard'}</h1>
+        <h1 className="page-title">{t(SIH_WORKSPACE_ENABLED ? 'Executive Cyber Risk Overview' : 'Cyber Risk Financial Dashboard')}</h1>
         <p className="page-subtitle">Financial exposure, business impact, investment decisions and regulatory posture</p>
       </div>
 
       {loadError && (
         <div className="card" style={{ borderColor: 'var(--color-critical)', color: 'var(--color-critical)' }}>
           <strong>Financial calculation unavailable:</strong> {loadError}
-          <div style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-            Live EAL requires a current, evidenced annual incident-frequency assessment for every finding.
-          </div>
         </div>
       )}
 
@@ -128,28 +124,28 @@ export default function FinancialDashboard() {
       {/* KPI Row */}
       <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard
-          title="Expected Annual Loss"
+          title={t("Expected Annual Loss")}
           value={enterprise ? formatLakh(enterprise.total_eal_lakh) : 'Unavailable'}
           subtitle="Total cyber exposure this year"
           icon={<IndianRupee size={16} />}
           accentColor={TOKENS.critical}
         />
         <KPICard
-          title="P95 Cyber VaR"
+          title={t("P95 Cyber VaR")}
           value={enterprise ? formatRupees(enterprise.var_95_inr) : 'Unavailable'}
           subtitle="Worst-case annual scenario"
           icon={<TrendingUp size={16} />}
           accentColor={TOKENS.sevHigh}
         />
         <KPICard
-          title="Current Security Spend"
+          title={t("Current Security Spend")}
           value={currentSpend == null ? 'Not supplied' : `${formatRupees(currentSpend)}/yr`}
           subtitle={enterprise ? `vs. ${formatLakh(enterprise.total_eal_lakh)} annual loss exposure` : 'Awaiting verified financial inputs'}
           icon={<Wallet size={16} />}
           accentColor={TOKENS.primaryBlue}
         />
         <KPICard
-          title="Optimal ROSI"
+          title={t("Optimal ROSI")}
           value={bestAction ? `${bestAction.rosi_pct}%` : 'Unavailable'}
           subtitle={bestAction ? `Top action: ${bestAction.name}` : 'Awaiting verified control catalogue'}
           icon={<Percent size={16} />}
@@ -381,8 +377,6 @@ export default function FinancialDashboard() {
         </div>
       </div>
 
-      {/* AI Advisor */}
-      <AIAdvisorChat theme="financial" suggestions={FINANCIAL_SUGGESTIONS} />
     </div>
   );
 }

@@ -52,6 +52,7 @@ class GenericHTTPIntegrationCreate(BaseModel):
 def _public(row: dict) -> dict:
     result = dict(row)
     result.pop("encrypted_credentials", None)
+    result["items_ingested"] = int(result.get("config", {}).get("items_ingested", 0))
     return result
 
 

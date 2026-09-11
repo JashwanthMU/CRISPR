@@ -3,6 +3,7 @@
 import json
 import os
 from contextvars import ContextVar
+from functools import lru_cache
 from pathlib import Path
 
 from psycopg import Error as PsycopgError
@@ -22,6 +23,17 @@ def set_active_organization(organization_id) -> None:
     _active_organization.set(organization_id)
 
 
+@lru_cache(maxsize=64)
+def _persisted_organization_mode(organization_id) -> str:
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT data_mode FROM organizations WHERE organization_id=%s", (organization_id,)
+        ).fetchone()
+    if not row:
+        raise LiveDataUnavailable("Organization does not exist")
+    return row["data_mode"]
+
+
 def organization_data_mode(organization_id=None) -> str:
     deployment_mode = os.getenv("CRISPR_DATA_MODE", "live").strip().upper()
     # Explicit demo deployments and the test process remain entirely sandboxed.
@@ -31,13 +43,7 @@ def organization_data_mode(organization_id=None) -> str:
     if organization_id is None:
         return deployment_mode
     try:
-        with get_connection() as connection:
-            row = connection.execute(
-                "SELECT data_mode FROM organizations WHERE organization_id=%s", (organization_id,)
-            ).fetchone()
-        if not row:
-            raise LiveDataUnavailable("Organization does not exist")
-        return row["data_mode"]
+        return _persisted_organization_mode(organization_id)
     except PsycopgError as error:
         raise LiveDataUnavailable("Organization mode is unavailable") from error
 
@@ -64,14 +70,11 @@ def _demo_rows(filename: str) -> list[dict]:
 
 def load_assets(organization_id=None) -> list[dict]:
     is_demo = demo_mode_enabled(organization_id)
-    if is_demo:
-        return _demo_rows("assets.json")
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM assets"
             conditions, parameters = [], []
-            if not is_demo:
-                conditions.append("data_origin = 'LIVE'")
+            conditions.append("data_origin = 'DEMO'" if is_demo else "data_origin = 'LIVE'")
             if organization_id is not None:
                 conditions.append("organization_id = %s")
                 parameters.append(organization_id)
@@ -80,6 +83,8 @@ def load_assets(organization_id=None) -> list[dict]:
             rows = connection.execute(query + " ORDER BY asset_id", parameters).fetchall()
         if not rows and not is_demo:
             raise LiveDataUnavailable("No LIVE assets have been ingested")
+        if not rows and is_demo:
+            return _demo_rows("assets.json")
         return [row["payload"] for row in rows]
     except LiveDataUnavailable:
         raise
@@ -100,18 +105,10 @@ def load_findings(source_type: str | None = None, organization_id=None) -> list[
         "THREAT_INTEL": "threat_intel.json",
     }
     is_demo = demo_mode_enabled(organization_id)
-    if is_demo:
-        if source_type:
-            return _demo_rows(filenames[source_type]) if source_type in filenames else []
-        result = []
-        for filename in filenames.values():
-            result.extend(_demo_rows(filename))
-        return result
     query = "SELECT payload FROM findings"
     parameters = []
     conditions = []
-    if not is_demo:
-        conditions.append("data_origin = 'LIVE'")
+    conditions.append("data_origin = 'DEMO'" if is_demo else "data_origin = 'LIVE'")
     if source_type:
         conditions.append("source_type = %s")
         parameters.append(source_type)
@@ -127,6 +124,17 @@ def load_findings(source_type: str | None = None, organization_id=None) -> list[
         if not rows and not is_demo:
             qualifier = f" for source {source_type}" if source_type else ""
             raise LiveDataUnavailable(f"No LIVE findings have been ingested{qualifier}")
+        if not rows and is_demo:
+            # A demo-scoped caller may use an organization that has not yet
+            # been seeded in the database (tests and first-run deployments do
+            # this). Preserve the explicit demo contract by loading the
+            # bundled evidence instead of returning a misleading empty set.
+            if source_type:
+                return _demo_rows(filenames[source_type]) if source_type in filenames else []
+            result = []
+            for filename in filenames.values():
+                result.extend(_demo_rows(filename))
+            return result
         return [row["payload"] for row in rows]
     except LiveDataUnavailable:
         raise
@@ -144,9 +152,9 @@ def load_findings(source_type: str | None = None, organization_id=None) -> list[
 def load_control_posture(asset_id: str, organization_id=None) -> dict:
     is_demo = demo_mode_enabled(organization_id)
     if is_demo:
-        from backend.controls.effectiveness import DEMO_CONTROLS
+        from backend.controls.effectiveness import DEFAULT_CONTROLS, DEMO_CONTROLS
 
-        return DEMO_CONTROLS.get(asset_id, {})
+        return DEMO_CONTROLS.get(asset_id, DEFAULT_CONTROLS)
     try:
         with get_connection() as connection:
             query = "SELECT payload FROM control_postures WHERE asset_id = %s AND data_origin = %s"
@@ -164,9 +172,9 @@ def load_control_posture(asset_id: str, organization_id=None) -> dict:
     if row:
         return row["payload"]
     if is_demo:
-        from backend.controls.effectiveness import DEMO_CONTROLS
+        from backend.controls.effectiveness import DEFAULT_CONTROLS, DEMO_CONTROLS
 
-        return DEMO_CONTROLS.get(asset_id, {})
+        return DEMO_CONTROLS.get(asset_id, DEFAULT_CONTROLS)
     raise LiveDataUnavailable(f"No live control posture exists for asset {asset_id}")
 
 

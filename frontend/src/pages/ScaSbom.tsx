@@ -1,21 +1,50 @@
-import { useMemo, useState } from 'react';
+import { useLanguage } from '../lib/i18n';
+import { useEffect, useMemo, useState } from 'react';
 import { Package, Gitlab } from 'lucide-react';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
-import { REPOSITORIES, SCA_FINDINGS } from '../demo/fixtures';
 import { toast } from '../lib/toastStore';
 import { TOKENS } from '../utils/format';
+import { getRepositories, getScaFindings } from '../lib/api';
+import { httpClient } from '../lib/api';
+import type { Repository, SCAFinding } from '../types';
 
 export default function ScaSbom() {
-  const [activeRepo, setActiveRepo] = useState(REPOSITORIES[1].name); // payments-service by default
+  const { t } = useLanguage();
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [allFindings, setAllFindings] = useState<SCAFinding[]>([]);
+  const [activeRepo, setActiveRepo] = useState('');
   const [runtimeOnly, setRuntimeOnly] = useState(false);
 
   const findings = useMemo(
-    () => SCA_FINDINGS.filter((f) => f.repository === activeRepo && (!runtimeOnly || f.reachable)),
-    [activeRepo, runtimeOnly]
+    () => allFindings.filter((f) => f.repository === activeRepo && (!runtimeOnly || f.reachable)),
+    [allFindings, activeRepo, runtimeOnly]
   );
 
-  const repo = REPOSITORIES.find((r) => r.name === activeRepo);
+  const repo = repositories.find((r) => r.name === activeRepo);
+
+  useEffect(() => {
+    Promise.all([getRepositories(), getScaFindings()]).then(([repos, rows]) => {
+      setRepositories(repos);
+      setAllFindings(rows as SCAFinding[]);
+      setActiveRepo((current) => current || repos[0]?.name || '');
+    }).catch(() => toast.error('SCA data unavailable', 'The backend could not load repositories and dependency findings.'));
+  }, []);
+
+  const createRemediation = async (finding: SCAFinding) => {
+    try {
+      await httpClient.post('/api/remediation', {
+        title: `Upgrade ${finding.component}${finding.fixedVersion ? ` to ${finding.fixedVersion}` : ''}`,
+        finding_id: finding.id,
+        priority: finding.severity === 'INFO' ? 'LOW' : finding.severity,
+        recommended_fix: finding.fixedVersion ? `Upgrade ${finding.component} to ${finding.fixedVersion}.` : `Upgrade ${finding.component} to a non-vulnerable version.`,
+        metadata: { repository: activeRepo, cve: finding.cve, source: 'SCA' },
+      });
+      toast.success('Remediation created', `${finding.component} was added to the remediation queue.`);
+    } catch {
+      toast.error('Remediation failed', 'The backend could not create the remediation item.');
+    }
+  };
 
   return (
     <div className="page-container page-stack">
@@ -30,7 +59,7 @@ export default function ScaSbom() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {REPOSITORIES.map((r) => (
+        {repositories.map((r) => (
           <button
             key={r.id}
             className="chip"
@@ -68,14 +97,14 @@ export default function ScaSbom() {
           <thead>
             <tr>
               <th>Finding</th>
-              <th>Severity</th>
+              <th>{t("Severity")}</th>
               <th>Component</th>
               <th>Version</th>
               <th>Fixed Version</th>
               <th>Reachable</th>
               <th>Exploit</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{t("Status")}</th>
+              <th>{t("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -95,9 +124,9 @@ export default function ScaSbom() {
                   <button
                     className="btn-secondary"
                     style={{ padding: '4px 10px', fontSize: '0.6875rem' }}
-                    onClick={() => toast.success('Pull request opened', `Upgrade ${f.component} to ${f.fixedVersion} on ${activeRepo}.`)}
+                    onClick={() => createRemediation(f)}
                   >
-                    Open PR
+                    Add to Queue
                   </button>
                 </td>
               </tr>

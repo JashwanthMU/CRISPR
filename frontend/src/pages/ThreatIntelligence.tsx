@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Radar } from 'lucide-react';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
@@ -8,6 +9,7 @@ import { API_MODE, getThreatIntel } from '../lib/api';
 import { TOKENS } from '../utils/format';
 
 export default function ThreatIntelligence() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [threatFindings, setThreatFindings] = useState<any[]>([]);
   const [sourceCount, setSourceCount] = useState(0);
@@ -40,7 +42,7 @@ export default function ThreatIntelligence() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Radar size={22} color="var(--color-primary-blue)" /> Threat Intelligence
+          <Radar size={22} color="var(--color-primary-blue)" /> {t("Threat Intelligence")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Active threat actor tracking and campaign correlation from MISP feeds

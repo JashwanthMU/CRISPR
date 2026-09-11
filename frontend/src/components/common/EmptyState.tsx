@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { ReactNode } from 'react';
 import { Inbox } from 'lucide-react';
 
@@ -9,11 +10,12 @@ interface Props {
 }
 
 export default function EmptyState({ icon, title, description, action }: Props) {
+  const { t } = useLanguage();
   return (
     <div className="empty-state">
       {icon ?? <Inbox size={22} color="var(--text-subtle)" />}
-      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
-      {description && <div style={{ fontSize: '0.75rem', maxWidth: 360 }}>{description}</div>}
+      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{t(title)}</div>
+      {description && <div style={{ fontSize: '0.75rem', maxWidth: 360 }}>{t(description)}</div>}
       {action}
     </div>
   );

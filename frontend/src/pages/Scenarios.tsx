@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, BadgeIcon, Lock, Clock } from 'lucide-react';
 import { formatRupees } from '../utils/format';
@@ -35,6 +36,7 @@ const iconForPreset = (id: string) => {
 };
 
 export default function Scenarios() {
+  const { t } = useLanguage();
   const [mfa, setMfa] = useState(false);
   const [patching, setPatching] = useState<'immediate' | '30day' | '60day'>('immediate');
   const [segmentation, setSegmentation] = useState(false);
@@ -114,7 +116,7 @@ export default function Scenarios() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">What-If Scenario Simulator</h1>
+        <h1 className="page-title">{t("What-If Scenario Simulator")}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Model the financial impact of security investments before you make them
         </p>
@@ -254,7 +256,7 @@ export default function Scenarios() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Asset</th>
+                    <th>{t("Asset")}</th>
                     <th>Before EAL</th>
                     <th>After EAL</th>
                     <th>Δ</th>

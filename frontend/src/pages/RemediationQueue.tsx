@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useState, useEffect } from 'react';
 import { Inbox, GitPullRequest, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react';
 import SeverityBadge from '../components/common/SeverityBadge';
@@ -46,6 +47,7 @@ const normalizeItem = (item: any): RemediationScenario => ({
 });
 
 export default function RemediationQueue() {
+  const { t } = useLanguage();
   const [scenarios, setScenarios] = useState<RemediationScenario[]>(API_MODE === 'demo' ? REMEDIATION_SCENARIOS : []);
   const [prTarget, setPrTarget] = useState<RemediationScenario | null>(null);
   const [issueTarget, setIssueTarget] = useState<RemediationScenario | null>(null);
@@ -109,7 +111,7 @@ export default function RemediationQueue() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Inbox size={22} color="var(--color-primary-blue)" /> Remediation Queue
+          <Inbox size={22} color="var(--color-primary-blue)" /> {t("Remediation Queue")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Track and action remediation work end-to-end, from assignment to resolution
@@ -132,10 +134,10 @@ export default function RemediationQueue() {
               <th>Affected Resource</th>
               <th>Effort</th>
               <th>Risk Reduction</th>
-              <th>Owner</th>
+              <th>{t("Owner")}</th>
               <th>Delivery Risk</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{t("Status")}</th>
+              <th>{t("Actions")}</th>
             </tr>
           </thead>
           <tbody>

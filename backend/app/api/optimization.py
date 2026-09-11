@@ -9,7 +9,7 @@ from typing import Optional
 from backend.optimizer.knapsack import optimize_budget
 from backend.scenario_engine.simulator import simulate_enterprise
 from backend.app.api.risks import _load_assets
-from backend.data_access import load_control_catalog
+from backend.data_access import demo_mode_enabled, load_control_catalog
 from backend.ingestion.store import upsert_control_catalog
 
 router = APIRouter()
@@ -51,6 +51,9 @@ def _get_controls_with_reduction(organization_id=None):
     assets = _load_assets(organization_id)
     controls_with_reduction = []
     for c in load_control_catalog(organization_id=organization_id):
+        if demo_mode_enabled(organization_id) and c.get("risk_reduction_inr") is not None:
+            controls_with_reduction.append(dict(c))
+            continue
         res = simulate_enterprise(assets, c.get("overrides", {}), organization_id=organization_id)
         c_copy = dict(c)
         c_copy["risk_reduction_inr"] = res["reduction_inr"]
