@@ -1,6 +1,6 @@
 import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
-import { Waypoints } from 'lucide-react';
+import { DatabaseZap, Network, Waypoints } from 'lucide-react';
 import AttackPathGraph from '../components/attackpath/AttackPathGraph';
 import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
 import SeverityBadge from '../components/common/SeverityBadge';
@@ -81,12 +81,15 @@ export default function AttackPaths() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Waypoints size={22} color="var(--color-primary-blue)" /> {executiveView ? 'Attack Path Overview' : 'Attack Paths'}
-        </h1>
-        <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          Trace exploitable routes from the internet to your most sensitive resources
-        </p>
+        <div className="attack-path-heading">
+          <div>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Waypoints size={22} color="var(--color-primary-blue)" /> {executiveView ? 'Attack Path Overview' : 'Attack Paths'}
+            </h1>
+            <p>Trace evidence-backed routes from external entry points to critical assets.</p>
+          </div>
+          <div className="attack-path-engine"><DatabaseZap size={16} /><span><strong>Neo4j</strong> graph traversal</span></div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -111,8 +114,11 @@ export default function AttackPaths() {
 
       <div className="attack-path-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 16 }}>
         <div className="card">
-          <div className="card-title">{activePath.title}</div>
-          <AttackPathGraph path={activePath} height={380} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />
+          <div className="attack-graph-title">
+            <div><Network size={16} /><span>{activePath.title}</span></div>
+            <span>{activePath.nodes.length} nodes · {activePath.edges.length} relationships</span>
+          </div>
+          <AttackPathGraph path={activePath} height={540} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />
           <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
             Drag to pan · scroll buttons to zoom · click a node to inspect · red edges indicate an exploitable transition
           </div>
