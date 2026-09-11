@@ -8,6 +8,7 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -86,6 +87,25 @@ class AuthUser(BaseModel):
     organization_id: UUID = DEFAULT_ORGANIZATION_ID
     organization_name: str | None = None
     data_mode: str = "LIVE"
+    workspace: Literal["executive", "technical"] | None = None
+
+
+def workspace_for_email(email: str) -> Literal["executive", "technical"] | None:
+    """Return the server-authorized SIH workspace for a dedicated identity."""
+    normalized = email.strip().lower()
+    executive_email = os.getenv("SIH_EXECUTIVE_EMAIL", "").strip().lower()
+    technical_email = os.getenv("SIH_TECHNICAL_EMAIL", "").strip().lower()
+    if executive_email and normalized == executive_email:
+        return "executive"
+    if technical_email and normalized == technical_email:
+        return "technical"
+    return None
+
+
+def auth_user(user: dict) -> AuthUser:
+    values = dict(user)
+    values["workspace"] = workspace_for_email(str(values["email"]))
+    return AuthUser.model_validate(values)
 
 
 def create_token(user: dict) -> str:
@@ -168,7 +188,7 @@ def get_current_user(
         raise unauthorized
     from backend.data_access import set_active_organization
     set_active_organization(token_organization_id)
-    return AuthUser.model_validate(user)
+    return auth_user(user)
 
 
 def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:

@@ -66,7 +66,10 @@ function useGlobalShortcuts() {
 
 function Shell() {
   useGlobalShortcuts();
-  const identityWorkspace = getIdentityWorkspace(getSession()?.user.email);
+  const sessionUser = getSession()?.user;
+  // The backend assignment is authoritative. Email lookup only supports
+  // sessions created before the workspace claim was introduced.
+  const identityWorkspace = sessionUser?.workspace ?? getIdentityWorkspace(sessionUser?.email);
   const workspace = identityWorkspace ?? getWorkspace();
   const home = workspace === 'executive' ? '/executive' : '/security';
 

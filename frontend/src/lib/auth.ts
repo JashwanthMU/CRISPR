@@ -6,6 +6,7 @@ export interface SessionUser {
   organization_id: string;
   organization_name?: string;
   data_mode?: 'LIVE' | 'DEMO';
+  workspace?: 'executive' | 'technical' | null;
 }
 
 export interface AuthSession {
