@@ -233,7 +233,7 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
 // ----------------------------------------------------------------------------
 // Analysis trigger — delegates to the deterministic demo engine in demo mode.
 // ----------------------------------------------------------------------------
-export async function runAnalysis(): Promise<{ started: boolean }> {
+export async function runAnalysis(): Promise<{ started: boolean; id?: string }> {
   if (API_MODE === 'demo') {
     await runDemoAnalysis();
     return { started: true };

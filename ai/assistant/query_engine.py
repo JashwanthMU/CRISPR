@@ -16,8 +16,11 @@ from ai.tools.llm import chat, is_available
 from ml.anomaly_detection.detector import detect_anomalies
 from ml.forecasting.trend import DEFAULT_DAILY_GROWTH_RATE, forecast_eal
 from backend.data_access import require_demo_mode
+from backend.data_access import load_assets, load_findings
 
 INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("full_analysis", ("complete executive dashboard", "complete technical dashboard",
+                       "full dashboard analysis", "entire dashboard analysis")),
     ("mfa_scenario", ("mfa", "multi-factor", "multifactor")),
     ("patch_delay_scenario", ("delay patch", "patch delay", "patching by 30", "delay by 30",
                               "delayed patch", "30 days", "30 day", "wait 30", "patch later")),
@@ -34,6 +37,7 @@ INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 TASK_BY_INTENT = {
+    "full_analysis": "explain",
     "top_risk": "explain",
     "risk_drivers": "explain",
     "enterprise_summary": "explain",
@@ -245,6 +249,48 @@ def _answer_enterprise(question: str = "", organization_id=None) -> tuple[str, d
     return answer, {"summary": e}
 
 
+def _answer_full_analysis(question: str, organization_id=None) -> tuple[str, dict]:
+    """Explain the current role-specific dashboard from calculated organization data."""
+    enterprise = risk_tools.get_enterprise_summary(organization_id)
+    risks = risk_tools.get_all_risks(organization_id).get("risks", [])
+    assets = load_assets(organization_id)
+    findings = load_findings(organization_id=organization_id)
+    top_risks = risks[:3]
+    is_technical = "technical" in question.lower() or "security team" in question.lower()
+    data = {
+        "enterprise": enterprise,
+        "top_risks": top_risks,
+        "asset_count": len(assets),
+        "internet_exposed_assets": sum(bool(asset.get("internet_facing")) for asset in assets),
+        "finding_counts": {
+            severity: sum(str(row.get("severity", "")).upper() == severity for row in findings)
+            for severity in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+        },
+    }
+    top_names = ", ".join(
+        f"{row.get('asset_name', row.get('asset_id', 'unknown'))} ({format_inr(row.get('eal_inr', 0))} EAL)"
+        for row in top_risks
+    ) or "no modeled risk cases"
+    if is_technical:
+        counts = data["finding_counts"]
+        answer = (
+            f"Technical posture: risk score {enterprise.get('enterprise_risk_score')} with "
+            f"{counts['CRITICAL']} critical and {counts['HIGH']} high findings across {len(assets)} assets; "
+            f"{data['internet_exposed_assets']} are internet exposed. Priority risk cases: {top_names}. "
+            "Act first on exploited or internet-facing critical findings, validate access and control weaknesses, "
+            "assign accountable owners, and verify each remediation with a rescan before recognizing risk reduction."
+        )
+    else:
+        answer = (
+            f"Executive posture: enterprise risk score {enterprise.get('enterprise_risk_score')}, Expected Annual Loss "
+            f"{format_inr(enterprise.get('total_eal_inr', 0))}, and P95 Cyber VaR "
+            f"{format_inr(enterprise.get('var_95_inr', 0))}. Largest business exposures: {top_names}. "
+            "Leadership should fund the controls with the strongest verified risk reduction, address regulatory gaps, "
+            "and require evidence-backed remediation verification before reporting realized savings."
+        )
+    return answer, data
+
+
 def _preset_costs() -> list[dict]:
     try:
         from backend.app.api.scenarios import PRESET_SCENARIOS
@@ -298,6 +344,7 @@ def _polish_with_llm(intent: str, question: str, data: dict) -> tuple[str | None
 
 
 HANDLERS_PARAM = {
+    "full_analysis": _answer_full_analysis,
     "risk_drivers": _answer_risk_drivers,
     "mfa_scenario": _answer_mfa,
     "patch_delay_scenario": _answer_patch_delay,

@@ -9,10 +9,11 @@ import ProjectSelector from './ProjectSelector';
 import GlobalSearch from './GlobalSearch';
 import AskAIButton from './AskAIButton';
 import RecentActivity from './RecentActivity';
-import SystemStatus from './SystemStatus';
 import NotificationBell from './NotificationBell';
 import UserMenu from './UserMenu';
 import { httpClient, runAnalysis as runBackendAnalysis } from '../../lib/api';
+import { openAIDrawer } from '../../lib/uiStore';
+import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
 
 /**
  * Top header / global control bar. LEFT = project selector + breadcrumbs,
@@ -60,8 +61,24 @@ export default function TopHeader() {
   const handleRunAnalysis = async () => {
     setAnalysisPending(true);
     try {
-      await runBackendAnalysis();
-      toast.success('Analysis started', 'The backend accepted the risk analysis job.');
+      const analysis = await runBackendAnalysis();
+      if (analysis.id) {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const job = (await httpClient.get(`/api/analysis/jobs/${analysis.id}`)).data;
+          if (job.status === 'SUCCEEDED') break;
+          if (job.status === 'FAILED') throw new Error(job.error || 'Risk analysis failed');
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
+      }
+      const workspace = SIH_WORKSPACE_ENABLED ? getWorkspace() : 'technical';
+      window.dispatchEvent(new CustomEvent('crispr:data-refresh'));
+      openAIDrawer();
+      window.dispatchEvent(new CustomEvent('crispr:ai-prompt', {
+        detail: workspace === 'executive'
+          ? 'Run a complete executive dashboard analysis. Explain our overall financial exposure, highest business risks, major risk drivers, compliance impact, investment priorities, and the next actions leadership should approve.'
+          : 'Run a complete technical dashboard analysis. Explain our overall security posture, critical and high findings, exposed assets, highest-risk cases, control weaknesses, remediation priorities, and the next actions the security team should take.',
+      }));
+      toast.success('Analysis ready', 'CRISPR AI is explaining the current dashboard.');
     } catch {
       toast.error('Analysis failed', 'The backend did not accept the analysis job.');
     } finally {
@@ -88,7 +105,6 @@ export default function TopHeader() {
         <LanguageSelector />
         <AskAIButton />
         <RecentActivity />
-        <SystemStatus />
 
         <div className="topbar-vdivider" />
 

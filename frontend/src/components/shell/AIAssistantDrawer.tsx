@@ -67,6 +67,15 @@ export default function AIAssistantDrawer() {
     }
   };
 
+  useEffect(() => {
+    const runPrompt = (event: Event) => {
+      const question = (event as CustomEvent<string>).detail;
+      if (typeof question === 'string' && question.trim()) void send(question);
+    };
+    window.addEventListener('crispr:ai-prompt', runPrompt);
+    return () => window.removeEventListener('crispr:ai-prompt', runPrompt);
+  });
+
   if (!open) return null;
 
   return (
