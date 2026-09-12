@@ -1,5 +1,5 @@
 import { useLanguage } from '../lib/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DatabaseZap, IndianRupee, Network, ShieldAlert, Waypoints } from 'lucide-react';
 import AttackPathGraph from '../components/attackpath/AttackPathGraph';
 import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
@@ -10,6 +10,50 @@ import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 import { getAttackPaths } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { formatRupees } from '../utils/format';
+
+function mergeAttackTopology(paths: AttackPath[]): AttackPath | null {
+  if (!paths.length) return null;
+  const nodeMap = new Map<string, AttackPathNode>();
+  const edgeMap = new Map<string, AttackPath['edges'][number]>();
+  paths.forEach((path) => {
+    path.nodes.forEach((node) => {
+      const current = nodeMap.get(node.id);
+      nodeMap.set(node.id, current?.severity === 'CRITICAL' ? current : { ...current, ...node });
+    });
+    path.edges.forEach((edge) => edgeMap.set(`${edge.source}:${edge.target}:${edge.label ?? ''}`, edge));
+  });
+
+  const edges = [...edgeMap.values()];
+  const incoming = new Map<string, number>();
+  nodeMap.forEach((_, id) => incoming.set(id, 0));
+  edges.forEach((edge) => incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1));
+  const roots = [...nodeMap.keys()].filter((id) => (incoming.get(id) ?? 0) === 0);
+  const depth = new Map<string, number>(roots.map((id) => [id, 0]));
+  const queue = [...roots];
+  const processed = new Set<string>();
+  while (queue.length) {
+    const source = queue.shift()!;
+    if (processed.has(source)) continue;
+    processed.add(source);
+    edges.filter((edge) => edge.source === source).forEach((edge) => {
+      const nextDepth = (depth.get(source) ?? 0) + 1;
+      if (nextDepth > (depth.get(edge.target) ?? -1)) depth.set(edge.target, nextDepth);
+      if (!processed.has(edge.target) && !queue.includes(edge.target)) queue.push(edge.target);
+    });
+  }
+  const levels = new Map<number, string[]>();
+  nodeMap.forEach((_, id) => {
+    const level = depth.get(id) ?? 0;
+    levels.set(level, [...(levels.get(level) ?? []), id]);
+  });
+  const nodes = [...nodeMap.values()].map((node) => {
+    const level = depth.get(node.id) ?? 0;
+    const peers = levels.get(level) ?? [node.id];
+    const index = peers.indexOf(node.id);
+    return { ...node, x: 75 + level * 180, y: 100 + index * 130 };
+  });
+  return { id: 'enterprise-topology', title: 'Enterprise attack topology', severity: paths.some((path) => path.severity === 'CRITICAL') ? 'CRITICAL' : paths[0].severity, nodes, edges };
+}
 
 export default function AttackPaths() {
   const { t } = useLanguage();
@@ -24,6 +68,7 @@ export default function AttackPaths() {
   const criticalPaths = paths.filter((path) => path.severity === 'CRITICAL').length;
   const maximumImpact = Math.max(0, ...paths.map((path) => Number(path.financial_impact_inr ?? 0)));
   const maximumConfidence = Math.max(0, ...paths.map((path) => Number(path.confidence ?? 0)));
+  const technicalTopology = useMemo(() => mergeAttackTopology(paths), [paths]);
 
   useEffect(() => {
     getAttackPaths().then((rows: any[]) => {
@@ -96,7 +141,7 @@ export default function AttackPaths() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {!executiveView && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {paths.map((p) => (
           <button
             key={p.id}
@@ -114,7 +159,7 @@ export default function AttackPaths() {
             {p.title}
           </button>
         ))}
-      </div>
+      </div>}
 
       {executiveView ? (
         <>
@@ -134,13 +179,31 @@ export default function AttackPaths() {
           </div>
 
           <div className="card">
-            <div className="attack-graph-title">
-              <div><Network size={16} /><span>{activePath.title}</span></div>
-              <span>{activePath.nodes.length} stages · {formatRupees(activePath.financial_impact_inr ?? 0)} potential impact</span>
+            <div className="card-title">Business Exposure Routes</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+              {paths.map((path) => (
+                <div key={path.id} style={{ border: '1px solid var(--bg-border)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                    <SeverityBadge severity={path.severity} />
+                    <strong style={{ color: 'var(--text-primary)' }}>{formatRupees(path.financial_impact_inr ?? 0)}</strong>
+                  </div>
+                  <div style={{ marginTop: 14, fontWeight: 700 }}>{path.title}</div>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {path.nodes.map((node, index) => (
+                      <span key={node.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {index > 0 && <span aria-hidden="true">→</span>}
+                        <span className="chip">{node.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 12, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {path.nodes.length} business stages · {Math.round(Number(path.confidence ?? 0) * 100)}% evidence confidence
+                  </div>
+                </div>
+              ))}
             </div>
-            <AttackPathGraph path={activePath} height={390} />
-            <div style={{ marginTop: 12, fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              This evidence-backed route shows how an external entry point can reach a sensitive business asset. Prioritize controls that break the earliest high-confidence transition and validate the resulting financial risk reduction.
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--bg-border)', fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              Decision: prioritize controls that interrupt the highest-impact route earliest, then verify the realized financial risk reduction through remediation evidence.
             </div>
           </div>
         </>
@@ -149,10 +212,10 @@ export default function AttackPaths() {
           <div className="attack-path-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 16 }}>
             <div className="card">
               <div className="attack-graph-title">
-                <div><Network size={16} /><span>{activePath.title}</span></div>
-                <span>{activePath.nodes.length} nodes · {activePath.edges.length} relationships</span>
+                <div><Network size={16} /><span>Enterprise topology · Focus: {activePath.title}</span></div>
+                <span>{technicalTopology?.nodes.length ?? 0} nodes · {technicalTopology?.edges.length ?? 0} relationships</span>
               </div>
-              <AttackPathGraph path={activePath} height={540} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />
+              {technicalTopology && <AttackPathGraph path={technicalTopology} height={540} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
               <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
                 Drag to pan · use controls to zoom · click a node to inspect · red edges indicate an exploitable transition
               </div>
@@ -168,7 +231,7 @@ export default function AttackPaths() {
             <table className="data-table">
               <thead><tr><th>Node</th><th>{t("Type")}</th><th>{t("Severity")}</th><th>{t("Owner")}</th><th>Environment</th></tr></thead>
               <tbody>
-                {activePath.nodes.map((n) => (
+                {(technicalTopology?.nodes ?? []).map((n) => (
                   <tr key={n.id} tabIndex={0} onClick={() => setSelectedNode(n)} onKeyDown={activateOnEnter(() => setSelectedNode(n))}>
                     <td style={{ fontWeight: 600 }}>{n.label}</td>
                     <td style={{ textTransform: 'capitalize', color: 'var(--text-muted)' }}>{n.type.replace(/_/g, ' ')}</td>
