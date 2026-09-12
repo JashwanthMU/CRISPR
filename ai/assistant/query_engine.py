@@ -8,6 +8,7 @@ returned. The engine NEVER invents financial figures.
 """
 
 import json
+import re
 
 from ai.tools import optimize_tools, risk_tools, scenario_tools
 from ai.tools.formatting import extract_budget_inr, format_inr, format_pct
@@ -24,6 +25,10 @@ INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("mfa_scenario", ("mfa", "multi-factor", "multifactor")),
     ("patch_delay_scenario", ("delay patch", "patch delay", "patching by 30", "delay by 30",
                               "delayed patch", "30 days", "30 day", "wait 30", "patch later")),
+    ("project_calculation", ("calculate eal", "compute eal", "calculate rosi", "compute rosi",
+                             "calculate risk reduction", "compute risk reduction",
+                             "calculate residual risk", "compute residual risk", "calculate delay impact",
+                             "compute delay impact", "work out eal", "work out rosi")),
     ("budget_optimize", ("budget", "spend", "invest", "crore", "lakh", "allocate")),
     ("exposed_assets", ("exposed assets", "internet-facing assets", "internet facing assets",
                         "public-facing assets", "public facing assets")),
@@ -55,6 +60,7 @@ TASK_BY_INTENT = {
     "exposed_assets": "explain",
     "risk_increase": "explain",
     "security_activity": "explain",
+    "project_calculation": "calculate",
 }
 
 SYSTEM_PROMPT = (
@@ -72,6 +78,49 @@ GENERAL_SYSTEM_PROMPT = (
     "systems or risk figures. Never invent financial figures. Keep the answer under 140 words."
 )
 
+PROJECT_GLOSSARY: list[tuple[tuple[str, ...], str]] = [
+    (("rosi", "return on security investment"),
+     "ROSI means Return on Security Investment. CRISPR calculates it as (expected annual risk reduction − implementation cost) ÷ implementation cost × 100. It compares recurring expected loss avoided with control cost; the inputs and control-overlap assumptions must remain traceable."),
+    (("fair", "factor analysis of information risk"),
+     "FAIR means Factor Analysis of Information Risk. It expresses cyber risk using event frequency and loss magnitude. In CRISPR, approved annual incident-frequency evidence and financial loss evidence feed EAL; the CVE exploitation model is kept separate."),
+    (("expected annual loss", " eal"),
+     "Expected Annual Loss (EAL) is the average modeled loss per year: annual incident probability × loss magnitude. It is an expectation, not the guaranteed loss for a particular year."),
+    (("value at risk", " var", "p95", "p99"),
+     "Cyber Value at Risk is an annual-loss percentile from the modeled loss distribution. P95 is the loss level not exceeded in 95% of simulations; P99 is the corresponding 99th percentile. It is not the same as statistical confidence."),
+    (("expected shortfall", "tail var", "tvar"),
+     "Expected Shortfall, also called Tail VaR, is the average loss in simulations beyond a selected VaR threshold. It describes the severity of the tail after VaR has been crossed."),
+    (("monte carlo",),
+     "Monte Carlo simulation repeatedly samples incident occurrence and loss magnitude to build an annual-loss distribution. CRISPR uses deterministic seeds for reproducibility and reports EAL, P95, P99, and Expected Shortfall with assumptions."),
+    (("epss",),
+     "EPSS is FIRST's Exploit Prediction Scoring System. It estimates the probability that a published CVE will be exploited in the wild during the next 30 days. CRISPR uses it for vulnerability prioritization, not directly as annual incident probability."),
+    (("kev", "known exploited vulnerabilities"),
+     "CISA KEV is the catalog of vulnerabilities known to be exploited in the wild. KEV evidence raises remediation priority, but KEV membership is not an organization's annual incident probability."),
+    (("cvss",),
+     "CVSS measures technical vulnerability severity. It does not by itself include business criticality, actual exposure, control strength, incident frequency, or financial loss, so CVSS is not equivalent to business risk."),
+    (("shap",),
+     "SHAP explains how model features move a prediction away from its baseline. In CRISPR it should explain the XGBoost CVE exploitation-priority score; it must not be presented as proof of financial loss or annual incident frequency."),
+    (("asset criticality", "business criticality"),
+     "Asset criticality represents business importance using factors such as revenue dependency, sensitive data, external exposure, service dependencies, and operational impact. It adds business context to technical findings."),
+    (("control effectiveness",),
+     "Control effectiveness is the evidence-backed degree to which a safeguard reduces the relevant risk. CRISPR compares current and target coverage and recalculates residual risk while accounting for overlapping controls."),
+    (("residual risk",),
+     "Residual risk is the exposure remaining after controls or remediation. A simplified single-control calculation is original risk × (1 − effectiveness); multiple controls require overlap-aware marginal calculation."),
+    (("risk case",),
+     "A CRISPR risk case correlates findings and evidence around an asset or business service, then links technical drivers, annual incident-frequency evidence, loss magnitude, controls, and remediation decisions."),
+    (("attack path",),
+     "An attack path is an evidence-backed sequence from an entry point through vulnerabilities, identities, permissions, and services to a valuable target. Technical view shows detailed transitions; executive view emphasizes business impact and interruption points."),
+    (("risk acceptance", "accept risk"),
+     "Risk acceptance is an authorized decision to retain residual risk for a defined period. It should record the approver, rationale, expiry date, residual EAL, and supporting evidence."),
+    (("remediation verification", "verify remediation", "verified risk reduction"),
+     "Remediation verification confirms that a control actually works using evidence such as a rescan or control test. CRISPR should recognize realized risk reduction only after authorized verification; failed verification reopens the work."),
+    (("siem",), "SIEM centralizes and correlates security logs for detection, investigation, and audit."),
+    (("iam",), "IAM manages identities, authentication, authorization, roles, and access lifecycle."),
+    (("edr", "xdr"), "EDR monitors endpoint behavior; XDR correlates detections across endpoints and other security layers."),
+    (("cspm",), "CSPM continuously identifies risky cloud configurations and control gaps."),
+    (("cmdb",), "A CMDB records assets, ownership, services, configurations, and dependencies used to add business context."),
+    (("nvd",), "NVD is NIST's vulnerability database and provides CVE metadata such as CVSS, CWE, publication dates, and references."),
+]
+
 
 def route_intent(question: str) -> str:
     q = f" {question.lower().strip()} "
@@ -83,10 +132,12 @@ def route_intent(question: str) -> str:
 
 def _answer_general(question: str) -> tuple[str, dict, str]:
     normalized = question.lower().strip()
-    if normalized in {"hi", "hii", "hello", "hey", "good morning", "good afternoon", "good evening"}:
+    if normalized in {"hi", "hii", "hello", "hey", "good morning", "good afternoon", "good evening",
+                      "how are you", "how are you?", "who are you", "who are you?"}:
         return (
-            "Hello! Ask me about the organization’s live risk posture, scenarios, investments, "
-            "or any general cybersecurity concept.",
+            "Hello! I’m CRISPR AI, your cyber-risk decision assistant. Ask me about current risk posture, "
+            "FAIR, EAL, VaR, ROSI, CVSS, EPSS, KEV, attack paths, controls, scenarios, investments, "
+            "or ask me to calculate EAL, ROSI, risk reduction, residual risk, or delay impact.",
             {},
             "template",
         )
@@ -98,7 +149,14 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
         "unavailable. You can still ask about top risks, risk drivers, MFA, patch delays, "
         "budgets, forecasts, or login anomalies."
     )
-    if "idor" in normalized or "insecure direct object reference" in normalized:
+    padded = f" {normalized} "
+    glossary_answer = next(
+        (answer for keywords, answer in PROJECT_GLOSSARY if any(keyword in padded for keyword in keywords)),
+        None,
+    )
+    if glossary_answer:
+        fallback = glossary_answer
+    elif "idor" in normalized or "insecure direct object reference" in normalized:
         fallback = (
             "IDOR (Insecure Direct Object Reference) is an access-control vulnerability. "
             "It occurs when an application accepts an object identifier—such as an account, "
@@ -165,6 +223,116 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
     if not guarded["ok"]:
         return fallback, {}, "template"
     return guarded["text"], {}, "llm"
+
+
+_MONEY_RE = re.compile(r"(?:₹\s*)?(\d[\d,]*(?:\.\d+)?)\s*(crores?|cr|lakhs?|l)\b|₹\s*(\d[\d,]*(?:\.\d+)?)", re.I)
+
+
+def _money_values(question: str) -> list[float]:
+    values: list[float] = []
+    for match in _MONEY_RE.finditer(question):
+        raw = match.group(1) or match.group(3)
+        value = float(raw.replace(",", ""))
+        unit = (match.group(2) or "").lower()
+        if unit in {"crore", "crores", "cr"}:
+            value *= 10_000_000
+        elif unit in {"lakh", "lakhs", "l"}:
+            value *= 100_000
+        values.append(value)
+    return values
+
+
+def _percentage_values(question: str) -> list[float]:
+    return [float(value) for value in re.findall(r"(\d+(?:\.\d+)?)\s*%", question)]
+
+
+def _answer_project_calculation(question: str, organization_id=None) -> tuple[str, dict]:
+    """Calculate only documented CRISPR formulas from explicit user inputs."""
+    normalized = question.lower()
+    money = _money_values(question)
+    percentages = _percentage_values(question)
+
+    if "rosi" in normalized:
+        if len(money) < 2:
+            return ("To calculate ROSI, provide expected annual risk reduction and implementation cost, for example: "
+                    "“Calculate ROSI for ₹24 lakh risk reduction and ₹10 lakh cost.”"), {"required": ["risk_reduction_inr", "implementation_cost_inr"]}
+        reduction, cost = money[0], money[1]
+        if cost <= 0:
+            return "Implementation cost must be greater than zero to calculate ROSI.", {"error": "invalid_cost"}
+        rosi_ratio = (reduction - cost) / cost
+        return (f"ROSI = ({format_inr(reduction)} − {format_inr(cost)}) ÷ {format_inr(cost)} = "
+                f"{format_pct(rosi_ratio * 100)} ({rosi_ratio:.2f}×)."), {
+                    "risk_reduction_inr": reduction, "implementation_cost_inr": cost,
+                    "rosi_ratio": round(rosi_ratio, 6), "rosi_pct": round(rosi_ratio * 100, 4),
+                    "formula": "(risk_reduction_inr - implementation_cost_inr) / implementation_cost_inr",
+                }
+
+    if "delay" in normalized:
+        if not percentages or not money:
+            return ("To calculate delay impact, provide annual incident probability, delay days, and loss magnitude, "
+                    "for example: “Calculate delay impact for 20%, 30 days, and ₹1 crore loss.”"), {
+                        "required": ["annual_incident_probability_pct", "delay_days", "loss_magnitude_inr"]}
+        days_match = re.search(r"(\d+(?:\.\d+)?)\s*days?", normalized)
+        if not days_match:
+            return "Please include the remediation delay in days.", {"required": ["delay_days"]}
+        probability, days, loss = percentages[0] / 100, float(days_match.group(1)), money[0]
+        if not 0 <= probability <= 1:
+            return "Annual incident probability must be between 0% and 100%.", {"error": "invalid_probability"}
+        delayed_probability = 1 - (1 - probability) ** (1 + days / 365)
+        before, after = probability * loss, delayed_probability * loss
+        return (f"Using P(delayed) = 1 − (1 − {format_pct(probability * 100)})^(1 + {days:g}/365), "
+                f"probability becomes {format_pct(delayed_probability * 100)}. EAL changes from "
+                f"{format_inr(before)} to {format_inr(after)}, an increase of {format_inr(after - before)}."), {
+                    "before_probability": probability, "after_probability": delayed_probability,
+                    "before_eal_inr": round(before, 2), "after_eal_inr": round(after, 2),
+                    "increase_inr": round(after - before, 2),
+                    "formula": "1 - (1 - p) ** (1 + delay_days / 365)",
+                }
+
+    if "residual" in normalized:
+        if not money or not percentages:
+            return ("To calculate residual risk, provide original financial risk and control effectiveness, for example: "
+                    "“Calculate residual risk for ₹50 lakh at 40% effectiveness.”"), {
+                        "required": ["original_risk_inr", "control_effectiveness_pct"]}
+        original, effectiveness = money[0], percentages[0] / 100
+        if not 0 <= effectiveness <= 1:
+            return "Control effectiveness must be between 0% and 100%.", {"error": "invalid_effectiveness"}
+        residual = original * (1 - effectiveness)
+        return (f"Residual risk = {format_inr(original)} × (1 − {format_pct(effectiveness * 100)}) = "
+                f"{format_inr(residual)}. This simplified result assumes one independent control."), {
+                    "original_risk_inr": original, "effectiveness": effectiveness,
+                    "residual_risk_inr": residual, "formula": "original_risk * (1 - effectiveness)",
+                }
+
+    if "risk reduction" in normalized:
+        if len(money) < 2:
+            return ("To calculate risk reduction, provide before and after EAL, for example: "
+                    "“Calculate risk reduction from ₹80 lakh to ₹50 lakh.”"), {"required": ["before_eal_inr", "after_eal_inr"]}
+        before, after = money[0], money[1]
+        reduction = before - after
+        reduction_pct = (reduction / before * 100) if before else 0
+        return (f"Risk reduction = {format_inr(before)} − {format_inr(after)} = {format_inr(reduction)} "
+                f"({format_pct(reduction_pct)})."), {
+                    "before_eal_inr": before, "after_eal_inr": after, "reduction_inr": reduction,
+                    "reduction_pct": reduction_pct, "formula": "before_eal - after_eal",
+                }
+
+    if "eal" in normalized or "expected annual loss" in normalized:
+        if not percentages or not money:
+            return ("To calculate EAL, provide annual incident probability and loss magnitude, for example: "
+                    "“Calculate EAL for 20% annual probability and ₹1 crore loss magnitude.”"), {
+                        "required": ["annual_incident_probability_pct", "loss_magnitude_inr"]}
+        probability, loss = percentages[0] / 100, money[0]
+        if not 0 <= probability <= 1:
+            return "Annual incident probability must be between 0% and 100%.", {"error": "invalid_probability"}
+        eal = probability * loss
+        return (f"EAL = {format_pct(probability * 100)} × {format_inr(loss)} = {format_inr(eal)} per year."), {
+                    "annual_incident_probability": probability, "loss_magnitude_inr": loss,
+                    "eal_inr": eal, "formula": "annual_incident_probability * loss_magnitude_inr",
+                }
+
+    return ("I can calculate EAL, ROSI, before/after risk reduction, residual risk, and patch-delay impact. "
+            "Name the calculation and provide its inputs with units."), {}
 
 
 def _answer_top_risk(question: str = "", organization_id=None) -> tuple[str, dict]:
@@ -449,6 +617,7 @@ HANDLERS_PARAM = {
     "mfa_scenario": _answer_mfa,
     "patch_delay_scenario": _answer_patch_delay,
     "budget_optimize": _answer_budget,
+    "project_calculation": _answer_project_calculation,
 }
 
 FULL_HANDLERS = {**HANDLERS, **HANDLERS_PARAM}

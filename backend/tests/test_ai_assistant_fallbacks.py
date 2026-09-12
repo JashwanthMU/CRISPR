@@ -40,3 +40,37 @@ def test_general_security_fallbacks_are_unique_when_llm_is_offline(monkeypatch):
     assert len(set(answers)) == len(questions)
     assert all("₹" not in answer for answer in answers)
     assert all(query_engine._answer_general(question)[2] == "template" for question in questions)
+
+
+def test_project_glossary_answers_without_llm(monkeypatch):
+    monkeypatch.setattr(query_engine, "chat", lambda **kwargs: None)
+
+    rosi, _, engine = query_engine._answer_general("What is ROSI?")
+    fair, _, _ = query_engine._answer_general("Explain FAIR")
+    epss, _, _ = query_engine._answer_general("What is EPSS?")
+
+    assert engine == "template"
+    assert "Return on Security Investment" in rosi
+    assert "Factor Analysis of Information Risk" in fair
+    assert "next 30 days" in epss
+
+
+def test_core_project_calculations_are_deterministic():
+    eal, eal_data = query_engine._answer_project_calculation(
+        "Calculate EAL for 20% annual probability and ₹1 crore loss magnitude"
+    )
+    rosi, rosi_data = query_engine._answer_project_calculation(
+        "Calculate ROSI for ₹24 lakh risk reduction and ₹10 lakh cost"
+    )
+    residual, residual_data = query_engine._answer_project_calculation(
+        "Calculate residual risk for ₹50 lakh at 40% effectiveness"
+    )
+    reduction, reduction_data = query_engine._answer_project_calculation(
+        "Calculate risk reduction from ₹80 lakh to ₹50 lakh"
+    )
+
+    assert eal_data["eal_inr"] == 2_000_000
+    assert rosi_data["rosi_pct"] == 140
+    assert residual_data["residual_risk_inr"] == 3_000_000
+    assert reduction_data["reduction_inr"] == 3_000_000
+    assert all(answer for answer in (eal, rosi, residual, reduction))
