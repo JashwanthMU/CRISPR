@@ -2396,7 +2396,8 @@ table.density-comfortable th {
 
 /* Insight slide card */
 .insight-card {
-  width: 340px;
+  width: auto;
+  min-width: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -2406,6 +2407,30 @@ table.density-comfortable th {
   gap: 10px;
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--motion-base) var(--ease-standard);
+}
+.security-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.security-insights-grid .insight-card {
+  height: 100%;
+}
+@media (max-width: 1400px) {
+  .security-insights-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .security-insights-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .security-insights-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .insight-card:hover {
   box-shadow: var(--shadow-sm);
@@ -2777,7 +2802,10 @@ table.density-comfortable th {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 6px 8px;
+  width: 104px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 8px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   color: var(--text-primary);
@@ -2790,8 +2818,13 @@ table.density-comfortable th {
   background: inherit;
   border: 0;
   cursor: pointer;
-  max-width: 110px;
-  min-height: 28px;
+  width: 72px;
+  min-width: 0;
+  max-width: 72px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  outline: none;
 }
 .language-selector:focus-within { outline: 2px solid var(--color-primary-blue); outline-offset: 2px; }
 .login-language { display: flex; justify-content: flex-end; margin-bottom: 20px; }

@@ -230,8 +230,8 @@ export default function SecurityDashboard() {
               View all
             </button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 460, overflowY: 'auto', marginTop: 12 }}>
-            {sortedRisks.map((r) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+            {sortedRisks.slice(0, 3).map((r) => (
               <div
                 key={r.asset_id}
                 role="button"

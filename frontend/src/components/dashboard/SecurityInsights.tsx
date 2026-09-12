@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, ShieldAlert, Globe, KeyRound, UserCog, ArrowRight } from 'lucide-react';
-import Carousel from '../common/Carousel';
 import SeverityBadge from '../common/SeverityBadge';
 import type { Severity } from '../../types';
 
@@ -56,7 +55,7 @@ const INSIGHTS: Insight[] = [
   },
 ];
 
-/** "Security Insights" — selective horizontal carousel, not an auto-scrolling whole page. */
+/** Security insights are shown together so navigation controls never imply hidden content. */
 export default function SecurityInsights() {
   const navigate = useNavigate();
 
@@ -65,7 +64,7 @@ export default function SecurityInsights() {
       <div className="card-title" style={{ marginBottom: 12 }}>
         Security Insights
       </div>
-      <Carousel autoAdvanceMs={6000} ariaLabel="Security insights">
+      <div className="security-insights-grid" aria-label="Security insights">
         {INSIGHTS.map((insight) => {
           const Icon = insight.icon;
           return (
@@ -101,7 +100,7 @@ export default function SecurityInsights() {
             </div>
           );
         })}
-      </Carousel>
+      </div>
     </div>
   );
 }
