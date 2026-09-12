@@ -37,6 +37,8 @@ jobs:
       DB_USER: crispr_test
       DB_PASSWORD: unit-test-postgres-password
       INTEGRATION_ENCRYPTION_KEY: 5B8xVnHYr-SYNYcvlqrRk6zjIn8NF0Xw8A3Nj3T7C30=
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: unit-test-neo4j-password
       CRISPR_DATA_MODE: demo
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
