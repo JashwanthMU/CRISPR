@@ -69,6 +69,10 @@ export default function AttackPaths() {
   const maximumImpact = Math.max(0, ...paths.map((path) => Number(path.financial_impact_inr ?? 0)));
   const maximumConfidence = Math.max(0, ...paths.map((path) => Number(path.confidence ?? 0)));
   const technicalTopology = useMemo(() => mergeAttackTopology(paths), [paths]);
+  const executivePaths = useMemo(
+    () => [...paths].sort((a, b) => Number(b.financial_impact_inr ?? 0) - Number(a.financial_impact_inr ?? 0)).slice(0, 3),
+    [paths],
+  );
 
   useEffect(() => {
     getAttackPaths().then((rows: any[]) => {
@@ -192,7 +196,7 @@ export default function AttackPaths() {
           <div className="card">
             <div className="card-title">Business Exposure Routes</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
-              {paths.map((path) => (
+              {executivePaths.map((path) => (
                 <div key={path.id} style={{ border: '1px solid var(--bg-border)', borderRadius: 10, padding: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
                     <SeverityBadge severity={path.severity} />

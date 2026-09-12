@@ -17,14 +17,13 @@ def test_demo_attack_paths_fall_back_when_neo4j_is_unavailable(monkeypatch):
         UUID("00000000-0000-0000-0000-000000000002"), demo=True
     )
 
-    assert result["count"] == 2
+    assert result["count"] >= 8
     assert result["edge_count"] == len(attack_paths.DEMO_EDGES)
     assert result["graph_engine"] == "Deterministic SIH demo traversal"
     assert all(path["nodes"] and path["edges"] for path in result["paths"])
-    assert {path["nodes"][-1]["label"] for path in result["paths"]} == {
-        "Payment Database",
-        "Customer Data Lake",
-    }
+    targets = {path["nodes"][-1]["label"] for path in result["paths"]}
+    assert {"Payment Database", "Customer Data Lake", "Secrets Vault", "Finance Records"} <= targets
+    assert len({node["label"] for path in result["paths"] for node in path["nodes"]}) >= 20
 
 
 def test_live_attack_paths_do_not_substitute_demo_graph(monkeypatch):
