@@ -36,7 +36,7 @@ import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
 import { API_MODE } from './lib/api';
-import { getIdentityWorkspace, getWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from './lib/workspace';
+import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from './lib/workspace';
 
 function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
   if (API_MODE === 'demo') return <>{children}</>;
@@ -66,11 +66,8 @@ function useGlobalShortcuts() {
 
 function Shell() {
   useGlobalShortcuts();
-  const sessionUser = getSession()?.user;
-  // The backend assignment is authoritative. Email lookup only supports
-  // sessions created before the workspace claim was introduced.
-  const identityWorkspace = sessionUser?.workspace ?? getIdentityWorkspace(sessionUser?.email);
-  const workspace = identityWorkspace ?? getWorkspace();
+  // The authenticated workspace claim overrides the browser's login-page selection.
+  const workspace = getEffectiveWorkspace();
   const home = workspace === 'executive' ? '/executive' : '/security';
 
   const workspacePage = (allowed: Workspace, page: ReactNode) => (

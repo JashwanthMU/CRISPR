@@ -1,3 +1,5 @@
+import { getSession } from './auth';
+
 export type Workspace = 'executive' | 'technical';
 
 const KEY = 'crispr_sih_workspace';
@@ -19,6 +21,12 @@ export function getIdentityWorkspace(email?: string): Workspace | null {
 export function getWorkspace(): Workspace {
   if (!SIH_WORKSPACE_ENABLED) return 'technical';
   return localStorage.getItem(KEY) === 'technical' ? 'technical' : 'executive';
+}
+
+/** Resolve the effective workspace. An authenticated backend claim always wins. */
+export function getEffectiveWorkspace(): Workspace {
+  const user = getSession()?.user;
+  return user?.workspace ?? getIdentityWorkspace(user?.email) ?? getWorkspace();
 }
 
 export function setWorkspace(workspace: Workspace): void {

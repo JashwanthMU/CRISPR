@@ -13,7 +13,7 @@ import NotificationBell from './NotificationBell';
 import UserMenu from './UserMenu';
 import { httpClient, runAnalysis as runBackendAnalysis } from '../../lib/api';
 import { openAIDrawer } from '../../lib/uiStore';
-import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
+import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
 
 /**
  * Top header / global control bar. LEFT = project selector + breadcrumbs,
@@ -70,7 +70,7 @@ export default function TopHeader() {
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
       }
-      const workspace = SIH_WORKSPACE_ENABLED ? getWorkspace() : 'technical';
+      const workspace = SIH_WORKSPACE_ENABLED ? getEffectiveWorkspace() : 'technical';
       window.dispatchEvent(new CustomEvent('crispr:data-refresh'));
       openAIDrawer();
       window.dispatchEvent(new CustomEvent('crispr:ai-prompt', {

@@ -6,7 +6,7 @@ import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
 import SeverityBadge from '../components/common/SeverityBadge';
 import { activateOnEnter } from '../utils/a11y';
 import type { AttackPath, AttackPathNode, Severity } from '../types';
-import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
+import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 import { getAttackPaths } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { formatRupees } from '../utils/format';
@@ -64,7 +64,7 @@ export default function AttackPaths() {
   const [error, setError] = useState('');
 
   const activePath = paths.find((p) => p.id === activePathId) ?? paths[0];
-  const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
+  const executiveView = SIH_WORKSPACE_ENABLED && getEffectiveWorkspace() === 'executive';
   const criticalPaths = paths.filter((path) => path.severity === 'CRITICAL').length;
   const maximumImpact = Math.max(0, ...paths.map((path) => Number(path.financial_impact_inr ?? 0)));
   const maximumConfidence = Math.max(0, ...paths.map((path) => Number(path.confidence ?? 0)));

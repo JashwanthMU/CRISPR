@@ -5,7 +5,7 @@ import api from '../lib/api';
 import { API_MODE, getReports } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { SkeletonTable } from '../components/common/Skeleton';
-import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
+import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED } from '../lib/workspace';
 
 interface ReportItem {
   id: string;
@@ -18,7 +18,7 @@ interface ReportItem {
 
 export default function Reports() {
   const { t } = useLanguage();
-  const executiveView = SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive';
+  const executiveView = SIH_WORKSPACE_ENABLED && getEffectiveWorkspace() === 'executive';
   const [reports, setReports] = useState<ReportItem[] | null>(null);
 
   useEffect(() => {

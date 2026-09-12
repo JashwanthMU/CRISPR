@@ -15,7 +15,7 @@ import SidebarResizer from './SidebarResizer';
 import OrganizationSelector from './OrganizationSelector';
 import { CrisprMark } from '../../assets/branding/CrisprMark';
 import { BRAND } from '../../config/branding';
-import { getWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
+import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED } from '../../lib/workspace';
 import SidebarTooltip from './SidebarTooltip';
 
 /**
@@ -38,7 +38,7 @@ export default function Sidebar() {
   const visuallyCollapsed = collapsed && !mobileNavOpen;
 
   const effectiveWidth = visuallyCollapsed ? SIDEBAR_COLLAPSED_WIDTH : width;
-  const workspace = getWorkspace();
+  const workspace = getEffectiveWorkspace();
   const navGroups = SIH_WORKSPACE_ENABLED ? (workspace === 'executive' ? EXECUTIVE_NAV_GROUPS : TECHNICAL_NAV_GROUPS) : NAV_GROUPS;
 
   return (
