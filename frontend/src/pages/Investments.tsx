@@ -15,6 +15,10 @@ export default function Investments() {
   const [error, setError] = useState('');
 
   const budgetInr = budgetLakh * 100000;
+  const setBoundedBudgetLakh = (value: number) => {
+    if (!Number.isFinite(value)) return;
+    setBudgetLakh(Math.min(200, Math.max(10, Math.round(value))));
+  };
 
   const runOptimize = async () => {
     setOptimizing(true);
@@ -54,24 +58,32 @@ export default function Investments() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 280 }}>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
-              Budget: ₹{budgetLakh}L
+              Budget: {formatRupees(budgetInr)} <span style={{ color: 'var(--color-text-secondary)' }}>(₹10 lakh–₹2 crore)</span>
             </label>
             <input
               type="range"
               min={10}
               max={200}
               value={budgetLakh}
-              onChange={(e) => setBudgetLakh(Number(e.target.value))}
+              step={5}
+              onChange={(e) => setBoundedBudgetLakh(Number(e.target.value))}
               style={{ width: '100%' }}
             />
           </div>
-          <input
-            type="number"
-            className="input-field"
-            style={{ width: 120 }}
-            value={budgetLakh}
-            onChange={(e) => setBudgetLakh(Number(e.target.value))}
-          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
+            Budget (₹ lakh)
+            <input
+              type="number"
+              className="input-field"
+              style={{ width: 96 }}
+              min={10}
+              max={200}
+              step={5}
+              value={budgetLakh}
+              onChange={(e) => setBoundedBudgetLakh(Number(e.target.value))}
+              aria-label="Investment budget in lakh rupees"
+            />
+          </label>
           <button className="btn-primary" onClick={runOptimize} disabled={optimizing}>
             {optimizing ? 'Optimizing…' : 'OPTIMIZE NOW'}
           </button>
@@ -83,7 +95,7 @@ export default function Investments() {
           <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
             <div>
               <div style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                Optimal ₹{budgetLakh}L Portfolio → {formatRupees(result.total_risk_reduction_inr)} Risk Reduction
+                Optimal {formatRupees(result.budget_inr ?? budgetInr)} Portfolio → {formatRupees(result.total_risk_reduction_inr)} Risk Reduction
               </div>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>
                 Spend {formatRupees(result.total_spend_inr)} · Unused budget {formatRupees(result.unused_budget_inr)}
