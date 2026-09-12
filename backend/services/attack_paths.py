@@ -39,14 +39,72 @@ def _format_paths(records: list[dict]) -> dict:
     return {"paths": paths, "count": len(paths), "graph_engine": "Neo4j", "provenance": "current organization-supplied relationship evidence"}
 
 
+def _traverse_demo_in_memory(rows: list[dict], max_depth: int) -> list[dict]:
+    """Deterministic offline fallback for the explicitly labelled SIH demo.
+
+    Live organizations never use this path. It keeps the golden demo usable
+    when the optional Neo4j container is unavailable while retaining the same
+    edge evidence and traversal semantics.
+    """
+    adjacency: dict[str, list[dict]] = {}
+    node_kinds: dict[str, str] = {}
+    for raw in rows:
+        edge = dict(raw)
+        adjacency.setdefault(edge["source_node"], []).append(edge)
+        node_kinds[edge["source_node"]] = edge.get("source_kind") or "COMPUTE"
+        node_kinds[edge["target_node"]] = edge.get("target_kind") or "COMPUTE"
+
+    entries = [name for name, kind in node_kinds.items() if str(kind).upper() in {"INTERNET", "EXTERNAL", "UNTRUSTED"}]
+    records: list[dict] = []
+
+    def walk(node: str, path_nodes: list[str], path_edges: list[dict]) -> None:
+        if len(path_edges) >= max_depth:
+            return
+        for raw in adjacency.get(node, []):
+            target = raw["target_node"]
+            if target in path_nodes:
+                continue
+            evidence = raw.get("evidence") or {}
+            edge = {
+                "edge_id": str(raw["external_edge_id"]),
+                "relation_type": raw.get("relation_type") or "REACHES",
+                "confidence": float(raw.get("confidence") or 0),
+                "evidence_json": json.dumps(evidence, default=str),
+                "financial_impact_inr": float(evidence.get("financial_impact_inr") or 0),
+            }
+            next_nodes = [*path_nodes, target]
+            next_edges = [*path_edges, edge]
+            if str(node_kinds.get(target, "")).upper() in {"CROWN_JEWEL", "CRITICAL_ASSET"}:
+                records.append({
+                    "nodes": [{"name": name, "kind": node_kinds.get(name, "COMPUTE")} for name in next_nodes],
+                    "edges": next_edges,
+                    "confidence": min(item["confidence"] for item in next_edges),
+                })
+            walk(target, next_nodes, next_edges)
+
+    for entry in entries:
+        walk(entry, [entry], [])
+    records.sort(key=lambda record: record["confidence"], reverse=True)
+    return records
+
+
 def calculate_attack_paths(organization_id, max_depth: int = 8, demo: bool = False) -> dict:
     if demo:
         rows = DEMO_EDGES
     else:
         with get_connection() as db:
             rows = db.execute("""SELECT external_edge_id,source_name,source_node,target_node,relation_type,source_kind,target_kind,confidence,evidence FROM relationship_edges WHERE organization_id=%s AND observed_at<=NOW() AND (valid_until IS NULL OR valid_until>NOW()) ORDER BY source_node,target_node""", (organization_id,)).fetchall()
-    records = project_and_traverse(organization_id, [dict(row) for row in rows], max_depth)
+    graph_engine = "Neo4j"
+    try:
+        records = project_and_traverse(organization_id, [dict(row) for row in rows], max_depth)
+    except Exception:
+        if not demo:
+            raise
+        records = _traverse_demo_in_memory([dict(row) for row in rows], max_depth)
+        graph_engine = "Deterministic SIH demo traversal"
     response = _format_paths(records)
+    response["graph_engine"] = graph_engine
+    response["provenance"] = "bundled SIH demo relationship evidence" if demo else "current organization-supplied relationship evidence"
     response["edge_count"] = len(rows)
     response["limitations"] = ["Reachability is evidence-based and does not prove exploitability", "Missing edges produce incomplete paths rather than synthetic links"]
     return response

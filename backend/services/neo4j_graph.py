@@ -4,11 +4,16 @@ import json
 import os
 from functools import lru_cache
 
-from neo4j import GraphDatabase
+try:
+    from neo4j import GraphDatabase
+except ImportError:  # Optional at import time; live traversal still fails closed.
+    GraphDatabase = None
 
 
 @lru_cache(maxsize=1)
 def _driver():
+    if GraphDatabase is None:
+        raise RuntimeError("Neo4j Python driver is not installed")
     return GraphDatabase.driver(
         os.getenv("NEO4J_URI", "bolt://neo4j:7687"),
         auth=(os.getenv("NEO4J_USER", "neo4j"), os.environ["NEO4J_PASSWORD"]),

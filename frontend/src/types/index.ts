@@ -310,6 +310,9 @@ export interface AttackPath {
   severity: Severity;
   nodes: AttackPathNode[];
   edges: AttackPathEdge[];
+  risk_score?: number;
+  confidence?: number;
+  financial_impact_inr?: number;
 }
 
 // ----------------------------------------------------------------------------
