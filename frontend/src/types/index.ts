@@ -85,6 +85,7 @@ export interface Asset {
   is_regulated: boolean;
   value_inr: number;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   control_effectiveness: number;
   controls?: AssetControls;
   environment?: 'production' | 'staging' | 'development';
@@ -141,11 +142,18 @@ export interface RiskCase {
   asset_name: string;
   business_service: string;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   eal_inr: number;
   eal_lakh: number;
   risk_score: number;
   likelihood: number;
   control_effectiveness_pct: number;
+  control_effectiveness_evidence?: {
+    source: string;
+    formula: string;
+    current_posture: Record<string, number | boolean>;
+    calculated_effectiveness: number;
+  };
   sources: SourceType[];
   confidence_pct: number;
   loss_breakdown: LossBreakdown;
@@ -155,6 +163,24 @@ export interface RiskCase {
   lastUpdated?: string;
   severity?: Severity;
   exposure?: 'INTERNET' | 'INTERNAL' | 'ISOLATED';
+  exploitation_priority?: {
+    score?: number | null;
+    ranking_score?: number | null;
+    tier?: string | null;
+    model?: string | null;
+    model_version?: string | null;
+    semantics: string;
+  };
+  annual_frequency?: {
+    probability: number;
+    semantics: string;
+    evidence?: Record<string, unknown>;
+  };
+  model_contributions?: {
+    base_value: number;
+    note: string;
+    top_contributors: Array<{ feature: string; shap_value: number }>;
+  } | null;
 }
 
 // ----------------------------------------------------------------------------
@@ -284,6 +310,9 @@ export interface AttackPath {
   severity: Severity;
   nodes: AttackPathNode[];
   edges: AttackPathEdge[];
+  risk_score?: number;
+  confidence?: number;
+  financial_impact_inr?: number;
 }
 
 // ----------------------------------------------------------------------------

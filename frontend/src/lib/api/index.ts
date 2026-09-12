@@ -128,7 +128,7 @@ export function getRiskCases(): Promise<RiskCase[]> {
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
-  return liveOrFallback(`/api/risks/${id}`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
+  return liveOrFallback(`/api/risks/${id}?explain=true`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
 }
 
 // ----------------------------------------------------------------------------
@@ -233,7 +233,7 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
 // ----------------------------------------------------------------------------
 // Analysis trigger — delegates to the deterministic demo engine in demo mode.
 // ----------------------------------------------------------------------------
-export async function runAnalysis(): Promise<{ started: boolean }> {
+export async function runAnalysis(): Promise<{ started: boolean; id?: string }> {
   if (API_MODE === 'demo') {
     await runDemoAnalysis();
     return { started: true };
@@ -341,7 +341,7 @@ export function getThreatActors() {
 
 export function getAttackPaths() {
   return liveOrFallback("/api/attack-paths", [], "get", undefined, (p) =>
-    Array.isArray(p) ? p : Array.isArray(p?.attack_paths) ? p.attack_paths : []
+    Array.isArray(p) ? p : Array.isArray(p?.paths) ? p.paths : Array.isArray(p?.attack_paths) ? p.attack_paths : []
   );
 }
 

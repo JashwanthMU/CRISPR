@@ -321,7 +321,7 @@ export default function SecurityDashboard() {
                 </div>
               ))}
             </div>
-            <RiskDonut data={sources} height={180} />
+            <RiskDonut data={sources} height={190} />
           </div>
         </div>
       </div>
@@ -354,7 +354,6 @@ export default function SecurityDashboard() {
         </div>
       </div>
 
-      {/* AI Advisor */}
       <AIAdvisorChat theme="security" suggestions={SECURITY_SUGGESTIONS} />
 
       <RiskCaseDrawer riskCase={activeCase} open={!!activeCase} onClose={() => setActiveCase(null)} />

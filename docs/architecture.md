@@ -9,5 +9,5 @@ This document serves as an overview of the CRISPR platform architecture. For com
 ## Core Components
 - **Frontend App**: React/TypeScript application powered by Vite.
 - **Backend Service**: FastAPI server handling risk, scenarios, and optimizations.
-- **Machine Learning**: XGBoost pipeline for vulnerability incident prediction.
+- **Machine Learning**: XGBoost pipeline for CISA KEV-membership prioritization. Its output is excluded from annual financial frequency.
 - **Financial Engine**: FAIR-based EAL calculation with Monte Carlo simulation support.

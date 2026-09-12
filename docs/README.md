@@ -32,7 +32,7 @@ methodology or historical implementation notes.
 
 ## Machine learning
 
-- [Incident prediction model card](ml/MODEL_CARD.md)
+- [CVE exploitation-prioritization model card](ml/MODEL_CARD.md)
 - [Validation status](ml/validation_status.md)
 
 ## Historical and supporting material

@@ -284,7 +284,7 @@ Then break it apart:
 
 Then:
 
-Incident likelihood
+Annual-frequency assumption
 
 21%
 

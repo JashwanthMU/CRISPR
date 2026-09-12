@@ -40,7 +40,11 @@ export default function Login() {
     setError('');
   };
 
-  if (getSession()) return <Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />;
+  const existingSession = getSession();
+  if (existingSession) {
+    const existingWorkspace = existingSession.user.workspace ?? getWorkspace();
+    return <Navigate to={SIH_WORKSPACE_ENABLED && existingWorkspace === 'executive' ? '/executive' : '/security'} replace />;
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -78,17 +82,13 @@ export default function Login() {
           session = switchBody as AuthSession;
         }
       }
-      // The two demo identities are distinct entry points. If credentials are
-      // typed or autofilled directly, route the account to its own workspace
-      // even when a previously saved selector choice belongs to the other
-      // persona.
-      const normalizedEmail = email.trim().toLowerCase();
-      const accountWorkspace: Workspace = normalizedEmail === DEMO_ACCOUNTS.technical.email.trim().toLowerCase()
-        ? 'technical'
-        : normalizedEmail === DEMO_ACCOUNTS.executive.email.trim().toLowerCase()
-          ? 'executive'
-          : workspace;
-      if (SIH_WORKSPACE_ENABLED) setWorkspace(accountWorkspace);
+      // Never trust the browser selector to grant a workspace. The backend
+      // derives this assignment from the authenticated account.
+      const accountWorkspace = session.user.workspace;
+      if (SIH_WORKSPACE_ENABLED && !accountWorkspace) {
+        throw new Error('This account is not assigned to an SIH workspace.');
+      }
+      if (SIH_WORKSPACE_ENABLED && accountWorkspace) setWorkspace(accountWorkspace);
       setSession(session);
       const requestedDestination = (location.state as { from?: string } | null)?.from;
       const destination = SIH_WORKSPACE_ENABLED

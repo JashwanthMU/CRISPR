@@ -15,6 +15,7 @@ from psycopg import IntegrityError, OperationalError
 from backend.app.auth import (
     AuthUser, DEFAULT_ORGANIZATION_ID, LoginRequest, RegisterRequest,
     TOKEN_LIFETIME_MINUTES, authenticate_user, create_token, get_current_user, hash_password,
+    auth_user,
 )
 from backend.database.connection import get_connection
 from backend.services.audit import record_audit_event
@@ -59,7 +60,7 @@ def auth_response(user: dict) -> dict:
     return {
         "access_token": create_token(user), "refresh_token": refresh_token,
         "token_type": "bearer", "expires_in_seconds": TOKEN_LIFETIME_MINUTES * 60,
-        "user": AuthUser.model_validate(user),
+        "user": auth_user(user),
     }
 
 

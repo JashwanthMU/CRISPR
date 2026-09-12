@@ -1,6 +1,5 @@
 """
-CRISPR - Incident Likelihood Model V4
-Replaces rule-based V1 (ml/incident_prediction/model.py)
+CRISPR - CVE Exploitation Prioritization Model V4
 
 Two models:
   final_model      - uncalibrated XGBoost (for CVE ranking)
@@ -219,8 +218,7 @@ def _rule_based_fallback(
     control_effectiveness: float,
 ) -> float:
     """
-    V1 rule-based model — used when XGBoost model is not available.
-    Kept here for backward compatibility and graceful degradation.
+    Legacy rule-based CVE-priority fallback used when XGBoost is unavailable.
     """
     score  = (cvss / 10.0) * 0.25
     score += (0.95 if exploit_in_wild   else 0.30) * 0.20

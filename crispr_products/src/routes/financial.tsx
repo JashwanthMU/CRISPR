@@ -9,7 +9,7 @@ export const Route = createFileRoute("/financial")({
   head: () => ({
     meta: [
       { title: "Financial risk engine — ₹3.8 crore exposure" },
-      { name: "description", content: "CRISPR converts technical findings into rupee exposure: ₹3.8 Cr potential impact, 21% incident likelihood, ₹79.8 L expected annual loss with P50/P90/P95 loss percentiles." },
+      { name: "description", content: "CRISPR converts technical findings into rupee exposure: ₹3.8 Cr potential impact, a disclosed 21% annual-frequency assumption, and ₹79.8 L expected annual loss with P50/P90/P95 loss percentiles." },
       { property: "og:title", content: "CRISPR financial risk engine" },
       { property: "og:description", content: "₹3.8 Cr potential impact · ₹79.8 L expected annual loss." },
     ],
@@ -54,7 +54,7 @@ function Financial() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Stat label="Incident likelihood (12 mo)" value={<AnimatedNumber value={RISK_CASE.likelihood} suffix="%" />} sub="threat activity + exposure + control state" tone="critical" />
+          <Stat label="Annual-frequency assumption (12 mo)" value={<AnimatedNumber value={RISK_CASE.likelihood} suffix="%" />} sub="disclosed demo scenario input" tone="critical" />
           <Stat label="Expected annual loss" value={<><span>₹</span><AnimatedNumber value={RISK_CASE.ealLakh} decimals={1} /><span> L</span></>} sub="likelihood × modelled impact" tone="money" />
           <Stat label="Risk score" value={<AnimatedNumber value={RISK_CASE.score} suffix=" / 100" />} sub="CRITICAL band" tone="critical" />
           <Stat label="Confidence" value={<AnimatedNumber value={RISK_CASE.confidence} suffix="%" />} sub="5 correlated sources" tone="safe" />

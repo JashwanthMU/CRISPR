@@ -117,10 +117,8 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
     controls = get_controls_for_asset(inp["asset_id"], organization_id=organization_id)
     ce = calculate_control_effectiveness(controls)
 
-    # ── Likelihood: ML model first, rule-based FAIR formula as fallback ──
-    # predict_from_risk_row returns None / an error_fallback dict if the
-    # model artifacts fail to load - in that case we fall back to the
-    # deterministic rule-based likelihood so the API never silently breaks.
+    # XGBoost ranks CVE exploitation priority only. It never supplies the
+    # annual incident probability used by the financial engine.
     model_result = predict_from_risk_row({
         "cvss": inp["cvss"],
         "exploit_in_wild": inp["exploit_in_wild"],
@@ -187,23 +185,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
             },
         }
         model_used = model_result["model"]
-    elif used_model_probability:
-        lh_dict = calculate_likelihood(
-            cvss=inp["cvss"],
-            exploit_in_wild=inp["exploit_in_wild"],
-            patch_age_days=inp["patch_age_days"],
-            internet_facing=asset.get("internet_facing", False),
-            control_effectiveness=ce,
-            threat_intel_active=inp["threat_intel"],
-            model_features=inp,
-        )
-        likelihood = lh_dict["incident_probability"]
-        model_used = model_result["model"]
     else:
-        if not demo_mode_enabled():
-            raise LiveDataUnavailable(
-                f"A calibrated ML prediction is unavailable for finding {inp.get('finding_id')}"
-            )
         lh_dict = calculate_likelihood(
             cvss=inp["cvss"],
             exploit_in_wild=inp["exploit_in_wild"],
@@ -213,7 +195,7 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
             threat_intel_active=inp["threat_intel"],
         )
         likelihood = lh_dict["incident_probability"]
-        model_used = "rule_based_fair_formula"
+        model_used = model_result["model"] if used_model_probability else None
 
     # ── Financial impact: always the real FAIR loss calculator, never
     # reverse-fitted or overridden by a hardcoded target ──
@@ -233,11 +215,32 @@ def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organizat
         "title": inp.get("title"),
         "cve_id": inp.get("cve_id"),
         "business_criticality": enriched["business_criticality"],
+        "criticality_breakdown": enriched["criticality_breakdown"],
         "control_effectiveness_pct": round(ce * 100, 1),
+        "control_effectiveness_evidence": {
+            "source": "bundled SIH demo control posture" if demo_mode_enabled(organization_id) else "current organization control posture",
+            "formula": "25% MFA + 20% EDR + 15% WAF + 20% patch compliance + 15% segmentation + 5% logging",
+            "current_posture": controls,
+            "calculated_effectiveness": ce,
+        },
         "model_used": model_used,
+        "model_purpose": "CVE exploitation prioritization only; excluded from EAL",
         "ranking_score": model_result.get("ranking_score") if used_model_probability else None,
         "model_tier": model_result.get("tier") if used_model_probability else None,
         "model_contributions": model_result.get("contributions") if used_model_probability else None,
+        "exploitation_priority": {
+            "score": model_result.get("probability") if used_model_probability else None,
+            "ranking_score": model_result.get("ranking_score") if used_model_probability else None,
+            "tier": model_result.get("tier") if used_model_probability else None,
+            "model": model_result.get("model") if used_model_probability else None,
+            "model_version": model_result.get("model_version") if used_model_probability else None,
+            "semantics": "CISA KEV-membership prioritization; excluded from EAL",
+        },
+        "annual_frequency": {
+            "probability": likelihood,
+            "semantics": lh_dict.get("likelihood_semantics"),
+            "evidence": lh_dict.get("calculation"),
+        },
         "likelihood_calculation": lh_dict,
         **eal,
         "loss_breakdown": loss_magnitude,
@@ -314,7 +317,11 @@ def get_all_risks(user: AuthUser = Depends(require_security)):
         "financial_methodology": {
             "formula": "EAL = sourced annual incident probability × loss magnitude",
             "kev_model_use": "prioritization only; excluded from EAL",
-            "frequency_source": "latest unexpired organization assessment per finding",
+            "frequency_source": (
+                "bundled, labelled SIH demo scenario assumptions"
+                if demo_mode_enabled(organization_id)
+                else "latest unexpired organization assessment per finding"
+            ),
         },
     }
 
@@ -353,7 +360,11 @@ def calculate_enterprise_summary(organization_id: UUID | None = None):
         "financial_methodology": {
             "formula": "EAL = sourced annual incident probability × loss magnitude",
             "kev_model_use": "prioritization only; excluded from EAL",
-            "frequency_source": "latest unexpired organization assessment per finding",
+            "frequency_source": (
+                "bundled, labelled SIH demo scenario assumptions"
+                if demo_mode_enabled(organization_id)
+                else "latest unexpired organization assessment per finding"
+            ),
         },
         "top_risk": risks[0] if risks else None,
         "asset_risk_aggregation": asset_risks,

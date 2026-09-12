@@ -36,7 +36,7 @@ import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
 import { API_MODE } from './lib/api';
-import { getWorkspace, SIH_WORKSPACE_ENABLED } from './lib/workspace';
+import { getIdentityWorkspace, getWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from './lib/workspace';
 
 function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
   if (API_MODE === 'demo') return <>{children}</>;
@@ -66,47 +66,57 @@ function useGlobalShortcuts() {
 
 function Shell() {
   useGlobalShortcuts();
+  const sessionUser = getSession()?.user;
+  // The backend assignment is authoritative. Email lookup only supports
+  // sessions created before the workspace claim was introduced.
+  const identityWorkspace = sessionUser?.workspace ?? getIdentityWorkspace(sessionUser?.email);
+  const workspace = identityWorkspace ?? getWorkspace();
+  const home = workspace === 'executive' ? '/executive' : '/security';
+
+  const workspacePage = (allowed: Workspace, page: ReactNode) => (
+    !SIH_WORKSPACE_ENABLED || workspace === allowed ? <>{page}</> : <Navigate to={home} replace />
+  );
 
   return (
     <>
       <AppShell>
         <Routes>
-          <Route path="/" element={<Navigate to={SIH_WORKSPACE_ENABLED && getWorkspace() === 'executive' ? '/executive' : '/security'} replace />} />
-          <Route path="/executive" element={<FinancialDashboard />} />
-          <Route path="/security" element={<SecurityDashboard />} />
-          <Route path="/financial" element={<FinancialDashboard />} />
+          <Route path="/" element={<Navigate to={home} replace />} />
+          <Route path="/executive" element={workspacePage('executive', <FinancialDashboard />)} />
+          <Route path="/security" element={workspacePage('technical', <SecurityDashboard />)} />
+          <Route path="/financial" element={workspacePage('executive', <FinancialDashboard />)} />
 
-          <Route path="/findings" element={<Findings />} />
+          <Route path="/findings" element={workspacePage('technical', <Findings />)} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/risks" element={<Risks />} />
           <Route path="/attack-paths" element={<AttackPaths />} />
-          <Route path="/resources" element={<Resources />} />
+          <Route path="/resources" element={workspacePage('executive', <Resources />)} />
 
-          <Route path="/vulnerabilities" element={<Vulnerabilities />} />
-          <Route path="/secrets" element={<Secrets />} />
+          <Route path="/vulnerabilities" element={workspacePage('technical', <Vulnerabilities />)} />
+          <Route path="/secrets" element={workspacePage('technical', <Secrets />)} />
           <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
-          <Route path="/cloud-security" element={<CloudSecurity />} />
-          <Route path="/identity-security" element={<IdentitySecurity />} />
-          <Route path="/code-security" element={<CodeSecurity />} />
-          <Route path="/code-security/repositories/:id" element={<RepositoryDetail />} />
-          <Route path="/code-security/sca" element={<ScaSbom />} />
+          <Route path="/cloud-security" element={workspacePage('technical', <CloudSecurity />)} />
+          <Route path="/identity-security" element={workspacePage('technical', <IdentitySecurity />)} />
+          <Route path="/code-security" element={workspacePage('technical', <CodeSecurity />)} />
+          <Route path="/code-security/repositories/:id" element={workspacePage('technical', <RepositoryDetail />)} />
+          <Route path="/code-security/sca" element={workspacePage('technical', <ScaSbom />)} />
 
           <Route path="/scenarios" element={<Scenarios />} />
-          <Route path="/recommendations" element={<Recommendations />} />
+          <Route path="/recommendations" element={workspacePage('executive', <Recommendations />)} />
           <Route path="/remediation-queue" element={<RemediationQueue />} />
-          <Route path="/investments" element={<Investments />} />
+          <Route path="/investments" element={workspacePage('executive', <Investments />)} />
 
           <Route path="/compliance" element={<Compliance />} />
-          <Route path="/policies" element={<Policies />} />
+          <Route path="/policies" element={workspacePage('technical', <Policies />)} />
           <Route path="/reports" element={<Reports />} />
 
-          <Route path="/integrations" element={<Integrations />} />
-          <Route path="/api-reference" element={<ApiReference />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/integrations" element={workspacePage('technical', <Integrations />)} />
+          <Route path="/api-reference" element={workspacePage('technical', <ApiReference />)} />
+          <Route path="/settings" element={workspacePage('technical', <SettingsPage />)} />
 
-          <Route path="/demo/vscode" element={<DemoOnly feature="VS Code demonstration"><VSCodeDemo /></DemoOnly>} />
+          <Route path="/demo/vscode" element={workspacePage('technical', <DemoOnly feature="VS Code demonstration"><VSCodeDemo /></DemoOnly>)} />
 
-          <Route path="*" element={<Navigate to="/security" replace />} />
+          <Route path="*" element={<Navigate to={home} replace />} />
         </Routes>
       </AppShell>
       <ToastHost />

@@ -1,5 +1,5 @@
 {
-  "model_name": "CRISPR XGBoost Incident Likelihood v4",
+  "model_name": "CRISPR XGBoost CVE Exploitation-Prioritization v4",
   "model_version": "xgb_v4_final",
   "trained_on": "2026-08-28",
   "framework": "XGBoost",

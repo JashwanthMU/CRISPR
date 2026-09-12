@@ -7,6 +7,7 @@ python-multipart>=0.0.9
 httpx==0.28.1
 python-dotenv>=1.0.1
 psycopg[binary]>=3.2.0
+neo4j>=5.25.0,<6.0.0
 email-validator>=2.2.0
 alembic==1.16.5
 SQLAlchemy==2.0.43
@@ -24,3 +25,9 @@ PuLP>=2.8.0
 # Testing 
 pytest>=8.2.0
 pytest-asyncio>=0.23.0
+
+
+# Optional V2 training and tree-model explainability dependencies.
+pandas>=2.2.0
+xgboost>=2.0.0
+shap>=0.45.0
