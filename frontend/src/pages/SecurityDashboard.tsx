@@ -19,6 +19,7 @@ import { API_MODE, getAssets, getEnterprise, getRemediation, getRiskCases, getSo
 import { MULTI_SERIES_TREND } from '../demo/fixtures';
 import { useDemoStore } from '../demo/demoStore';
 import { useUiStore, setFilter } from '../lib/uiStore';
+import { isDemoOrganization } from '../lib/auth';
 import { formatLakh, sourceColor, sourceLabel, TOKENS } from '../utils/format';
 import { activateOnEnter } from '../utils/a11y';
 import type { Finding, RiskCase } from '../types';
@@ -55,6 +56,7 @@ export default function SecurityDashboard() {
   const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
   const isRunning = useDemoStore((s) => s.isRunning);
   const filters = useUiStore((s) => s.filters);
+  const demoOrganization = isDemoOrganization();
   const riskScore = enterprise?.enterprise_risk_score ?? (API_MODE === 'demo' ? demoRiskScore : 0);
 
   useEffect(() => {
@@ -330,7 +332,7 @@ export default function SecurityDashboard() {
       <div className="card animate-in-3">
         <div className="card-title">Risk Trend</div>
         <InteractiveTrendChart
-          data={trendData.length ? trendData : API_MODE === 'demo' ? MULTI_SERIES_TREND : []}
+          data={demoOrganization ? MULTI_SERIES_TREND : trendData}
           xKey="month"
           series={TREND_SERIES}
           defaultSeries={['enterpriseRisk']}
