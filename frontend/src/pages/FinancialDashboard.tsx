@@ -138,7 +138,7 @@ export default function FinancialDashboard() {
             <div><div className="text-label">P95 annual loss</div><strong>{formatRupees(enterprise.var_95_inr)}</strong></div>
             <div><div className="text-label">P99 annual loss</div><strong>{formatRupees(enterprise.var_99_inr)}</strong></div>
             <div><div className="text-label">Expected shortfall (95%)</div><strong>{formatRupees(enterprise.tail_value_at_risk_95_inr)}</strong></div>
-            <div><div className="text-label">Evidence source</div><strong>{enterprise.financial_methodology.frequency_source}</strong></div>
+            <div><div className="text-label">Assessment basis</div><strong>Annual frequency × business impact</strong></div>
           </div>
           <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: '0.75rem', lineHeight: 1.6 }}>
             {enterprise.monte_carlo_methodology.iterations?.toLocaleString()} seeded simulations (seed {enterprise.monte_carlo_methodology.seed});{' '}
