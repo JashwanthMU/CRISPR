@@ -6,7 +6,8 @@ import IntegrationLogo from '../components/common/IntegrationLogo';
 import { toast } from '../lib/toastStore';
 import { TOKENS } from '../utils/format';
 import type { Integration, IntegrationStatus } from '../types';
-import { API_MODE, getIntegrations, httpClient } from '../lib/api';
+import { getIntegrations, httpClient } from '../lib/api';
+import { isDemoOrganization } from '../lib/auth';
 
 const STATUS_COLOR: Record<IntegrationStatus, string> = {
   connected: TOKENS.success,
@@ -26,25 +27,43 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
 
 export default function Integrations() {
   const { t } = useLanguage();
-  const [items, setItems] = useState<Integration[]>(API_MODE === 'demo' ? INTEGRATIONS.map((i) => ({ ...i })) : []);
+  const demoOrganization = isDemoOrganization();
+  const [items, setItems] = useState<Integration[]>(demoOrganization ? INTEGRATIONS.map((i) => ({ ...i })) : []);
 
   useEffect(() => {
+    if (demoOrganization) {
+      setItems(INTEGRATIONS.map((item) => ({ ...item })));
+      return;
+    }
     getIntegrations().then(setItems).catch((error) => {
       toast.error('Integrations unavailable', error?.response?.data?.detail ?? error.message);
     });
-  }, []);
+  }, [demoOrganization]);
+
+  useEffect(() => {
+    if (!demoOrganization) return;
+    const connecting = items.filter((item) => item.status === 'connecting');
+    if (!connecting.length) return;
+    const timer = window.setTimeout(() => {
+      setItems((current) => current.map((item) => item.status === 'connecting'
+        ? { ...item, status: 'connected', lastSync: new Date().toISOString(), itemsIngested: 24 }
+        : item));
+      connecting.forEach((item) => toast.success(`${item.name} connected`, 'Demo synchronization completed successfully.'));
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [demoOrganization, items]);
 
   const connect = (id: string) => {
-    if (API_MODE !== 'demo') {
+    if (!demoOrganization) {
       toast.info('Credential required', 'Configure a GitHub token and organization through the integration configuration endpoint.');
       return;
     }
-    const integration = items.find((item) => item.id === id);
-    toast.info('Demo catalogue entry', `${integration?.name ?? 'This connector'} is not a live adapter in this workspace.`);
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'connecting' } : item));
+    toast.info('Connecting demo source…', 'Running the deterministic SIH demonstration flow.');
   };
 
   const reconnect = async (id: string) => {
-    if (API_MODE !== 'demo') {
+    if (!demoOrganization) {
       try {
         setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
         await httpClient.post(`/api/integrations/${id}/reconnect`);
@@ -57,11 +76,15 @@ export default function Integrations() {
       }
       return;
     }
-    toast.info('Demo catalogue entry', 'No external connection or synchronization is performed in the demo workspace.');
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'syncing' } : item));
+    window.setTimeout(() => {
+      setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'connected', lastSync: new Date().toISOString() } : item));
+      toast.success('Demo source reconnected', 'Deterministic synchronization completed.');
+    }, 1000);
   };
 
   const disable = async (id: string) => {
-    if (API_MODE !== 'demo') {
+    if (!demoOrganization) {
       try {
         await httpClient.post(`/api/integrations/${id}/disable`);
         setItems(await getIntegrations());
@@ -71,11 +94,12 @@ export default function Integrations() {
       }
       return;
     }
-    toast.info('Demo catalogue entry', 'Demo source states are fixed evidence and cannot be presented as live operations.');
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'disconnected', itemsIngested: 0 } : item));
+    toast.warning('Demo integration disabled', 'The demonstration source has been paused.');
   };
 
   const testConnection = async (integration: Integration) => {
-    if (API_MODE !== 'demo') {
+    if (!demoOrganization) {
       try {
         const { data } = await httpClient.post(`/api/integrations/${integration.id}/reconnect`);
         toast.success('Connection healthy', `${data.account ?? integration.name} authenticated successfully.`);
@@ -84,7 +108,8 @@ export default function Integrations() {
       }
       return;
     }
-    toast.info('Demo catalogue entry', `${integration.name} has no external endpoint to test in this workspace.`);
+    toast.info('Testing demo connection…');
+    window.setTimeout(() => toast.success('Demo connection healthy', `${integration.name} responded successfully.`), 800);
   };
 
   const connectedCount = items.filter((i) => i.status === 'connected' || i.status === 'syncing').length;
@@ -109,9 +134,9 @@ export default function Integrations() {
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>{integration.name}</div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{integration.category.replace('_', ' ')}</div>
-                  <div style={{ marginTop: 3, fontSize: '0.625rem', fontWeight: 700, color: API_MODE === 'demo' ? 'var(--color-warning)' : 'var(--color-success)' }}>
-                    {API_MODE === 'demo' ? 'DEMO DATA' : integration.key === 'github' || integration.key === 'generic_http' ? 'LIVE ADAPTER' : 'PLANNED'}
-                  </div>
+                  {!demoOrganization && <div style={{ marginTop: 3, fontSize: '0.625rem', fontWeight: 700, color: 'var(--color-success)' }}>
+                    {integration.key === 'github' || integration.key === 'generic_http' ? 'LIVE ADAPTER' : 'PLANNED'}
+                  </div>}
                 </div>
               </div>
               <span
