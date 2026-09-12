@@ -42,3 +42,14 @@ def test_patch_delay_compounds_exposure_and_discloses_formula():
     calculation = delayed["per_asset"][0]["likelihood_calculation"]["calculation"]
     assert calculation["patch_delay_days"] == 30
     assert calculation["delay_formula"] == "1 - (1 - p) ** (1 + delay_days / 365)"
+
+
+def test_coverage_targets_never_weaken_existing_demo_controls():
+    assets = [{"asset_id": "A001", "name": "Payment Gateway", "type": "gateway", "data_classification": "pci", "internet_facing": True}]
+    finding = {"cvss": 8.5, "exploit_in_wild": True, "patch_age_days": 18, "threat_intel_active": True}
+    baseline = simulate_enterprise(assets, {}, findings_by_asset={"A001": finding})
+    lower_target = simulate_enterprise(assets, {"mfa_coverage": 0.50}, findings_by_asset={"A001": finding})
+    higher_target = simulate_enterprise(assets, {"mfa_coverage": 0.95}, findings_by_asset={"A001": finding})
+
+    assert lower_target["after_total_eal_inr"] == baseline["after_total_eal_inr"]
+    assert higher_target["after_total_eal_inr"] < baseline["after_total_eal_inr"]

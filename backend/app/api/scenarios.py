@@ -39,7 +39,12 @@ def run_scenario(
     implement_segmentation: Optional[bool] = Query(None),
     edr_expand: Optional[bool] = Query(None),
     patch_delay: Optional[int] = Query(None),
-    mfa_coverage: Optional[float] = Query(None),
+    mfa_coverage: Optional[float] = Query(None, ge=0, le=1),
+    edr_coverage: Optional[float] = Query(None, ge=0, le=1),
+    patch_compliance: Optional[float] = Query(None, ge=0, le=1),
+    segmentation_coverage: Optional[float] = Query(None, ge=0, le=1),
+    logging_coverage: Optional[float] = Query(None, ge=0, le=1),
+    waf_enabled: Optional[bool] = Query(None),
     user: AuthUser = Depends(require_security),
 ):
     overrides = {}
@@ -49,6 +54,11 @@ def run_scenario(
     if edr_expand is not None: overrides["edr_expand"] = edr_expand
     if patch_delay is not None: overrides["patch_delay"] = patch_delay
     if mfa_coverage is not None: overrides["mfa_coverage"] = mfa_coverage
+    if edr_coverage is not None: overrides["edr_coverage"] = edr_coverage
+    if patch_compliance is not None: overrides["patch_compliance"] = patch_compliance
+    if segmentation_coverage is not None: overrides["segmentation_coverage"] = segmentation_coverage
+    if logging_coverage is not None: overrides["logging_coverage"] = logging_coverage
+    if waf_enabled is not None: overrides["waf_enabled"] = waf_enabled
     result = _simulate(overrides, user.organization_id)
     result["total_eal_inr"] = result["after_total_eal_inr"]
     result["total_eal_lakh"] = result["after_total_eal_lakh"]

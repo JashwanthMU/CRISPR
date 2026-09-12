@@ -94,6 +94,16 @@ def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict |
         control_overrides["patch_compliance"] = 0.95
     if overrides.get("edr_expand") is True:
         control_overrides["edr_coverage"] = 1.0
+    if overrides.get("edr_coverage") is not None:
+        control_overrides["edr_coverage"] = float(overrides["edr_coverage"])
+    if overrides.get("patch_compliance") is not None:
+        control_overrides["patch_compliance"] = float(overrides["patch_compliance"])
+    if overrides.get("segmentation_coverage") is not None:
+        control_overrides["segmentation"] = float(overrides["segmentation_coverage"])
+    if overrides.get("logging_coverage") is not None:
+        control_overrides["logging_coverage"] = float(overrides["logging_coverage"])
+    if overrides.get("waf_enabled") is not None:
+        control_overrides["waf_enabled"] = bool(overrides["waf_enabled"])
     if overrides.get("cloud_hardening") is True:
         control_overrides["waf_enabled"] = True
         control_overrides["segmentation"] = min(1.0, control_overrides.get("segmentation", 0) + 0.20)
@@ -129,7 +139,14 @@ def simulate_enterprise(assets: list, overrides: dict, findings_by_asset: dict |
             continue
         # Calculate every finding, then combine probabilities once per asset so
         # loss magnitude is not counted once for every vulnerability.
-        effective_overrides = dict(control_overrides)
+        effective_overrides = {
+            key: (
+                max(float(base_controls.get(key, 0)), float(value))
+                if key in {"mfa_coverage", "edr_coverage", "patch_compliance", "segmentation", "logging_coverage"}
+                else value
+            )
+            for key, value in control_overrides.items()
+        }
         if patch_delay_days > 0:
             effective_overrides["patch_delay_days"] = patch_delay_days
         finding_results = [

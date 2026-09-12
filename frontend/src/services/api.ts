@@ -22,10 +22,17 @@ const demoScenario = (p: any) => {
   const before = 18_400_000;
   let reduction = 0;
   if (p.implement_mfa) reduction += 4_860_000;
+  else if (typeof p.mfa_coverage === 'number') reduction += 4_860_000 * Math.max(0, Math.min(1, (p.mfa_coverage - 0.55) / 0.45));
   if (p.implement_patching) reduction += 3_100_000;
+  else if (typeof p.patch_compliance === 'number') reduction += 3_100_000 * Math.max(0, Math.min(1, (p.patch_compliance - 0.55) / 0.40));
   if (p.implement_segmentation) reduction += 3_870_000;
+  else if (typeof p.segmentation_coverage === 'number') reduction += 3_870_000 * Math.max(0, Math.min(1, (p.segmentation_coverage - 0.50) / 0.45));
   if (p.edr_expand) reduction += 1_800_000;
+  else if (typeof p.edr_coverage === 'number') reduction += 1_800_000 * Math.max(0, Math.min(1, (p.edr_coverage - 0.65) / 0.35));
+  if (typeof p.logging_coverage === 'number') reduction += 900_000 * Math.max(0, Math.min(1, (p.logging_coverage - 0.60) / 0.40));
+  if (p.waf_enabled) reduction += 2_200_000;
   if (p.patch_delay) reduction -= p.patch_delay === 60 ? 3_900_000 : 2_100_000;
+  reduction = Math.min(reduction, before * 0.85);
   return { before_total_eal_inr: before, after_total_eal_inr: Math.max(0, before - reduction), per_asset: MOCK_ASSETS.map((a: any, i: number) => ({ asset_name: a.name, before_eal_inr: Math.round(before / MOCK_ASSETS.length), after_eal_inr: Math.round(Math.max(0, before - reduction) / MOCK_ASSETS.length), asset_id: a.asset_id, rank: i + 1 })) };
 };
 const DEMO_PRESETS = [

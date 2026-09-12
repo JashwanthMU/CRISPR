@@ -41,6 +41,11 @@ export default function Scenarios() {
   const [patching, setPatching] = useState<'immediate' | '30day' | '60day'>('immediate');
   const [segmentation, setSegmentation] = useState(false);
   const [edrCoverage, setEdrCoverage] = useState(60);
+  const [mfaCoverage, setMfaCoverage] = useState(80);
+  const [patchCompliance, setPatchCompliance] = useState(80);
+  const [segmentationCoverage, setSegmentationCoverage] = useState(75);
+  const [loggingCoverage, setLoggingCoverage] = useState(75);
+  const [wafEnabled, setWafEnabled] = useState(false);
   const [result, setResult] = useState<SimResult | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [simulating, setSimulating] = useState(false);
@@ -81,12 +86,14 @@ export default function Scenarios() {
 
   const simulate = () => {
     const params: Record<string, boolean | number> = {};
-    if (mfa) params.implement_mfa = true;
-    if (segmentation) params.implement_segmentation = true;
-    if (patching === 'immediate') params.implement_patching = true;
+    if (mfa) params.mfa_coverage = mfaCoverage / 100;
+    if (segmentation) params.segmentation_coverage = segmentationCoverage / 100;
+    if (patching === 'immediate') params.patch_compliance = patchCompliance / 100;
     if (patching === '30day') params.patch_delay = 30;
     if (patching === '60day') params.patch_delay = 60;
-    if (edrCoverage === 100) params.edr_expand = true;
+    params.edr_coverage = edrCoverage / 100;
+    params.logging_coverage = loggingCoverage / 100;
+    if (wafEnabled) params.waf_enabled = true;
     void runWithParams(params);
   };
 
@@ -156,6 +163,8 @@ export default function Scenarios() {
               </button>
             </div>
 
+            {mfa && <ControlCoverage label="MFA Target Coverage" value={mfaCoverage} onChange={setMfaCoverage} />}
+
             <div>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', marginBottom: 8 }}>Patching Cadence</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -167,6 +176,8 @@ export default function Scenarios() {
                 ))}
               </div>
             </div>
+
+            {patching === 'immediate' && <ControlCoverage label="Patch Compliance Target" value={patchCompliance} onChange={setPatchCompliance} />}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>Network Segmentation</span>
@@ -197,19 +208,28 @@ export default function Scenarios() {
               </button>
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>EDR Coverage</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>{edrCoverage}%</span>
+            {segmentation && <ControlCoverage label="Segmentation Coverage Target" value={segmentationCoverage} onChange={setSegmentationCoverage} />}
+
+            <ControlCoverage label="EDR / XDR Coverage" value={edrCoverage} onChange={setEdrCoverage} />
+            <ControlCoverage label="SIEM Logging Coverage" value={loggingCoverage} onChange={setLoggingCoverage} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>Web Application Firewall</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: 2 }}>Protect internet-facing application traffic</div>
               </div>
-              <input
-                type="range"
-                min={60}
-                max={100}
-                value={edrCoverage}
-                onChange={(e) => setEdrCoverage(Number(e.target.value))}
-                style={{ width: '100%' }}
-              />
+              <button
+                onClick={() => setWafEnabled(!wafEnabled)}
+                aria-pressed={wafEnabled}
+                aria-label="Toggle Web Application Firewall"
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: 'none',
+                  background: wafEnabled ? 'var(--accent-blue)' : 'var(--bg-elevated)',
+                  position: 'relative', cursor: 'pointer',
+                }}
+              >
+                <span style={{ position: 'absolute', top: 2, left: wafEnabled ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.15s ease' }} />
+              </button>
             </div>
 
             <button className="btn-primary" onClick={simulate} disabled={simulating}>
@@ -359,6 +379,18 @@ export default function Scenarios() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ControlCoverage({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{label}</span>
+        <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>{value}%</span>
+      </div>
+      <input type="range" min={0} max={100} step={5} value={value} onChange={(event) => onChange(Number(event.target.value))} style={{ width: '100%' }} aria-label={label} />
     </div>
   );
 }
