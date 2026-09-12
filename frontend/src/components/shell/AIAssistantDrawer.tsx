@@ -17,6 +17,53 @@ const SUGGESTED_PROMPTS = [
   { icon: ScrollText, text: "Summarize today's security activity" },
 ];
 
+const NETWORK_FALLBACKS = [
+  {
+    matches: ['highest-risk', 'highest risk', 'top risk', 'biggest risk'],
+    text: 'Live risk analysis is temporarily unavailable. Open Risk Cases and sort by Expected Annual Loss; review the highest item’s incident-frequency evidence, loss magnitude, asset criticality, and control gaps before prioritizing it.',
+    references: [{ label: 'View Risk Cases', path: '/risks' }],
+  },
+  {
+    matches: ['exposed asset', 'internet-facing', 'internet facing', 'public-facing'],
+    text: 'Live asset analysis is temporarily unavailable. Open Assets and filter for internet-facing resources, then review exploitable findings, privileged access, missing controls, business criticality, and evidence freshness.',
+    references: [{ label: 'View Assets', path: '/assets' }],
+  },
+  {
+    matches: ['risk increase', 'risk increased', 'exposure increase', 'why did risk'],
+    text: 'Live trend analysis is temporarily unavailable. Check dated risk snapshots for new findings, newly exposed assets, threat-intelligence changes, weakened controls, stale evidence, and overdue remediation before attributing the increase.',
+    references: [{ label: 'View Risk Cases', path: '/risks' }],
+  },
+  {
+    matches: ['security activity', 'activity summary', "today's activity", 'todays activity'],
+    text: "Live activity analysis is temporarily unavailable. Review Findings for newly detected critical or high items and the Developer Queue for assignments, status changes, overdue work, and remediation-verification results.",
+    references: [{ label: 'View Findings', path: '/findings' }, { label: 'View Queue', path: '/remediation-queue' }],
+  },
+  {
+    matches: ['mfa', 'multi-factor', 'multifactor'],
+    text: 'The scenario service is temporarily unavailable. MFA normally reduces credential and privileged-access risk, but CRISPR will not estimate financial reduction until the deterministic scenario engine reconnects.',
+    references: [{ label: 'Open Scenarios', path: '/scenarios' }],
+  },
+  {
+    matches: ['budget', 'invest', 'spend', 'optimiz'],
+    text: 'The optimization service is temporarily unavailable. Review Recommendations by verified marginal risk reduction, implementation cost, overlap with other controls, and delivery constraints; no investment value will be estimated offline.',
+    references: [{ label: 'View Recommendations', path: '/recommendations' }],
+  },
+  {
+    matches: ['full dashboard', 'entire dashboard', 'complete executive', 'complete technical'],
+    text: 'The complete live analysis is temporarily unavailable. Dashboard data remains visible; review top financial exposures, critical findings, exposed assets, overdue remediation, control gaps, and evidence freshness. CRISPR will not fabricate a summary while disconnected.',
+    references: [{ label: 'View Risk Cases', path: '/risks' }, { label: 'View Findings', path: '/findings' }],
+  },
+];
+
+function networkFallback(question: string): Pick<Message, 'text' | 'references'> {
+  const normalized = question.toLowerCase();
+  const match = NETWORK_FALLBACKS.find((entry) => entry.matches.some((term) => normalized.includes(term)));
+  return match ?? {
+    text: 'CRISPR AI cannot reach the analysis service because of a network or provider issue. Core dashboards remain available. Retry shortly or use Risk Cases, Findings, Scenarios, and Recommendations directly; no financial values will be invented while disconnected.',
+    references: [{ label: 'View Risk Cases', path: '/risks' }, { label: 'View Findings', path: '/findings' }],
+  };
+}
+
 /**
  * Global, always-available AI assistant. It lives in the application shell, is reachable from
  * any page via the header's "Ask CRISPR AI" button or Ctrl+/ shortcut area,
@@ -48,8 +95,6 @@ export default function AIAssistantDrawer() {
     return () => window.removeEventListener('keydown', onEscape);
   }, [open]);
 
-  const unavailableAnswer = "The AI Advisor cannot reach the deterministic backend for this question. Start the backend and retry so I can answer from current risk data.";
-
   const send = async (question: string) => {
     if (!question.trim() || loading) return;
     setMessages((m) => [...m, { role: 'user', text: question }]);
@@ -57,16 +102,18 @@ export default function AIAssistantDrawer() {
     setLoading(true);
     try {
       const res = await queryAssistant(question);
-      const answer = res?.data?.answer || res?.data?.response || unavailableAnswer;
+      const fallback = networkFallback(question);
+      const answer = res?.data?.answer || res?.data?.response || fallback.text;
       const evidence = res?.data?.data ?? {};
       const risk = evidence.top_risk ?? evidence.risk_case ?? evidence.summary?.top_risk;
       const references = risk?.asset_id ? [
         { label: `Risk ${risk.finding_id ?? risk.asset_id}`, path: `/risks?asset=${encodeURIComponent(risk.asset_id)}` },
         ...(risk.finding_id ? [{ label: `Finding ${risk.finding_id}`, path: `/findings?finding=${encodeURIComponent(risk.finding_id)}` }] : []),
-      ] : [];
+      ] : (!res?.data?.answer && !res?.data?.response ? fallback.references : []);
       setMessages((m) => [...m, { role: 'assistant', text: answer, references }]);
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', text: unavailableAnswer }]);
+      const fallback = networkFallback(question);
+      setMessages((m) => [...m, { role: 'assistant', ...fallback }]);
     } finally {
       setLoading(false);
     }

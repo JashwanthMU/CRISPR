@@ -25,9 +25,15 @@ INTENT_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("patch_delay_scenario", ("delay patch", "patch delay", "patching by 30", "delay by 30",
                               "delayed patch", "30 days", "30 day", "wait 30", "patch later")),
     ("budget_optimize", ("budget", "spend", "invest", "crore", "lakh", "allocate")),
+    ("exposed_assets", ("exposed assets", "internet-facing assets", "internet facing assets",
+                        "public-facing assets", "public facing assets")),
+    ("risk_increase", ("why did risk increase", "why has risk increased", "risk increased",
+                       "risk increase", "exposure increased", "exposure increase")),
+    ("security_activity", ("today's security activity", "todays security activity",
+                           "security activity", "recent security activity", "activity summary")),
     ("risk_drivers", ("why ", "reason", "driver", "cause", "explain the risk")),
     ("top_risk", ("highest financial", "top risk", "worst risk", "biggest risk",
-                  "highest risk", "top cyber", "most dangerous")),
+                  "highest risk", "highest-risk", "top cyber", "most dangerous")),
     ("forecast", ("forecast", "trend", "90 day", "90-day", "next 90", "future risk",
                   "risk trajectory", "no action")),
     ("anomaly_scan", ("anomal", "failed login", "suspicious login", "unusual login",
@@ -46,6 +52,9 @@ TASK_BY_INTENT = {
     "mfa_scenario": "mitigate",
     "patch_delay_scenario": "mitigate",
     "budget_optimize": "mitigate",
+    "exposed_assets": "explain",
+    "risk_increase": "explain",
+    "security_activity": "explain",
 }
 
 SYSTEM_PROMPT = (
@@ -97,6 +106,48 @@ def _answer_general(question: str) -> tuple[str, dict, str]:
             "access that object. An attacker may change the identifier to read or modify another "
             "user's data. Prevent it with server-side authorization checks on every object request, "
             "deny-by-default policies, indirect identifiers where useful, and access-control tests."
+        )
+    elif "ransomware" in normalized:
+        fallback = (
+            "Ransomware encrypts or steals data to disrupt operations and demand payment. "
+            "Reduce exposure with tested offline backups, rapid patching, MFA, least privilege, "
+            "network segmentation, EDR monitoring, and a rehearsed incident-response plan."
+        )
+    elif "phishing" in normalized:
+        fallback = (
+            "Phishing uses deceptive messages to steal credentials or trigger malicious actions. "
+            "Use phishing-resistant MFA, email controls, user reporting, URL and attachment analysis, "
+            "and rapid credential revocation when a message succeeds."
+        )
+    elif "sql injection" in normalized or "sqli" in normalized:
+        fallback = (
+            "SQL injection occurs when untrusted input changes a database query. Prevent it with "
+            "parameterized queries, safe ORM usage, input validation, least-privileged database "
+            "accounts, and security tests in the delivery pipeline."
+        )
+    elif "cross-site scripting" in normalized or " xss" in f" {normalized}":
+        fallback = (
+            "Cross-site scripting lets untrusted content execute in a user's browser. Apply "
+            "context-aware output encoding, safe templating, input sanitization where appropriate, "
+            "a restrictive Content Security Policy, and automated browser-security tests."
+        )
+    elif "zero trust" in normalized:
+        fallback = (
+            "Zero Trust continuously verifies users, devices, and requests instead of trusting a "
+            "network location. Start with strong identity, least privilege, device posture checks, "
+            "segmentation, explicit authorization, and continuous monitoring."
+        )
+    elif "secret" in normalized or "credential" in normalized:
+        fallback = (
+            "Exposed secrets can enable unauthorized access even when software is fully patched. "
+            "Revoke and rotate the credential first, remove it from code and history, store replacements "
+            "in a secrets manager, reduce privileges, and review access logs for misuse."
+        )
+    elif "cvss" in normalized:
+        fallback = (
+            "CVSS measures technical vulnerability severity, not total business risk. Prioritization "
+            "should also consider exploit evidence, internet exposure, asset criticality, control "
+            "effectiveness, and the potential financial impact of the affected service."
         )
 
     llm_answer = chat(
@@ -249,6 +300,52 @@ def _answer_enterprise(question: str = "", organization_id=None) -> tuple[str, d
     return answer, {"summary": e}
 
 
+def _answer_exposed_assets(question: str = "", organization_id=None) -> tuple[str, dict]:
+    assets = load_assets(organization_id)
+    exposed = [asset for asset in assets if bool(asset.get("internet_facing"))]
+    names = ", ".join(str(asset.get("name") or asset.get("asset_name") or asset.get("asset_id")) for asset in exposed[:5])
+    if exposed:
+        suffix = f" The first assets to review are: {names}." if names else ""
+        answer = (
+            f"{len(exposed)} of {len(assets)} assets are marked internet-facing.{suffix} "
+            "Prioritize exploitable findings, privileged access, missing controls, and business-critical services."
+        )
+    else:
+        answer = f"None of the {len(assets)} current assets are marked internet-facing. Verify inventory coverage and exposure evidence before treating this as zero external exposure."
+    return answer, {"asset_count": len(assets), "exposed_assets": exposed}
+
+
+def _answer_risk_increase(question: str = "", organization_id=None) -> tuple[str, dict]:
+    enterprise = risk_tools.get_enterprise_summary(organization_id)
+    top = enterprise.get("top_risk") or {}
+    drivers = top.get("risk_drivers") or []
+    driver_names = ", ".join(
+        str(item.get("factor") or item.get("driver") or item.get("name"))
+        for item in drivers[:4] if isinstance(item, dict)
+    ) or "exposure, threat activity, asset criticality, and control weakness"
+    answer = (
+        "The available snapshot does not by itself prove a historical increase. Current upward risk pressure "
+        f"is concentrated in {top.get('asset_name', 'the highest-ranked risk case')}; its leading drivers are {driver_names}. "
+        "Compare dated risk snapshots and source freshness to confirm what changed."
+    )
+    return answer, {"summary": enterprise, "top_risk": top, "trend_confirmed": False}
+
+
+def _answer_security_activity(question: str = "", organization_id=None) -> tuple[str, dict]:
+    findings = load_findings(organization_id=organization_id)
+    open_states = {"OPEN", "NEW", "TRIAGED", "VALIDATED", "IN_PROGRESS", "IN PROGRESS"}
+    critical = sum(str(row.get("severity", "")).upper() == "CRITICAL" for row in findings)
+    high = sum(str(row.get("severity", "")).upper() == "HIGH" for row in findings)
+    active = sum(str(row.get("status", "OPEN")).upper() in open_states for row in findings)
+    answer = (
+        f"Current security snapshot: {len(findings)} findings, including {critical} critical, {high} high, "
+        f"and {active} active items. This is the current evidence set, not a time-filtered activity log; "
+        "review finding timestamps and the remediation queue to confirm today's changes."
+    )
+    return answer, {"finding_count": len(findings), "critical": critical, "high": high, "active": active,
+                    "time_filtered": False}
+
+
 def _answer_full_analysis(question: str, organization_id=None) -> tuple[str, dict]:
     """Explain the current role-specific dashboard from calculated organization data."""
     enterprise = risk_tools.get_enterprise_summary(organization_id)
@@ -318,6 +415,9 @@ HANDLERS = {
     "enterprise_summary": _answer_enterprise,
     "forecast": _answer_forecast,
     "anomaly_scan": _answer_anomalies,
+    "exposed_assets": _answer_exposed_assets,
+    "risk_increase": _answer_risk_increase,
+    "security_activity": _answer_security_activity,
 }
 
 
