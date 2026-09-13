@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUiStore, togglePopover, closePopover } from '../../lib/uiStore';
-import { useDemoStore } from '../../demo/demoStore';
 import type { PipelineStageState } from '../../types';
+import { httpClient } from '../../lib/api';
 
 interface SystemRow {
   label: string;
@@ -32,8 +32,7 @@ const STATE_DOT_CLASS: Record<PipelineStageState, string> = {
  */
 export default function SystemStatus() {
   const openPopover = useUiStore((s) => s.openPopover);
-  const pipeline = useDemoStore((s) => s.pipeline);
-  const isRunning = useDemoStore((s) => s.isRunning);
+  const [available, setAvailable] = useState<boolean | null>(null);
   const open = openPopover === 'status';
   const ref = useRef<HTMLDivElement>(null);
 
@@ -51,23 +50,25 @@ export default function SystemStatus() {
     };
   }, [open]);
 
-  const stageState = (id: string): PipelineStageState => pipeline.find((p) => p.id === id)?.state ?? 'idle';
-
   const rows: SystemRow[] = [
     { label: 'API', state: 'completed' },
     { label: 'Database', state: 'completed' },
-    { label: 'Ingestion', state: stageState('ingestion') },
-    { label: 'Correlation', state: stageState('correlation') },
-    { label: 'Risk Engine', state: stageState('risk-engine') },
-    { label: 'AI Engine', state: stageState('ai-analysis') },
+    { label: 'Ingestion', state: available === false ? 'warning' : 'completed' },
+    { label: 'Correlation', state: available === false ? 'warning' : 'completed' },
+    { label: 'Risk Engine', state: available === false ? 'warning' : 'completed' },
+    { label: 'AI Engine', state: available === false ? 'warning' : 'completed' },
   ];
 
+  useEffect(() => {
+    httpClient.get('/api/ingestion/status').then(() => setAvailable(true)).catch(() => setAvailable(false));
+  }, [open]);
+
   const anyIssue = rows.some((r) => r.state === 'warning' || r.state === 'failed');
-  const overallLabel = isRunning ? 'Analysis in progress' : anyIssue ? 'Degraded performance' : 'All systems operational';
-  const overallDotClass = isRunning ? 'status-dot-processing' : anyIssue ? 'status-dot-warning' : 'status-dot-ok';
+  const overallLabel = available === null ? 'Checking systems' : anyIssue ? 'Degraded performance' : 'All systems operational';
+  const overallDotClass = available === null ? 'status-dot-processing' : anyIssue ? 'status-dot-warning' : 'status-dot-ok';
 
   return (
-    <div className="topbar-popover-wrap" ref={ref}>
+    <div className="topbar-popover-wrap mobile-header-secondary" ref={ref}>
       <button
         type="button"
         className="topbar-status"

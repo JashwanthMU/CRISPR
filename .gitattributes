@@ -1,0 +1,16 @@
+# Prevent Git from rewriting line endings inside binary files. Without this,
+# a Windows checkout with core.autocrlf=true silently corrupts .pkl/.png
+# files byte-for-byte (CRLF conversion applied where it shouldn't be) -
+# this bit us once already: crispr_xgb_calibrated.pkl loaded as
+# "input stream corrupted" after a fresh Windows clone/pull.
+*.pkl binary
+*.pickle binary
+*.joblib binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.xlsx binary
+*.parquet binary
+*.npz binary
+*.npy binary

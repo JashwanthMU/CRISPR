@@ -8,6 +8,7 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -21,7 +22,9 @@ from backend.database.connection import get_connection
 TOKEN_SECRET = os.getenv("AUTH_SECRET", "")
 TOKEN_ISSUER = "crispr-api"
 TOKEN_AUDIENCE = "crispr-web"
-TOKEN_LIFETIME_HOURS = 12
+TOKEN_LIFETIME_MINUTES = int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "30"))
+DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
+DEMO_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000002")
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -81,6 +84,28 @@ class AuthUser(BaseModel):
     name: str
     email: EmailStr
     role: UserRole
+    organization_id: UUID = DEFAULT_ORGANIZATION_ID
+    organization_name: str | None = None
+    data_mode: str = "LIVE"
+    workspace: Literal["executive", "technical"] | None = None
+
+
+def workspace_for_email(email: str) -> Literal["executive", "technical"] | None:
+    """Return the server-authorized SIH workspace for a dedicated identity."""
+    normalized = email.strip().lower()
+    executive_email = os.getenv("SIH_EXECUTIVE_EMAIL", "").strip().lower()
+    technical_email = os.getenv("SIH_TECHNICAL_EMAIL", "").strip().lower()
+    if executive_email and normalized == executive_email:
+        return "executive"
+    if technical_email and normalized == technical_email:
+        return "technical"
+    return None
+
+
+def auth_user(user: dict) -> AuthUser:
+    values = dict(user)
+    values["workspace"] = workspace_for_email(str(values["email"]))
+    return AuthUser.model_validate(values)
 
 
 def create_token(user: dict) -> str:
@@ -94,7 +119,8 @@ def create_token(user: dict) -> str:
         "aud": TOKEN_AUDIENCE,
         "iat": int(now.timestamp()),
         "nbf": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=TOKEN_LIFETIME_HOURS)).timestamp()),
+        "exp": int((now + timedelta(minutes=TOKEN_LIFETIME_MINUTES)).timestamp()),
+        "organization_id": str(user.get("organization_id", DEFAULT_ORGANIZATION_ID)),
     }, separators=(",", ":")).encode())
     signing_input = f"{header}.{payload}"
     signature = _b64(hmac.new(TOKEN_SECRET.encode(), signing_input.encode(), hashlib.sha256).digest())
@@ -104,7 +130,9 @@ def create_token(user: dict) -> str:
 def authenticate_user(email: str, password: str) -> dict | None:
     with get_connection() as connection:
         user = connection.execute(
-            "SELECT * FROM users WHERE email = %s", (email.lower(),)
+            """SELECT u.*,o.name AS organization_name,o.data_mode
+               FROM users u JOIN organizations o ON o.organization_id=u.organization_id
+               WHERE u.email = %s""", (email.lower(),)
         ).fetchone()
     if not user or not verify_password(password, user["password_hash"]):
         return None
@@ -138,19 +166,29 @@ def get_current_user(
         if int(payload["exp"]) < now or int(payload["nbf"]) > now:
             raise ValueError("Expired token")
         user_id = UUID(payload["sub"])
+        token_organization_id = UUID(payload["organization_id"])
     except (KeyError, ValueError, TypeError, json.JSONDecodeError) as error:
         raise unauthorized from error
     try:
         with get_connection() as connection:
             user = connection.execute(
-                "SELECT user_id, name, email, role FROM users WHERE user_id = %s",
-                (user_id,),
+                """SELECT u.user_id,u.name,u.email,m.role,%s::uuid AS organization_id,
+                          o.name AS organization_name,o.data_mode
+                   FROM users u JOIN organization_members m ON m.user_id=u.user_id
+                   JOIN organizations o ON o.organization_id=m.organization_id
+                   WHERE u.user_id=%s AND m.organization_id=%s""",
+                (token_organization_id, user_id, token_organization_id),
             ).fetchone()
     except OperationalError as error:
-        raise HTTPException(status_code=503, detail="PostgreSQL is unavailable") from error
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="PostgreSQL is unavailable; token ownership could not be verified",
+        ) from error
     if not user:
         raise unauthorized
-    return AuthUser.model_validate(user)
+    from backend.data_access import set_active_organization
+    set_active_organization(token_organization_id)
+    return auth_user(user)
 
 
 def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
@@ -163,25 +201,35 @@ def require_security(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 def ensure_default_security_user() -> None:
-    """Ensure the configured security administrator exists with current credentials."""
+    """Create configured security users once without rotating existing passwords."""
     from uuid import uuid4
 
-    email = os.getenv("SECURITY_ADMIN_EMAIL", "").strip().lower()
-    if not email:
+    accounts = [
+        ("CRISPR Security Team", os.getenv("SECURITY_ADMIN_EMAIL", ""), os.getenv("SECURITY_ADMIN_PASSWORD", "")),
+        ("CRISPR Executive", os.getenv("SIH_EXECUTIVE_EMAIL", ""), os.getenv("SIH_EXECUTIVE_PASSWORD", "")),
+        ("CRISPR Technical Team", os.getenv("SIH_TECHNICAL_EMAIL", ""), os.getenv("SIH_TECHNICAL_PASSWORD", "")),
+    ]
+    configured = [(name, email.strip().lower(), password) for name, email, password in accounts if email.strip() or password]
+    if not configured or not configured[0][1]:
         raise RuntimeError("SECURITY_ADMIN_EMAIL must be set")
-    password = os.getenv("SECURITY_ADMIN_PASSWORD", "")
-    if len(password) < 12:
-        raise RuntimeError("SECURITY_ADMIN_PASSWORD must be at least 12 characters")
-    password_hash = hash_password(password)
+    for _, email, password in configured:
+        if not email:
+            raise RuntimeError("Every configured security user must have an email")
+        if len(password) < 12:
+            raise RuntimeError(f"Password for {email} must be at least 12 characters")
     with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO users (user_id, name, email, password_hash, role)
-            VALUES (%s, %s, %s, %s, 'SECURITY')
-            ON CONFLICT (email) DO UPDATE SET
-                name = EXCLUDED.name,
-                password_hash = EXCLUDED.password_hash,
-                role = 'SECURITY'
-            """,
-            (uuid4(), "NovaPay Security Team", email, password_hash),
-        )
+      for name, email, password in configured:
+        existing = connection.execute("SELECT user_id FROM users WHERE email=%s", (email,)).fetchone()
+        if not existing:
+            connection.execute(
+                """INSERT INTO users (user_id, name, email, password_hash, role, organization_id)
+                   VALUES (%s, %s, %s, %s, 'SECURITY', %s) ON CONFLICT (email) DO NOTHING""",
+                (uuid4(), name, email, hash_password(password), DEFAULT_ORGANIZATION_ID),
+            )
+        row = connection.execute("SELECT user_id FROM users WHERE email=%s", (email,)).fetchone()
+        for organization_id in (DEFAULT_ORGANIZATION_ID, DEMO_ORGANIZATION_ID):
+            connection.execute(
+                """INSERT INTO organization_members(organization_id,user_id,role)
+                   VALUES (%s,%s,'SECURITY') ON CONFLICT DO NOTHING""",
+                (organization_id, row["user_id"]),
+            )

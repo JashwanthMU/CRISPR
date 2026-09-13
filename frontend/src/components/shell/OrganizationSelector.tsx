@@ -1,7 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Building2, ChevronDown, Check } from 'lucide-react';
-import { ORG_OPTIONS, setSelectedOrg, togglePopover, closePopover, useUiStore } from '../../lib/uiStore';
+import { setSelectedOrg, togglePopover, closePopover, useUiStore } from '../../lib/uiStore';
 import { toast } from '../../lib/toastStore';
+import { httpClient } from '../../lib/api/client';
+import { getSession, setSession } from '../../lib/auth';
+import SidebarTooltip from './SidebarTooltip';
 
 interface Props {
   collapsed: boolean;
@@ -18,7 +21,17 @@ export default function OrganizationSelector({ collapsed }: Props) {
   const selectedOrgId = useUiStore((s) => s.selectedOrgId);
   const open = openPopover === 'org';
   const ref = useRef<HTMLDivElement>(null);
-  const current = ORG_OPTIONS.find((o) => o.id === selectedOrgId) ?? ORG_OPTIONS[0];
+  const [organizations, setOrganizations] = useState<Array<{id: string; name: string; data_mode: 'LIVE' | 'DEMO'}>>([]);
+  const current = organizations.find((o) => o.id === selectedOrgId)
+    ?? organizations.find((o) => o.id === getSession()?.user.organization_id)
+    ?? { id: selectedOrgId, name: getSession()?.user.organization_name ?? 'Organization', data_mode: getSession()?.user.data_mode ?? 'LIVE' };
+
+  useEffect(() => {
+    httpClient.get('/api/auth/organizations').then(({ data }) => {
+      setOrganizations(data.organizations ?? []);
+      setSelectedOrg(data.active_organization_id);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -36,42 +49,45 @@ export default function OrganizationSelector({ collapsed }: Props) {
     };
   }, [open]);
 
-  const select = (id: string) => {
-    setSelectedOrg(id);
-    closePopover();
-    const org = ORG_OPTIONS.find((o) => o.id === id);
-    if (org) toast.info('Organization switched', org.name);
+  const select = async (id: string) => {
+    if (id === current.id) return closePopover();
+    try {
+      const { data } = await httpClient.post(`/api/auth/organizations/${id}/switch`);
+      setSession(data);
+      setSelectedOrg(id);
+      closePopover();
+      toast.info('Organization switched', data.user.organization_name);
+      window.location.reload();
+    } catch {
+      toast.error('Switch failed', 'You do not have access to that organization.');
+    }
   };
 
   return (
     <div className="sidebar-org" ref={ref}>
+      <SidebarTooltip label={current.name} enabled={collapsed}>
       <button
         type="button"
         className="sidebar-org-trigger"
         onClick={() => togglePopover('org')}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title={collapsed ? current.name : undefined}
       >
         <Building2 size={16} className="sidebar-org-icon" />
         {!collapsed && (
           <span className="sidebar-org-text">
             <span className="sidebar-org-label">Organization</span>
             <span className="sidebar-org-name" title={current.name}>
-              {current.name}
+              {current.name} · {current.data_mode}
             </span>
           </span>
         )}
         {!collapsed && <ChevronDown size={14} className="sidebar-org-chevron" />}
-        {collapsed && (
-          <span className="nav-tooltip" role="tooltip">
-            {current.name}
-          </span>
-        )}
       </button>
+      </SidebarTooltip>
       {open && (
         <div className="sidebar-org-dropdown" role="listbox">
-          {ORG_OPTIONS.map((o) => (
+          {organizations.map((o) => (
             <button
               key={o.id}
               role="option"

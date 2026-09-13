@@ -16,3 +16,19 @@ DEMO_CONTROLS = {
     "A005": {"mfa_coverage": 0.40, "edr_coverage": 0.70, "waf_enabled": False, "patch_compliance": 0.70, "segmentation": 0.80, "logging_coverage": 0.60},
     "A006": {"mfa_coverage": 0.20, "edr_coverage": 0.50, "waf_enabled": False, "patch_compliance": 0.30, "segmentation": 0.90, "logging_coverage": 0.40},
 }
+
+# Used when an asset has no explicit posture in DEMO_CONTROLS above.
+# Represents an "average, unassessed" control posture - NOT zero coverage.
+# Using zero for unmodeled assets would silently make every asset outside the
+# original 6-asset demo look maximally vulnerable, which is not a real signal,
+# just a gap in demo data entry.
+DEFAULT_CONTROLS = {
+    "mfa_coverage": 0.55, "edr_coverage": 0.65, "waf_enabled": False,
+    "patch_compliance": 0.55, "segmentation": 0.50, "logging_coverage": 0.60,
+}
+
+
+def get_controls_for_asset(asset_id: str, organization_id=None) -> dict:
+    from backend.data_access import load_control_posture
+
+    return load_control_posture(asset_id, organization_id=organization_id)

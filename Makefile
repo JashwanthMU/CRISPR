@@ -1,14 +1,46 @@
+.PHONY: help dev frontend bug-bounty build up down logs migrate test test-backend test-frontend audit
+
+PYTHON ?= python3
+COMPOSE ?= docker compose
+
+help:
+	@echo "CRISPR development commands"
+	@echo "  make up             Build and start the complete stack"
+	@echo "  make test           Run backend tests and frontend build"
+	@echo "  make migrate        Apply database migrations"
+	@echo "  make audit          Run the technical audit in demo mode"
+
 dev:
-	uvicorn backend.app.main:app --reload --port 8000
+	$(PYTHON) -m uvicorn backend.app.main:app --reload --port 8000
 
 frontend:
-	cd frontend && npm run dev
+	npm --prefix frontend run dev
 
-docker:
-	docker-compose up --build
+bug-bounty:
+	npm --prefix bug-bounty run dev
 
-seed:
-	python backend/ingestion/seed.py
+build:
+	$(COMPOSE) build
 
-test:
-	pytest backend/tests/ -v
+up:
+	$(COMPOSE) up -d --build
+
+down:
+	$(COMPOSE) down
+
+logs:
+	$(COMPOSE) logs --tail=100 backend worker
+
+migrate:
+	$(COMPOSE) exec backend alembic upgrade head
+
+test: test-backend test-frontend
+
+test-backend:
+	$(PYTHON) -m pytest backend -q
+
+test-frontend:
+	npm --prefix frontend run build
+
+audit:
+	CRISPR_DATA_MODE=demo $(PYTHON) tools/audits/sih_jury_audit.py

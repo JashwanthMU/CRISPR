@@ -12,3 +12,11 @@ __pycache__/
 .pytest_cache/
 node_modules/
 dist/
+test_model.py
+debug*.py
+fix_knapsack*.py
+update_docs.py
+generate_ml_pipeline.py
+bandit_report.json
+test_ml_interactive.py
+test_ml_technical_jury.py

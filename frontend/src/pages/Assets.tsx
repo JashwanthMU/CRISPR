@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Globe, Lock, AlertTriangle } from 'lucide-react';
 import RiskScoreBadge from '../components/common/RiskScoreBadge';
@@ -7,6 +8,7 @@ import FilterBar from '../components/common/FilterBar';
 import { getAssets, getRisks, getFindings } from '../services/api';
 import { MOCK_ASSETS, MOCK_RISKS, MOCK_FINDINGS } from '../utils/mock';
 import { formatRupees, riskColor, TOKENS } from '../utils/format';
+import { API_MODE } from '../lib/api';
 
 const TYPE_LABELS: Record<string, string> = {
   api_gateway: 'API Gateway',
@@ -16,9 +18,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Assets() {
-  const [assets, setAssets] = useState<any[]>(MOCK_ASSETS);
-  const [risks, setRisks] = useState<any[]>(MOCK_RISKS);
-  const [findings, setFindings] = useState<any[]>(MOCK_FINDINGS);
+  const { t } = useLanguage();
+  const [assets, setAssets] = useState<any[]>(API_MODE === 'demo' ? MOCK_ASSETS : []);
+  const [risks, setRisks] = useState<any[]>(API_MODE === 'demo' ? MOCK_RISKS : []);
+  const [findings, setFindings] = useState<any[]>(API_MODE === 'demo' ? MOCK_FINDINGS : []);
+  const [loading, setLoading] = useState(API_MODE !== 'demo');
+  const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -29,7 +34,8 @@ export default function Assets() {
       if (a?.data) setAssets(a.data);
       if (r?.data) setRisks(r.data);
       if (f?.data) setFindings(f.data);
-    });
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const riskFor = (assetId: string) => risks.find((r) => r.asset_id === assetId);
@@ -50,13 +56,14 @@ export default function Assets() {
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
-        <h1 className="page-title">Asset Inventory</h1>
+        <h1 className="page-title">{t("Asset Inventory")}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-          Business-context-enriched inventory of NovaPay's critical assets
+          Business-context-enriched inventory of the organization’s critical assets
         </p>
       </div>
 
       <div className="card">
+        {error && <div className="empty-state">Live asset data unavailable: {error}</div>}
         <FilterBar
           search={search}
           onSearchChange={setSearch}
@@ -90,12 +97,17 @@ export default function Assets() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        {filteredAssets.length === 0 && (
+        {loading && (
+          <div className="card" style={{ gridColumn: 'span 3' }}>
+            <div className="empty-state">Loading…</div>
+          </div>
+        )}
+        {!loading && filteredAssets.length === 0 && (
           <div className="card" style={{ gridColumn: 'span 3' }}>
             <div className="empty-state">No assets match the current filters.</div>
           </div>
         )}
-        {filteredAssets.map((a) => {
+        {!loading && filteredAssets.map((a) => {
           const risk = riskFor(a.asset_id);
           const expanded = expandedId === a.asset_id;
           const isTestServer = a.asset_id === 'A006';
@@ -231,9 +243,9 @@ export default function Assets() {
                     <table className="data-table">
                       <thead>
                         <tr>
-                          <th>Severity</th>
+                          <th>{t("Severity")}</th>
                           <th>Title</th>
-                          <th>Status</th>
+                          <th>{t("Status")}</th>
                         </tr>
                       </thead>
                       <tbody>

@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useLanguage } from '../lib/i18n';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Github, Gitlab, GitCommit, ShieldAlert } from 'lucide-react';
-import { REPOSITORIES, CODE_ISSUES, SCA_FINDINGS } from '../demo/fixtures';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import OpenPrModal from '../components/codesecurity/OpenPrModal';
 import EmptyState from '../components/common/EmptyState';
 import { TOKENS } from '../utils/format';
+import { getRepository, getScaFindings } from '../lib/api';
+import type { CodeIssue, Repository, SCAFinding } from '../types';
 
 const TABS = ['Overview', 'Findings', 'Dependencies', 'Secrets', 'IaC', 'Commits', 'Scans'];
 
@@ -17,16 +19,30 @@ const MOCK_COMMITS = [
 ];
 
 export default function RepositoryDetail() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const navigate = useNavigate();
-  const repo = REPOSITORIES.find((r) => r.id === id);
+  const [repo, setRepo] = useState<Repository | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [codeIssues] = useState<CodeIssue[]>([]);
+  const [scaFindings, setScaFindings] = useState<SCAFinding[]>([]);
   const [tab, setTab] = useState('Overview');
   const [prOpen, setPrOpen] = useState(false);
 
-  const issues = useMemo(() => CODE_ISSUES.filter((i) => i.repository === repo?.name), [repo]);
-  const sca = useMemo(() => SCA_FINDINGS.filter((f) => f.repository === repo?.name), [repo]);
+  const issues = useMemo(() => codeIssues.filter((i) => i.repository === repo?.name), [codeIssues, repo]);
+  const sca = useMemo(() => scaFindings.filter((f) => f.repository === repo?.name), [scaFindings, repo]);
   const iacIssues = issues.filter((i) => i.category === 'iac');
   const secretIssues = issues.filter((i) => i.category === 'secrets');
+
+  useEffect(() => {
+    if (!id) return;
+    getRepository(id).then(async (item) => {
+      setRepo(item);
+      if (item) setScaFindings(await getScaFindings(item.name) as SCAFinding[]);
+    }).finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <div className="page-container"><div className="card empty-state">Loading repository data…</div></div>;
 
   if (!repo) {
     return (
@@ -85,7 +101,7 @@ export default function RepositoryDetail() {
               <table className="data-table">
                 <tbody>
                   <tr>
-                    <td>Language</td>
+                    <td>{t("Language")}</td>
                     <td>{repo.language}</td>
                   </tr>
                   <tr>
@@ -126,9 +142,9 @@ export default function RepositoryDetail() {
             <thead>
               <tr>
                 <th>Rule</th>
-                <th>Severity</th>
+                <th>{t("Severity")}</th>
                 <th>Category</th>
-                <th>Status</th>
+                <th>{t("Status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -158,11 +174,11 @@ export default function RepositoryDetail() {
             <thead>
               <tr>
                 <th>CVE</th>
-                <th>Severity</th>
+                <th>{t("Severity")}</th>
                 <th>Component</th>
                 <th>Version</th>
                 <th>Fixed Version</th>
-                <th>Actions</th>
+                <th>{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -198,7 +214,7 @@ export default function RepositoryDetail() {
             <thead>
               <tr>
                 <th>Rule</th>
-                <th>Severity</th>
+                <th>{t("Severity")}</th>
                 <th>Occurrences</th>
               </tr>
             </thead>
@@ -228,7 +244,7 @@ export default function RepositoryDetail() {
             <thead>
               <tr>
                 <th>Rule</th>
-                <th>Severity</th>
+                <th>{t("Severity")}</th>
                 <th>Framework</th>
               </tr>
             </thead>

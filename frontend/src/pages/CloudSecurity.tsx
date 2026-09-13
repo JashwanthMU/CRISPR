@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { Cloud } from 'lucide-react';
 import KPICard from '../components/common/KPICard';
 import IntegrationLogo from '../components/common/IntegrationLogo';
@@ -5,25 +6,26 @@ import ProgressBar from '../components/common/ProgressBar';
 import { TOKENS } from '../utils/format';
 
 const CLOUD_ACCOUNTS = [
-  { provider: 'aws', name: 'novapay-prod', resources: 312, misconfigs: 27, score: 68 },
-  { provider: 'aws', name: 'novapay-staging', resources: 94, misconfigs: 8, score: 84 },
-  { provider: 'azure', name: 'novapay-corp (disconnected)', resources: 0, misconfigs: 0, score: 0 },
+  { provider: 'aws', name: 'company-prod', resources: 312, misconfigs: 27, score: 68 },
+  { provider: 'aws', name: 'company-staging', resources: 94, misconfigs: 8, score: 84 },
+  { provider: 'azure', name: 'company-corp (disconnected)', resources: 0, misconfigs: 0, score: 0 },
 ];
 
 const TOP_MISCONFIGS = [
-  { rule: 'S3 bucket allows public read access', resource: 'novapay-customer-exports', severity: 'CRITICAL', service: 'S3' },
-  { rule: 'Security group allows unrestricted ingress on port 22', resource: 'novapay-prod-bastion', severity: 'HIGH', service: 'EC2' },
+  { rule: 'S3 bucket allows public read access', resource: 'company-customer-exports', severity: 'CRITICAL', service: 'S3' },
+  { rule: 'Security group allows unrestricted ingress on port 22', resource: 'company-prod-bastion', severity: 'HIGH', service: 'EC2' },
   { rule: 'IAM role has wildcard (*) resource permissions', resource: 'payments-service-role', severity: 'HIGH', service: 'IAM' },
   { rule: 'RDS instance without encryption at rest', resource: 'payments-db-replica', severity: 'CRITICAL', service: 'RDS' },
   { rule: 'CloudTrail logging disabled in one region', resource: 'ap-south-2', severity: 'MEDIUM', service: 'CloudTrail' },
 ];
 
 export default function CloudSecurity() {
+  const { t } = useLanguage();
   return (
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Cloud size={22} color="var(--color-primary-blue)" /> Cloud Security
+          <Cloud size={22} color="var(--color-primary-blue)" /> {t("Cloud Security")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Cloud security posture management (CSPM) across connected accounts
@@ -74,7 +76,7 @@ export default function CloudSecurity() {
               <th>Rule</th>
               <th>Resource</th>
               <th>Service</th>
-              <th>Severity</th>
+              <th>{t("Severity")}</th>
             </tr>
           </thead>
           <tbody>

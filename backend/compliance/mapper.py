@@ -13,8 +13,11 @@ COMPLIANCE_SCORES = {
 }
 
 FRAMEWORK_LABELS = {
-    "ISO_27001": "ISO 27001", "NIST_CSF": "NIST CSF", "CIS_CONTROLS": "CIS Controls",
-    "RBI_CSF": "RBI CSF", "SEBI_CSCRF": "SEBI CSCRF",
+    "ISO_27001": "ISO/IEC 27001:2022",
+    "NIST_CSF": "NIST Cybersecurity Framework 2.0",
+    "CIS_CONTROLS": "CIS Controls v8.1",
+    "RBI_CSF": "RBI Cyber Security Framework for Banks (2016)",
+    "SEBI_CSCRF": "SEBI Cybersecurity and Cyber Resilience Framework (2024)",
 }
 
 

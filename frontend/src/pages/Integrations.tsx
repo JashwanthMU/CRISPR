@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { Plug, RefreshCw, Settings2, Power, PlugZap } from 'lucide-react';
 import { INTEGRATIONS } from '../demo/fixtures';
@@ -5,7 +6,8 @@ import IntegrationLogo from '../components/common/IntegrationLogo';
 import { toast } from '../lib/toastStore';
 import { TOKENS } from '../utils/format';
 import type { Integration, IntegrationStatus } from '../types';
-import { getSources } from '../services/api';
+import { getIntegrations, httpClient } from '../lib/api';
+import { isDemoOrganization } from '../lib/auth';
 
 const STATUS_COLOR: Record<IntegrationStatus, string> = {
   connected: TOKENS.success,
@@ -24,61 +26,90 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
 };
 
 export default function Integrations() {
-  const [items, setItems] = useState<Integration[]>(INTEGRATIONS.map((i) => ({ ...i })));
+  const { t } = useLanguage();
+  const demoOrganization = isDemoOrganization();
+  const [items, setItems] = useState<Integration[]>(demoOrganization ? INTEGRATIONS.map((i) => ({ ...i })) : []);
 
   useEffect(() => {
-    getSources().then((response) => {
-      const sources = response?.data ?? [];
-      const sourceByKey = new Map<string, any>(
-        sources.map((source: any) => [String(source.source).toLowerCase().replace(/_/g, ''), source]),
-      );
-      setItems((current) => current.map((integration) => {
-        const source = sourceByKey.get(integration.key.replace(/_/g, ''));
-        return source
-          ? { ...integration, status: source.status, itemsIngested: source.count }
-          : integration;
-      }));
+    if (demoOrganization) {
+      setItems(INTEGRATIONS.map((item) => ({ ...item })));
+      return;
+    }
+    getIntegrations().then(setItems).catch((error) => {
+      toast.error('Integrations unavailable', error?.response?.data?.detail ?? error.message);
     });
-  }, []);
+  }, [demoOrganization]);
 
   useEffect(() => {
-    // Simulate any items in 'connecting' state resolving to 'connected' after a delay.
-    const connecting = items.filter((i) => i.status === 'connecting');
-    if (connecting.length === 0) return;
-    const timer = setTimeout(() => {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.status === 'connecting'
-            ? { ...i, status: 'connected', lastSync: new Date().toISOString(), itemsIngested: Math.floor(Math.random() * 40) + 5 }
-            : i
-        )
-      );
-      connecting.forEach((i) => toast.success(`${i.name} connected`, 'Initial sync completed successfully.'));
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, [items]);
+    if (!demoOrganization) return;
+    const connecting = items.filter((item) => item.status === 'connecting');
+    if (!connecting.length) return;
+    const timer = window.setTimeout(() => {
+      setItems((current) => current.map((item) => item.status === 'connecting'
+        ? { ...item, status: 'connected', lastSync: new Date().toISOString(), itemsIngested: 24 }
+        : item));
+      connecting.forEach((item) => toast.success(`${item.name} connected`, 'Demo synchronization completed successfully.'));
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [demoOrganization, items]);
 
   const connect = (id: string) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connecting' } : i)));
-    toast.info('Connecting…', 'Establishing a secure connection and requesting scopes.');
+    if (!demoOrganization) {
+      toast.info('Credential required', 'Configure a GitHub token and organization through the integration configuration endpoint.');
+      return;
+    }
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'connecting' } : item));
+    toast.info('Connecting demo source…', 'Running the deterministic SIH demonstration flow.');
   };
 
-  const reconnect = (id: string) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
-    setTimeout(() => {
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'connected', lastSync: new Date().toISOString() } : i)));
-      toast.success('Reconnected', 'Sync completed successfully.');
-    }, 1400);
+  const reconnect = async (id: string) => {
+    if (!demoOrganization) {
+      try {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'syncing' } : i)));
+        await httpClient.post(`/api/integrations/${id}/reconnect`);
+        await httpClient.post(`/api/integrations/${id}/sync`);
+        setItems(await getIntegrations());
+        toast.success('Sync queued', 'Credentials were verified and a durable synchronization job was queued.');
+      } catch (error: any) {
+        setItems(await getIntegrations().catch(() => items));
+        toast.error('Reconnect failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'syncing' } : item));
+    window.setTimeout(() => {
+      setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'connected', lastSync: new Date().toISOString() } : item));
+      toast.success('Demo source reconnected', 'Deterministic synchronization completed.');
+    }, 1000);
   };
 
-  const disable = (id: string) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'disconnected', itemsIngested: 0 } : i)));
-    toast.warning('Integration disabled', 'Ingestion has been paused for this source.');
+  const disable = async (id: string) => {
+    if (!demoOrganization) {
+      try {
+        await httpClient.post(`/api/integrations/${id}/disable`);
+        setItems(await getIntegrations());
+        toast.warning('Integration disabled', 'The stored credential was removed and synchronization stopped.');
+      } catch (error: any) {
+        toast.error('Disable failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
+    setItems((current) => current.map((item) => item.id === id ? { ...item, status: 'disconnected', itemsIngested: 0 } : item));
+    toast.warning('Demo integration disabled', 'The demonstration source has been paused.');
   };
 
-  const testConnection = (name: string) => {
-    toast.info('Testing connection…');
-    setTimeout(() => toast.success('Connection healthy', `${name} responded in 214ms.`), 1000);
+  const testConnection = async (integration: Integration) => {
+    if (!demoOrganization) {
+      try {
+        const { data } = await httpClient.post(`/api/integrations/${integration.id}/reconnect`);
+        toast.success('Connection healthy', `${data.account ?? integration.name} authenticated successfully.`);
+      } catch (error: any) {
+        toast.error('Connection failed', error?.response?.data?.detail ?? error.message);
+      }
+      return;
+    }
+    toast.info('Testing demo connection…');
+    window.setTimeout(() => toast.success('Demo connection healthy', `${integration.name} responded successfully.`), 800);
   };
 
   const connectedCount = items.filter((i) => i.status === 'connected' || i.status === 'syncing').length;
@@ -87,7 +118,7 @@ export default function Integrations() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Plug size={22} color="var(--color-primary-blue)" /> Integrations
+          <Plug size={22} color="var(--color-primary-blue)" /> {t("Integrations")}
         </h1>
         <p className="page-subtitle">
           {connectedCount} of {items.length} sources connected · manage ingestion across code, cloud, identity, and threat intelligence
@@ -103,6 +134,9 @@ export default function Integrations() {
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>{integration.name}</div>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{integration.category.replace('_', ' ')}</div>
+                  {!demoOrganization && <div style={{ marginTop: 3, fontSize: '0.625rem', fontWeight: 700, color: 'var(--color-success)' }}>
+                    {integration.key === 'github' || integration.key === 'generic_http' ? 'LIVE ADAPTER' : 'PLANNED'}
+                  </div>}
                 </div>
               </div>
               <span
@@ -148,7 +182,7 @@ export default function Integrations() {
                   <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => reconnect(integration.id)}>
                     <RefreshCw size={12} /> Reconnect
                   </button>
-                  <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem' }} onClick={() => testConnection(integration.name)}>
+                  <button className="btn-secondary" style={{ padding: '6px 10px', fontSize: '0.6875rem' }} onClick={() => testConnection(integration)}>
                     Test
                   </button>
                   <button className="icon-btn" title="Configure" onClick={() => toast.info(`Configure ${integration.name}`, 'Configuration panel would open here.')}>

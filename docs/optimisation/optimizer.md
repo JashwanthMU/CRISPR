@@ -33,7 +33,7 @@ backend/
 │   └── simulator.py          ← what-if EAL recalculator
 ├── optimizer/
 │   ├── __init__.py
-│   └── knapsack.py           ← PuLP budget optimizer
+│   └── knapsack.py           ← dynamic marginal greedy optimizer
 ├── compliance/
 │   ├── __init__.py
 │   └── mapper.py             ← framework scores + gap analysis
@@ -151,7 +151,7 @@ Then open a PR on GitHub: **`optimizer → develop`**
 
 ```
 feat(scenarios): add presets endpoint with live EAL
-feat(optimizer): PuLP knapsack with greedy fallback
+feat(optimizer): dynamic marginal risk-reduction optimizer
 feat(compliance): add framework gaps with ₹ impact
 fix(optimizer): handle budget less than cheapest control
 test(member5): add unit tests for MFA scenario target

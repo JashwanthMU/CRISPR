@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useState } from 'react';
 import { Terminal as TerminalIcon, Copy, Check } from 'lucide-react';
 import { toast } from '../lib/toastStore';
@@ -8,16 +9,22 @@ const ENDPOINTS = [
   { method: 'GET', path: '/api/risks/:id', description: 'Get a single risk case by asset ID' },
   { method: 'GET', path: '/api/findings', description: 'List all findings across connected sources' },
   { method: 'GET', path: '/api/assets', description: 'List all monitored assets' },
-  { method: 'GET', path: '/api/repositories', description: 'List all connected code repositories' },
-  { method: 'GET', path: '/api/integrations', description: 'List integration status and sync health' },
-  { method: 'POST', path: '/api/analysis/run', description: 'Trigger a full ingestion → correlation → risk scan' },
+  { method: 'GET',  path: '/api/scenarios/presets', description: 'List 4 pre-built what-if scenarios with EAL impact' },
+  { method: 'GET',  path: '/api/scenarios', description: 'Run a custom scenario with control overrides' },
+  { method: 'GET',  path: '/api/scenarios/compare', description: 'Compare two scenarios side by side' },
   { method: 'POST', path: '/api/optimize', description: 'Run the budget optimizer for a given spend' },
+  { method: 'GET', path: '/api/ingestion/kev/feed', description: 'Read the official CISA Known Exploited Vulnerabilities catalogue' },
+  { method: 'POST', path: '/api/ingestion/kev/refresh', description: 'Attach current CISA KEV evidence to mapped live CVE findings' },
+  { method: 'GET',  path: '/api/optimize/controls', description: 'List all 7 controls with cost and risk reduction' },
+  { method: 'GET',  path: '/api/compliance', description: 'Framework scores: ISO 27001, NIST CSF, RBI CSF, SEBI CSCRF' },
+  { method: 'GET',  path: '/api/compliance/gaps', description: 'Top compliance gaps with financial impact in ₹' },
 ];
 
-const CURL_EXAMPLE = `curl -X GET "https://api.crispr.novapay.io/api/risks" \\
+const CURL_EXAMPLE = `curl -X GET "https://api.example.com/api/risks" \\
   -H "Authorization: Bearer $CRISPR_API_KEY"`;
 
 export default function ApiReference() {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
@@ -61,7 +68,7 @@ export default function ApiReference() {
             <tr>
               <th>Method</th>
               <th>Path</th>
-              <th>Description</th>
+              <th>{t("Description")}</th>
             </tr>
           </thead>
           <tbody>

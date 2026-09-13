@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLanguage, translate } from '../../lib/i18n';
 import { useNavigate } from 'react-router-dom';
 import { Search, FileWarning, Building2, AlertTriangle, GitBranch, ScrollText, LayoutDashboard, Bug, Sparkles } from 'lucide-react';
 import { useUiStore, closeCommandPalette, openAIDrawer } from '../../lib/uiStore';
-import { MOCK_FINDINGS, MOCK_ASSETS, MOCK_RISKS } from '../../utils/mock';
-import { REPOSITORIES } from '../../demo/fixtures';
 import { NAV_GROUPS } from '../shell/navConfig';
-import { runAnalysis } from '../../demo/demoStore';
+import { getAssets, getFindings, getRepositories, getRiskCases, runAnalysis } from '../../lib/api';
 import type { CommandResult, CommandResultType } from '../../types';
 
 // "Pages" results are derived from the single shared nav config (see
@@ -69,9 +68,11 @@ function pushRecent(term: string) {
 }
 
 export default function CommandPalette() {
+  const { language, t } = useLanguage();
   const open = useUiStore((s) => s.commandPaletteOpen);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [entities, setEntities] = useState<{ assets: any[]; findings: any[]; risks: any[]; repositories: any[] }>({ assets: [], findings: [], risks: [], repositories: [] });
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -80,6 +81,9 @@ export default function CommandPalette() {
       setQuery('');
       setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 10);
+      Promise.all([getAssets(), getFindings(), getRiskCases(), getRepositories()])
+        .then(([assets, findings, risks, repositories]) => setEntities({ assets, findings, risks, repositories }))
+        .catch(() => setEntities({ assets: [], findings: [], risks: [], repositories: [] }));
     }
   }, [open]);
 
@@ -87,18 +91,19 @@ export default function CommandPalette() {
 
   const results: AnyResult[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const actionMatches = ACTION_RESULTS.filter((a) => !q || a.title.toLowerCase().includes(q));
+    const matches = (title: string) => title.toLowerCase().includes(q) || translate(language, title).toLowerCase().includes(q);
+    const actionMatches = ACTION_RESULTS.filter((a) => !q || matches(a.title));
 
     if (!q) return [...PAGE_RESULTS, ...actionMatches];
 
-    const assetResults: CommandResult[] = MOCK_ASSETS.filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
+    const assetResults: CommandResult[] = entities.assets.filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
       id: a.asset_id,
       type: 'asset',
       title: a.name,
       subtitle: a.business_service,
       path: `/assets`,
     }));
-    const findingResults: CommandResult[] = MOCK_FINDINGS.filter(
+    const findingResults: CommandResult[] = entities.findings.filter(
       (f) => f.title.toLowerCase().includes(q) || f.finding_id.toLowerCase().includes(q) || f.cve?.toLowerCase().includes(q)
     ).map((f) => ({
       id: f.finding_id,
@@ -107,24 +112,24 @@ export default function CommandPalette() {
       subtitle: `${f.finding_id}${f.cve ? ' · ' + f.cve : ''}`,
       path: `/findings`,
     }));
-    const riskResults: CommandResult[] = MOCK_RISKS.filter((r) => r.asset_name.toLowerCase().includes(q)).map((r) => ({
+    const riskResults: CommandResult[] = entities.risks.filter((r) => r.asset_name.toLowerCase().includes(q)).map((r) => ({
       id: r.asset_id,
       type: 'risk_case',
       title: r.asset_name,
       subtitle: `Risk score ${r.risk_score}`,
       path: `/risks`,
     }));
-    const repoResults: CommandResult[] = REPOSITORIES.filter((r) => r.name.toLowerCase().includes(q)).map((r) => ({
+    const repoResults: CommandResult[] = entities.repositories.filter((r) => r.name.toLowerCase().includes(q)).map((r) => ({
       id: r.id,
       type: 'repository',
       title: r.name,
       subtitle: `Security score ${r.securityScore}`,
       path: `/code-security/repositories/${r.id}`,
     }));
-    const pageResults = PAGE_RESULTS.filter((p) => p.title.toLowerCase().includes(q));
+    const pageResults = PAGE_RESULTS.filter((p) => matches(p.title));
 
     return [...pageResults, ...assetResults, ...riskResults, ...findingResults, ...repoResults, ...actionMatches].slice(0, 20);
-  }, [query]);
+  }, [query, language, entities]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, AnyResult[]> = {};
@@ -232,8 +237,8 @@ export default function CommandPalette() {
                   >
                     <Icon size={15} color="var(--text-muted)" />
                     <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <div style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</div>
-                      {r.subtitle && <div className="command-result-sub">{r.subtitle}</div>}
+                      <div style={{ fontSize: '0.8125rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.type === 'page' || r.type === 'action' ? t(r.title) : r.title}</div>
+                      {r.subtitle && <div className="command-result-sub">{r.type === 'page' || r.type === 'action' ? t(r.subtitle) : r.subtitle}</div>}
                     </div>
                   </div>
                 );

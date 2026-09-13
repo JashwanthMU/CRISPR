@@ -1,10 +1,10 @@
 .git
-.env
+.venv
 **/__pycache__
-**/*.pyc
 **/.pytest_cache
-**/node_modules
-**/dist
-frontend/*.tsbuildinfo
-frontend/vite.config.js
-frontend/vite.config.d.ts
+frontend/node_modules
+frontend/dist
+crispr_products/**/node_modules
+crispr_products/**/dist
+*.pyc
+*.log

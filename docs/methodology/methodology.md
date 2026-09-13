@@ -31,20 +31,24 @@ CRISPR implements the **Factor Analysis of Information Risk (FAIR)** model, the 
 ### 1.1 Core Formula
 
 ```
-EAL = LEF × LM
+EAL = annual incident probability × LM
 
 where:
-  LEF = Loss Event Frequency = TEF × (1 − CE)
+  annual incident probability = current, approved organization evidence
   LM  = Loss Magnitude (₹)
-  TEF = Threat Event Frequency (events/year)
-  CE  = Control Effectiveness (0.0 – 1.0)
+  ML KEV score = prioritization only; excluded from EAL
 
-VaR (95th percentile) = EAL × 3.2
+VaR = percentile of 10,000 seeded annual portfolio-loss simulations
 ```
 
 ### 1.2 Likelihood Calculation
 
-Implemented in `backend/risk_engine/likelihood.py`:
+Demo mode retains a deterministic likelihood formula for fixture-based
+demonstration. Live mode does not use that formula for EAL. It requires a
+current record in `incident_frequency_assessments`, with methodology, evidence
+reference, confidence, observation time, and expiry.
+
+The legacy demo-only formula in `backend/risk_engine/likelihood.py` is:
 
 ```
 likelihood = Σ (feature_score × weight)
@@ -236,7 +240,7 @@ Implemented in `backend/optimizer/knapsack.py`.
 
 ### 7.1 Problem Formulation
 
-CRISPR treats security investment as a **Binary Integer Linear Programming** (BILP) problem:
+CRISPR treats security investment as a budget-constrained control-selection problem. The deployed solver recomputes each candidate's marginal benefit against the residual risk after controls already selected:
 
 ```
 Maximise:   Σ risk_reduction_inr[i] × x[i]
@@ -248,10 +252,7 @@ Where `x[i] = 1` means control `i` is selected for implementation.
 
 ### 7.2 Solver Strategy
 
-1. **Primary:** PuLP CBC mixed-integer solver (exact optimal solution)
-2. **Fallback:** Greedy knapsack (sort by `reduction_inr / cost_inr` ratio, pick greedily while budget allows)
-
-The greedy fallback ensures the system is always functional even without the PuLP dependency installed — important for environments without build tools.
+The deployed `greedy_dynamic` solver repeatedly simulates every affordable remaining control, selects the highest marginal risk-reduction-per-rupee candidate, then recalculates residual risk. This prevents overlapping controls from claiming the same full benefit. It is deterministic and budget-safe, but it is a heuristic and is not presented as a proof of global optimality.
 
 ### 7.3 Control Catalogue
 

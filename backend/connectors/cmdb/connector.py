@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from backend.data_access import demo_mode_enabled, load_assets
 
 
 DATA_PATH = Path(__file__).resolve().parents[3] / "data/demo/assets.json"
@@ -12,8 +13,8 @@ def fetch_findings() -> list[dict]:
 
 
 def get_source_info() -> dict:
-    if not DATA_PATH.exists():
+    try:
+        assets = load_assets()
+    except Exception:
         return {"source": "CMDB", "name": "Asset CMDB", "status": "disconnected", "count": 0}
-    with DATA_PATH.open(encoding="utf-8") as file:
-        assets = json.load(file)
     return {"source": "CMDB", "name": "Asset CMDB", "status": "connected", "count": len(assets)}

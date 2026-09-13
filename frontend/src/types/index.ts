@@ -85,6 +85,7 @@ export interface Asset {
   is_regulated: boolean;
   value_inr: number;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   control_effectiveness: number;
   controls?: AssetControls;
   environment?: 'production' | 'staging' | 'development';
@@ -104,6 +105,8 @@ export interface Finding {
   title: string;
   cve?: string;
   cvss?: number;
+  exploited_in_wild?: boolean;
+  patch_available?: boolean;
   severity: Severity;
   confidence: number; // 0..1
   first_seen: string;
@@ -139,11 +142,18 @@ export interface RiskCase {
   asset_name: string;
   business_service: string;
   business_criticality: number;
+  criticality_breakdown?: Record<string, { normalized_value: number; weight: number; contribution: number }>;
   eal_inr: number;
   eal_lakh: number;
   risk_score: number;
   likelihood: number;
   control_effectiveness_pct: number;
+  control_effectiveness_evidence?: {
+    source: string;
+    formula: string;
+    current_posture: Record<string, number | boolean>;
+    calculated_effectiveness: number;
+  };
   sources: SourceType[];
   confidence_pct: number;
   loss_breakdown: LossBreakdown;
@@ -153,6 +163,24 @@ export interface RiskCase {
   lastUpdated?: string;
   severity?: Severity;
   exposure?: 'INTERNET' | 'INTERNAL' | 'ISOLATED';
+  exploitation_priority?: {
+    score?: number | null;
+    ranking_score?: number | null;
+    tier?: string | null;
+    model?: string | null;
+    model_version?: string | null;
+    semantics: string;
+  };
+  annual_frequency?: {
+    probability: number;
+    semantics: string;
+    evidence?: Record<string, unknown>;
+  };
+  model_contributions?: {
+    base_value: number;
+    note: string;
+    top_contributors: Array<{ feature: string; shap_value: number }>;
+  } | null;
 }
 
 // ----------------------------------------------------------------------------
@@ -282,12 +310,15 @@ export interface AttackPath {
   severity: Severity;
   nodes: AttackPathNode[];
   edges: AttackPathEdge[];
+  risk_score?: number;
+  confidence?: number;
+  financial_impact_inr?: number;
 }
 
 // ----------------------------------------------------------------------------
 // Remediation scenarios (new, camelCase — separate from legacy "Scenarios" what-if sim)
 // ----------------------------------------------------------------------------
-export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'RESOLVED';
+export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'BLOCKED' | 'AT_RISK' | 'RESOLVED' | 'VERIFIED';
 
 export interface RemediationScenario {
   id: string;
@@ -302,6 +333,14 @@ export interface RemediationScenario {
   status: ScenarioStatus;
   repository?: string;
   branch?: string;
+  version?: number;
+  ticketKey?: string;
+  plannedDueAt?: string;
+  forecastDueAt?: string;
+  capabilityStatus?: 'READY' | 'READY_WITH_REVIEW' | 'TRAINING_REQUIRED' | 'SPECIALIST_REQUIRED' | 'UNKNOWN';
+  backupOwner?: Owner;
+  realizedRiskReductionInr?: number;
+  openDeliveryIssues?: number;
 }
 
 // ----------------------------------------------------------------------------
@@ -388,10 +427,10 @@ export interface Vulnerability {
   id: string;
   cve: string;
   severity: Severity;
-  cvss: number;
+  cvss: number | null;
   component: string;
   affectedAssets: string[];
-  exploitAvailable: boolean;
-  patchAvailable: boolean;
+  exploitAvailable: boolean | null;
+  patchAvailable: boolean | null;
   status: FindingStatus;
 }

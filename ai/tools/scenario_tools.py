@@ -6,41 +6,33 @@ which poison direct calls; going to the engine keeps results identical to
 GET /api/scenarios while staying safe for in-process use.
 """
 
-import json
-from pathlib import Path
-
-from backend.app.api.risks import get_enterprise_summary
-from backend.scenario_engine.simulator import align_enterprise_baseline, simulate_enterprise
-
-_ASSETS_PATH = Path(__file__).resolve().parents[2] / "data" / "demo" / "assets.json"
+from backend.data_access import load_assets
+from backend.scenario_engine.simulator import simulate_enterprise
 
 
-def _assets() -> list:
-    with _ASSETS_PATH.open(encoding="utf-8") as file:
-        return json.load(file)
+def _assets(organization_id) -> list:
+    return load_assets(organization_id=organization_id)
 
 
-def _run(overrides: dict) -> dict:
-    result = simulate_enterprise(_assets(), overrides)
-    baseline = get_enterprise_summary()["total_eal_inr"]
-    return align_enterprise_baseline(result, baseline)
+def _run(overrides: dict, organization_id) -> dict:
+    return simulate_enterprise(_assets(organization_id), overrides, organization_id=organization_id)
 
 
-def get_current_state() -> dict:
-    return _run({})
+def get_current_state(organization_id) -> dict:
+    return _run({}, organization_id)
 
 
-def simulate_mfa() -> dict:
-    return _run({"implement_mfa": True})
+def simulate_mfa(organization_id) -> dict:
+    return _run({"implement_mfa": True}, organization_id)
 
 
-def simulate_patch_delay(days: int = 30) -> dict:
-    return _run({"patch_delay": int(days)})
+def simulate_patch_delay(days: int = 30, organization_id=None) -> dict:
+    return _run({"patch_delay": int(days)}, organization_id)
 
 
-def simulate_patching_now() -> dict:
-    return _run({"implement_patching": True})
+def simulate_patching_now(organization_id) -> dict:
+    return _run({"implement_patching": True}, organization_id)
 
 
-def simulate_segmentation() -> dict:
-    return _run({"implement_segmentation": True})
+def simulate_segmentation(organization_id) -> dict:
+    return _run({"implement_segmentation": True}, organization_id)

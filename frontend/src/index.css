@@ -417,6 +417,24 @@ h3 {
 .reference-login-form-wrap h2 { color: var(--color-text-primary); font-size: 1.85rem; font-weight: 600; letter-spacing: -.025em; text-align: center; }
 .reference-login-intro { max-width: 360px; margin: 10px auto 34px; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.55; text-align: center; }
 .reference-login-form-wrap form { display: grid; gap: 19px; }
+.demo-workspace-fieldset { min-width: 0; margin: 0 0 18px; padding: 0; border: 0; }
+.demo-workspace-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.demo-workspace-heading legend { padding: 0; color: var(--color-text-primary); font-size: .625rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
+.demo-workspace-heading span { color: var(--color-primary-blue); font-size: .625rem; white-space: nowrap; }
+.demo-workspace-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.demo-workspace-card { min-width: 0; min-height: 106px; padding: 10px 11px; text-align: left; color: var(--color-text-primary); background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: 0 2px 7px rgba(60,64,67,.08); cursor: pointer; transition: border-color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast), transform var(--motion-fast); }
+.demo-workspace-card:hover { border-color: #a8c7fa; box-shadow: 0 3px 9px rgba(60,64,67,.12); transform: translateY(-1px); }
+.demo-workspace-card:focus-visible { outline: 2px solid var(--color-primary-blue); outline-offset: 2px; }
+.demo-workspace-card.selected { background: #f3f6fc; border-color: var(--color-primary-blue); box-shadow: 0 0 0 1px rgba(26,115,232,.08), 0 3px 9px rgba(60,64,67,.1); }
+.demo-workspace-card-top { min-height: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.demo-workspace-icon { width: 22px; height: 22px; display: grid; place-items: center; color: var(--color-text-secondary); background: #e8eaed; border-radius: 5px; }
+.demo-workspace-card.selected .demo-workspace-icon { color: #fff; background: var(--color-primary-blue); }
+.demo-workspace-selected { padding: 2px 7px; color: var(--color-primary-blue); background: #e8f0fe; border: 1px solid #c6dafc; border-radius: 999px; font-size: .5625rem; font-weight: 600; line-height: 1.2; }
+.demo-workspace-title { display: block; margin-top: 7px; color: var(--color-text-primary); font-size: .75rem; line-height: 1.2; }
+.demo-workspace-description { display: block; margin-top: 3px; overflow: hidden; color: var(--color-text-secondary); font-size: .625rem; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.demo-workspace-profile { display: grid; gap: 1px; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--color-border); }
+.demo-workspace-profile small { color: var(--color-text-secondary); font-size: .5rem; letter-spacing: .06em; text-transform: uppercase; }
+.demo-workspace-profile strong { overflow: hidden; color: var(--color-text-primary); font-size: .5625rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .reference-login-field { display: grid; gap: 8px; }
 .reference-login-field label { color: var(--color-text-primary); font-size: .74rem; font-weight: 600; }
 .reference-login-input { height: 47px; display: flex; align-items: center; gap: 11px; padding: 0 13px; color: var(--color-text-secondary); background: #fff; border: 1px solid var(--color-border); border-radius: 7px; transition: border-color var(--motion-fast), box-shadow var(--motion-fast); }
@@ -442,6 +460,17 @@ h3 {
   .reference-login-message > p, .reference-login-benefits, .reference-login-story-footer { display: none; }
   .reference-login-form-area { padding: 42px 34px; }
 }
+
+.attack-path-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.attack-path-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: .8125rem; }
+.attack-path-engine { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--color-primary-blue) 30%, var(--color-border)); border-radius: 999px; color: var(--color-primary-blue); background: color-mix(in srgb, var(--color-primary-blue) 7%, var(--color-bg-primary)); font-size: .75rem; white-space: nowrap; }
+.attack-graph-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.attack-graph-title > div { display: flex; align-items: center; gap: 8px; font-size: .8125rem; font-weight: 700; }
+.attack-graph-title > span { color: var(--text-muted); font-size: .6875rem; }
+@media (max-width: 600px) {
+  .attack-path-heading, .attack-graph-title { align-items: flex-start; flex-direction: column; }
+  .attack-path-engine { align-self: flex-start; }
+}
 @media (max-width: 520px) {
   .reference-login { align-items: start; padding: 14px; }
   .reference-login-shell { border-radius: 10px; }
@@ -452,6 +481,9 @@ h3 {
   .reference-login-form-area { padding: 30px 22px 34px; }
   .reference-login-form-wrap h2 { font-size: 1.55rem; }
   .reference-login-intro { margin-bottom: 26px; }
+  .demo-workspace-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .demo-workspace-grid { grid-template-columns: 1fr; }
+  .demo-workspace-card { min-height: 102px; }
 }
 
 .page-title {
@@ -755,40 +787,27 @@ table.data-table tbody tr[aria-selected='true'] {
    Shell: sidebar, tooltips, command palette, toasts, drawers, pipeline
    ============================================================================ */
 
-/* Sidebar tooltip (collapsed mode) — white surface, bordered, per spec
-   ("Tooltip: white, border #DADCE0, subtle shadow, text #202124"). Fades in
-   with a slight horizontal shift. Rendered unconditionally when collapsed
-   and revealed purely via CSS hover/focus so it never fights React timing. */
-.nav-tooltip {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%) translateX(2px);
+.sidebar-floating-tooltip {
+  position: fixed;
+  transform: translateY(-50%);
+  z-index: 10000;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
   font-size: 0.75rem;
   font-weight: 500;
+  line-height: 1.3;
   white-space: nowrap;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 150ms var(--ease-standard), transform 150ms var(--ease-standard);
-  z-index: 100;
-  box-shadow: var(--shadow-md);
-  margin-left: 10px;
+  animation: sidebar-tooltip-in 120ms var(--ease-standard);
 }
-.sidebar-item.collapsed:hover .nav-tooltip,
-.sidebar-item.collapsed:focus-visible .nav-tooltip,
-.sidebar-brand:hover .nav-tooltip,
-.sidebar-brand:focus-visible .nav-tooltip,
-.sidebar-org-trigger:hover .nav-tooltip,
-.sidebar-org-trigger:focus-visible .nav-tooltip,
-.sidebar-utility-btn:hover .nav-tooltip,
-.sidebar-utility-btn:focus-visible .nav-tooltip {
-  opacity: 1;
-  transform: translateY(-50%) translateX(8px);
+
+@keyframes sidebar-tooltip-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-3px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 /* Generic tooltip used on metric cards etc. */
@@ -1563,6 +1582,16 @@ table.density-comfortable th {
   padding: 8px;
   min-height: 0;
 }
+.app-sidebar.sidebar-collapsed .sidebar-nav {
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.app-sidebar.sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .sidebar-group {
   margin-bottom: 2px;
 }
@@ -1681,11 +1710,6 @@ table.density-comfortable th {
 .sidebar-item.collapsed .sidebar-item-active-bar {
   left: 0;
 }
-.sidebar-item.collapsed:hover .nav-tooltip,
-.sidebar-item.collapsed:focus-visible .nav-tooltip {
-  opacity: 1;
-}
-
 /* ---- Footer / utility rail ---------------------------------------------- */
 .sidebar-footer {
   flex-shrink: 0;
@@ -1718,10 +1742,6 @@ table.density-comfortable th {
   justify-content: center;
   padding: 10px 0;
 }
-.app-sidebar.sidebar-collapsed .sidebar-utility-btn:hover .nav-tooltip {
-  opacity: 1;
-}
-
 /* ---- Resize handle -------------------------------------------------- */
 .sidebar-resizer {
   position: absolute;
@@ -1868,6 +1888,8 @@ table.density-comfortable th {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: 20px;
@@ -1901,10 +1923,6 @@ table.density-comfortable th {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.topbar-search-kbd {
-  flex-shrink: 0;
-}
-
 /* ---- Ask CRISPR AI button ---------------------------------------------- */
 .topbar-ai-btn {
   display: flex;
@@ -2544,12 +2562,22 @@ table.density-comfortable th {
   .app-sidebar {
     width: 72px !important;
   }
+  .app-sidebar .sidebar-nav {
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .app-sidebar .sidebar-nav::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
   .app-sidebar .sidebar-brand-text,
   .app-sidebar .sidebar-org-text,
   .app-sidebar .sidebar-org-chevron,
   .app-sidebar .sidebar-group-header,
   .app-sidebar .sidebar-item-label,
-  .app-sidebar .sidebar-utility-btn span:not(.nav-tooltip),
+  .app-sidebar .sidebar-utility-btn span,
   .app-sidebar .sidebar-resizer {
     display: none !important;
   }
@@ -2563,7 +2591,9 @@ table.density-comfortable th {
 
 @media (max-width: 768px) {
   .app-shell {
-    grid-template-columns: 0 1fr;
+    /* The fixed sidebar is removed from grid flow at this breakpoint, so the
+       application content must occupy the first (and only) grid track. */
+    grid-template-columns: minmax(0, 1fr);
   }
   .app-sidebar {
     position: fixed;
@@ -2620,6 +2650,523 @@ table.density-comfortable th {
     width: 94vw;
   }
   .page-container {
-    padding: 0 4px;
+    padding: 0;
+  }
+
+  .app-main {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .app-main main {
+    padding: 16px 12px 24px;
+    overflow-x: hidden;
+  }
+
+  .page-stack {
+    gap: 18px;
+  }
+
+  /* Several dashboard pages build their desktop layouts with inline grid
+     templates. At phone widths every content grid becomes a readable vertical
+     flow, including scenario forms, asset cards, recommendations and the
+     compliance detail region. */
+  .page-container [style*="display: grid"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .page-container [style*="display: grid"] > *,
+  .page-container .card,
+  .page-container .metric-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-container [style*="display: flex"][style*="justify-content: space-between"] {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  /* Preserve every data column while keeping horizontal movement local to the
+     table. The page itself never acquires a sideways scrollbar. */
+  .page-container table.data-table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-container table.data-table thead,
+  .page-container table.data-table tbody {
+    white-space: nowrap;
+  }
+
+  .page-container table.data-table td {
+    white-space: normal;
+    min-width: 96px;
+  }
+
+  .app-topheader {
+    min-height: 56px;
+    height: 56px;
+    flex-wrap: nowrap;
+    padding: 0 10px;
+    gap: 4px;
+  }
+
+  .topheader-left {
+    flex: 0 0 auto;
+  }
+
+  .topheader-left .topbar-project {
+    display: none;
+  }
+
+  .topheader-center {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .topheader-right {
+    flex: 0 0 auto;
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .topheader-right .topbar-activity,
+  .topheader-right .topbar-status,
+  .topheader-right .mobile-header-secondary,
+  .topheader-right .topbar-vdivider,
+  .topheader-right .run-analysis-btn,
+  .topheader-right > .icon-btn[aria-label*='Refresh'],
+  .topheader-right > .icon-btn[aria-label*='Export'] {
+    display: none !important;
+  }
+
+  .topheader-right .topbar-ai-btn {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .topheader-right .topbar-ai-btn span {
+    display: none;
+  }
+
+  .language-selector {
+    max-width: 108px;
+    padding: 4px 5px;
+    gap: 3px;
+  }
+
+  .language-selector select {
+    max-width: 72px;
+    min-width: 0;
+    font-size: 0.75rem;
+  }
+}
+.language-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  background: var(--color-bg);
+}
+.language-selector select {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: inherit;
+  background: inherit;
+  border: 0;
+  cursor: pointer;
+  max-width: 110px;
+  min-height: 28px;
+}
+.language-selector:focus-within { outline: 2px solid var(--color-primary-blue); outline-offset: 2px; }
+.login-language { display: flex; justify-content: flex-end; margin-bottom: 20px; }
+.language-help { font-size: 0.8125rem; color: var(--text-muted); line-height: 1.6; }
+@media (max-width: 1100px) {
+  .app-topheader { height: auto; min-height: 60px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  .topheader-right { flex-wrap: wrap; max-width: 100%; }
+}
+@media (max-width: 768px) {
+  .app-topheader { padding-left: 10px; padding-right: 10px; gap: 4px; }
+  .topheader-right { flex: 0 0 auto; width: auto; justify-content: flex-end; }
+}
+
+/* Translated labels are often wider and use taller glyphs. These rules let
+   shared surfaces grow or wrap without allowing text to collide with nearby
+   controls. They intentionally apply only outside the English layout. */
+html:not([lang='en']) body {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+html:not([lang='en']) .page-title {
+  line-height: 1.3;
+}
+
+html:not([lang='en']) .page-subtitle,
+html:not([lang='en']) .card-title,
+html:not([lang='en']) .metric-card,
+html:not([lang='en']) .card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html:not([lang='en']) .btn-primary,
+html:not([lang='en']) .btn-secondary,
+html:not([lang='en']) .btn-ghost,
+html:not([lang='en']) .chip {
+  height: auto;
+  min-height: 34px;
+  line-height: 1.35;
+  white-space: normal;
+  text-align: center;
+}
+
+html:not([lang='en']) .metric-card:has(.demo-badge) {
+  padding-top: 42px;
+}
+
+html:not([lang='en']) .demo-badge {
+  left: 16px;
+  right: auto;
+}
+
+html:not([lang='en']) .demo-workspace-card {
+  height: auto;
+  min-height: 118px;
+}
+
+html:not([lang='en']) .login-submit,
+html:not([lang='en']) .enterprise-login-submit,
+html:not([lang='en']) .reference-login-submit {
+  height: auto;
+  min-height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+html:not([lang='en']) .demo-workspace-heading span,
+html:not([lang='en']) .demo-workspace-selected {
+  white-space: normal;
+  text-align: end;
+}
+
+html:not([lang='en']) .demo-workspace-description {
+  display: -webkit-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+html:not([lang='en']) .demo-workspace-heading,
+html:not([lang='en']) .demo-workspace-card-top,
+html:not([lang='en']) .drawer-header,
+html:not([lang='en']) .notif-panel-header,
+html:not([lang='en']) .ai-drawer-header,
+html:not([lang='en']) .data-table-toolbar,
+html:not([lang='en']) .data-table-pagination {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+html:not([lang='en']) table.data-table th {
+  min-width: 96px;
+  white-space: normal;
+  line-height: 1.35;
+  vertical-align: bottom;
+}
+
+html:not([lang='en']) table.data-table td {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+html:not([lang='en']) .drawer-tab,
+html:not([lang='en']) .topbar-dropdown-option,
+html:not([lang='en']) .sidebar-org-option {
+  line-height: 1.4;
+}
+
+html:not([lang='en']) .app-sidebar:not(.sidebar-collapsed) .sidebar-item {
+  align-items: flex-start;
+}
+
+html:not([lang='en']) .app-sidebar:not(.sidebar-collapsed) .sidebar-item-label {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.4;
+}
+
+html:not([lang='en']) .app-sidebar:not(.sidebar-collapsed) .sidebar-group-body.expanded {
+  max-height: 800px;
+}
+
+html:not([lang='en']) .topbar-project-trigger,
+html:not([lang='en']) .topbar-ai-btn,
+html:not([lang='en']) .topbar-status {
+  height: auto;
+  min-height: 34px;
+  line-height: 1.35;
+}
+
+html:not([lang='en']) .status-popover-row,
+html:not([lang='en']) .status-popover-value {
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+html:not([lang='en']) .ai-drawer-title,
+html:not([lang='en']) .notif-item-title,
+html:not([lang='en']) .notif-item-body,
+html:not([lang='en']) .user-menu-item {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+html:not([lang='en']) .page-container [style*="justify-content: space-between"] {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+/* Pages contain several small, inline-styled horizontal rows. Translation can
+   make any one of them wider than its card, so give all horizontal page rows
+   the same wrapping and shrinking behavior. Column layouts are excluded. */
+html:not([lang='en']) .page-container [style*="display: flex"]:not([style*="flex-direction: column"]),
+html:not([lang='en']) .drawer-body [style*="display: flex"]:not([style*="flex-direction: column"]),
+html:not([lang='en']) .modal-panel [style*="display: flex"]:not([style*="flex-direction: column"]) {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+html:not([lang='en']) .page-container [style*="display: grid"],
+html:not([lang='en']) .responsive-grid-2,
+html:not([lang='en']) .responsive-grid-3,
+html:not([lang='en']) .responsive-grid-4,
+html:not([lang='en']) .dashboard-grid-2,
+html:not([lang='en']) .dashboard-grid-3 {
+  min-width: 0;
+}
+
+html:not([lang='en']) .page-container [style*="display: grid"] > *,
+html:not([lang='en']) .responsive-grid-2 > *,
+html:not([lang='en']) .responsive-grid-3 > *,
+html:not([lang='en']) .responsive-grid-4 > *,
+html:not([lang='en']) .dashboard-grid-2 > *,
+html:not([lang='en']) .dashboard-grid-3 > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+html:not([lang='en']) .topbar-dropdown,
+html:not([lang='en']) .sidebar-org-dropdown,
+html:not([lang='en']) .status-popover,
+html:not([lang='en']) .user-menu-panel,
+html:not([lang='en']) .notif-panel {
+  width: max-content;
+  min-width: min(220px, calc(100vw - 24px));
+  max-width: min(380px, calc(100vw - 24px));
+}
+
+html:not([lang='en']) .topbar-dropdown-option,
+html:not([lang='en']) .sidebar-org-option,
+html:not([lang='en']) .user-menu-item {
+  min-height: 36px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+html:not([lang='en']) .pipeline-stage {
+  min-width: 112px;
+}
+
+html:not([lang='en']) .pipeline-stage > span,
+html:not([lang='en']) .pipeline-stage > div:not(.pipeline-node):not(.pipeline-connector) {
+  max-width: 100%;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+}
+
+/* Tamil action labels are substantially wider in the global toolbar. Keep
+   that toolbar on one predictable row and expose compact actions by icon. */
+@media (min-width: 769px) {
+  html[lang='ta'] .app-topheader {
+    height: 60px;
+    min-height: 60px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  html[lang='ta'] .topheader-left {
+    flex: 0 1 30%;
+    gap: 8px;
+  }
+  html[lang='ta'] .topheader-center {
+    order: initial;
+    flex: 1 1 220px;
+  }
+  html[lang='ta'] .topheader-right {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin-left: 0;
+  }
+  html[lang='ta'] .topbar-search,
+  html[lang='ta'] .topbar-search.focused {
+    width: min(100%, 360px);
+  }
+  html[lang='ta'] .topbar-ai-btn {
+    width: 36px;
+    padding: 8px;
+    justify-content: center;
+  }
+  html[lang='ta'] .topbar-ai-btn span,
+  html[lang='ta'] .topbar-status-label,
+  html[lang='ta'] .run-analysis-label {
+    display: none;
+  }
+  html[lang='ta'] .topbar-status {
+    width: 30px;
+    padding: 8px;
+    justify-content: center;
+  }
+  html[lang='ta'] .run-analysis-btn {
+    width: 36px;
+    min-width: 36px !important;
+    padding: 8px !important;
+  }
+  html[lang='ta'] .topbar-vdivider {
+    margin: 0 2px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1050px) {
+  html[lang='ta'] .topbar-project-trigger span,
+  html[lang='ta'] .topbar-project-trigger svg:last-child {
+    display: none;
+  }
+  html[lang='ta'] .topbar-project-trigger {
+    width: 34px;
+    padding: 8px;
+    justify-content: center;
+  }
+  html[lang='ta'] .language-selector {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  html[lang='ta'] .language-selector select {
+    max-width: 76px;
+  }
+}
+
+@media (max-width: 1280px) {
+  html[lang='hi'] .app-topheader {
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  html[lang='hi'] .topheader-center {
+    order: 3;
+    flex: 1 1 280px;
+  }
+  html[lang='hi'] .topheader-right {
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+  html[lang='hi'] .topbar-search,
+  html[lang='hi'] .topbar-search.focused {
+    width: min(100%, 460px);
+  }
+}
+
+@media (max-width: 640px) {
+  html:not([lang='en']) .page-title {
+    font-size: 1.35rem;
+  }
+  html:not([lang='en']) .card,
+  html:not([lang='en']) .metric-card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  html:not([lang='en']) .drawer-footer,
+  html:not([lang='en']) .ai-drawer-footer-actions {
+    flex-wrap: wrap;
+  }
+  html:not([lang='en']) .app-main main {
+    padding: 16px 10px;
+  }
+  html:not([lang='en']) .topheader-right {
+    display: flex;
+    justify-content: end;
+    width: auto;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  html:not([lang='en']) .app-topheader {
+    height: 56px;
+    min-height: 56px;
+    flex-wrap: nowrap;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  html:not([lang='en']) .topheader-right .topbar-activity,
+  html:not([lang='en']) .topheader-right .topbar-status,
+  html:not([lang='en']) .topheader-right .mobile-header-secondary,
+  html:not([lang='en']) .topheader-right .run-analysis-btn,
+  html:not([lang='en']) .topheader-right > .icon-btn[aria-label*='Refresh'],
+  html:not([lang='en']) .topheader-right > .icon-btn[aria-label*='Export'] {
+    display: none !important;
+  }
+  html:not([lang='en']) .topbar-vdivider {
+    display: none;
+  }
+  html:not([lang='en']) .language-selector {
+    max-width: 118px;
+  }
+  html:not([lang='en']) .language-selector select {
+    min-width: 0;
+    max-width: 78px;
+  }
+  html:not([lang='en']) .reference-login {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  html:not([lang='en']) .reference-login-shell {
+    overflow: visible;
+  }
+  html:not([lang='en']) .reference-login-form-panel,
+  html:not([lang='en']) .login-panel,
+  html:not([lang='en']) .enterprise-login-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media (max-width: 900px) {
+  .attack-path-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }

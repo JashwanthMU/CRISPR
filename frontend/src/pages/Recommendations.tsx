@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ListChecks, ArrowRight } from 'lucide-react';
@@ -8,6 +9,7 @@ import { toast } from '../lib/toastStore';
 import { getControls } from '../services/api';
 
 export default function Recommendations() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [recommendations, setRecommendations] = useState(REMEDIATION_SCENARIOS);
@@ -19,7 +21,7 @@ export default function Recommendations() {
         id: control.id,
         title: control.name,
         finding: 'Recommended by the deterministic budget optimizer catalogue',
-        affectedResource: 'NovaPay enterprise controls',
+        affectedResource: 'Enterprise security controls',
         recommendedFix: control.name,
         priority: control.risk_reduction_inr >= 4_000_000 ? 'CRITICAL' : control.risk_reduction_inr >= 2_000_000 ? 'HIGH' : 'MEDIUM',
         estimatedEffort: `${control.time_weeks} week${control.time_weeks === 1 ? '' : 's'}`,
@@ -35,7 +37,7 @@ export default function Recommendations() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ListChecks size={22} color="var(--color-primary-blue)" /> Recommendations
+          <ListChecks size={22} color="var(--color-primary-blue)" /> {t("Recommendations")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Prioritized remediation guidance ranked by risk reduction and effort

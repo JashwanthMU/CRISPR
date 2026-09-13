@@ -64,7 +64,8 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-md)',
         overflow: 'hidden',
-        background: 'var(--color-bg-secondary)',
+        background: 'linear-gradient(145deg, color-mix(in srgb, var(--color-primary-blue) 5%, var(--color-bg-secondary)), var(--color-bg-secondary))',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
       }}
     >
       <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, zIndex: 5 }}>
@@ -90,6 +91,13 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
       >
         <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
           <defs>
+            <pattern id="attack-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+              <path d="M 28 0 L 0 0 0 28" fill="none" stroke={TOKENS.border} strokeWidth="0.45" opacity="0.5" />
+            </pattern>
+            <radialGradient id="node-surface" cx="35%" cy="28%" r="75%">
+              <stop offset="0%" stopColor="white" stopOpacity="0.16" />
+              <stop offset="100%" stopColor={TOKENS.bg} stopOpacity="1" />
+            </radialGradient>
             <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 Z" fill={TOKENS.textMuted} />
             </marker>
@@ -97,6 +105,7 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
               <path d="M0,0 L10,5 L0,10 Z" fill={TOKENS.critical} />
             </marker>
           </defs>
+          <rect x="0" y="0" width={maxX} height={maxY} fill="url(#attack-grid)" />
 
           {path.edges.map((edge) => {
             const source = path.nodes.find((n) => n.id === edge.source);
@@ -149,8 +158,13 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
                 }}
               >
                 <circle
+                  r={NODE_R + 8}
+                  fill={color}
+                  opacity={isSelected || isHovered ? 0.16 : 0.07}
+                />
+                <circle
                   r={NODE_R}
-                  fill={TOKENS.bg}
+                  fill="url(#node-surface)"
                   stroke={color}
                   strokeWidth={isSelected || isHovered ? 3 : 2}
                   style={{ filter: isSelected ? 'drop-shadow(0 2px 6px rgba(60,64,67,0.3))' : 'drop-shadow(0 1px 2px rgba(60,64,67,0.15))' }}

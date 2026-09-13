@@ -19,10 +19,13 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messages.length && !loading) return;
+    const container = messagesRef.current;
+    if (container) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
   const accent = theme === 'security' ? 'var(--color-primary-blue)' : 'var(--color-success)';
@@ -70,6 +73,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
       </div>
 
       <div
+        ref={messagesRef}
         style={{
           minHeight: 140,
           maxHeight: 320,
@@ -83,7 +87,7 @@ export default function AIAdvisorChat({ theme, suggestions }: Props) {
       >
         {messages.length === 0 && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', padding: '8px 0' }}>
-            Ask me anything about NovaPay's cyber risk posture — try one of the suggestions below.
+            Ask me anything about the organization’s cyber risk posture — try one of the suggestions below.
           </div>
         )}
         {messages.map((m, i) => (

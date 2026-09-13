@@ -150,14 +150,9 @@ curl "http://localhost:8000/api/scenarios?patch_delay=30"
 }
 ```
 
-**Key demo numbers (hardcoded for presentation):**
-
-| Scenario | `reduction_lakh` |
-|---|---|
-| MFA | `48.6` |
-| Patch now | `31.0` |
-| Segmentation | `38.7` |
-| Delay 30 days | `-21.0` (risk increases) |
+Scenario numbers are dynamic. Do not copy a fixed rupee reduction into a jury
+report: record the API response together with its data mode, calculation scope,
+model version, and input snapshot.
 
 ---
 
@@ -182,7 +177,7 @@ Invalid ID returns `{"error": "Preset not found", "valid_ids": ["mfa", "patch_no
 ### `POST /api/optimize`
 
 Given a budget in ₹, returns the optimal set of security controls to implement.  
-Uses PuLP integer programming (CBC solver). Falls back to greedy if solver unavailable.
+Uses the deterministic `greedy_dynamic` solver. It recomputes residual EAL for every affordable candidate after each selection, then chooses the best positive marginal reduction. This handles overlapping control benefits but does not claim global optimality.
 
 **Request body:**
 ```json
@@ -207,7 +202,7 @@ curl -X POST http://localhost:8000/api/optimize \
   "spent_lakh": 97.0,
   "remaining_inr": 300000,
   "remaining_lakh": 3.0,
-  "solver": "pulp_cbc",
+  "solver": "greedy_dynamic",
   "selected_controls": [
     {
       "id": "mfa",
@@ -227,7 +222,7 @@ curl -X POST http://localhost:8000/api/optimize \
 }
 ```
 
-**`solver` field values:** `"pulp_cbc"` (exact) or `"greedy"` (fallback).
+**`solver` field value:** `"greedy_dynamic"`.
 
 ---
 
@@ -570,7 +565,7 @@ result.remaining_lakh          // e.g. 3.0
 result.total_reduction_lakh    // e.g. 175.3  ← main headline number
 result.rosi                    // e.g. 8.06   → display as "706% ROSI"
 result.selected_controls       // array of cards to render
-result.solver                  // show "Optimized with PuLP CBC" badge
+result.solver                  // show "Dynamic marginal optimization" badge
 ```
 
 **`/compliance` page:**

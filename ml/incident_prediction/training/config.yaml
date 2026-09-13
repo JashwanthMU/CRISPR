@@ -1,0 +1,31 @@
+version: xgb_v4_final
+model_type: xgboost
+target_col: "exploited"
+target_definition: "CISA KEV membership; not annual incident frequency"
+synthetic_data_allowed: false
+features:
+  - cvss_score
+  - epss_score
+  - epss_percentile
+  - days_since_published
+  - severity_encoded
+  - is_cert_in
+  - attack_vector
+  - attack_complexity
+  - privileges_required
+  - user_interaction
+  - scope
+  - exploitability_score
+  - impact_score
+  - flag_rce
+  - flag_sqli
+  - flag_xss
+  - flag_buffer_overflow
+  - flag_priv_escalation
+  - flag_dos
+  - flag_dir_traversal
+calibration_method: sigmoid
+hyperparameters:
+  max_depth: 6
+  learning_rate: 0.1
+  n_estimators: 100

@@ -1,0 +1,86 @@
+name: CRISPR CI
+
+on:
+  push:
+    branches: [ "main", "develop", "feat/**" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: crispr_test
+          POSTGRES_USER: crispr_test
+          POSTGRES_PASSWORD: unit-test-postgres-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U crispr_test -d crispr_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AUTH_SECRET: unit-test-signing-material-not-for-deployment
+      SECURITY_ADMIN_EMAIL: security-test@example.com
+      SECURITY_ADMIN_PASSWORD: unit-test-password
+      SIH_EXECUTIVE_EMAIL: executive@crispr.demo
+      SIH_EXECUTIVE_PASSWORD: yourbestpassword
+      SIH_TECHNICAL_EMAIL: technical@crispr.demo
+      SIH_TECHNICAL_PASSWORD: yourworstpassword
+      POSTGRES_DB: crispr_test
+      POSTGRES_USER: crispr_test
+      POSTGRES_PASSWORD: unit-test-postgres-password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: crispr_test
+      DB_USER: crispr_test
+      DB_PASSWORD: unit-test-postgres-password
+      INTEGRATION_ENCRYPTION_KEY: 5B8xVnHYr-SYNYcvlqrRk6zjIn8NF0Xw8A3Nj3T7C30=
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: unit-test-neo4j-password
+      CRISPR_DATA_MODE: demo
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        python -m compileall -q backend ml ai
+
+    - name: Run Tests
+      run: |
+        alembic upgrade head
+        test "$(alembic current | awk '{print $1}')" = "0008_remediation_delivery_risk"
+        python -c "from backend.ingestion.store import refresh_demo_sources; print(refresh_demo_sources())"
+        pytest backend/ -q
+
+    - name: Build frontend
+      working-directory: frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: Docker build
+      run: |
+        docker compose build
+        docker compose up -d db backend worker
+        docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready')"
+
+    - name: Docker diagnostics
+      if: failure()
+      run: docker compose logs --no-color --tail=200 backend worker db
+
+    - name: Stop Docker services
+      if: always()
+      run: docker compose down --volumes

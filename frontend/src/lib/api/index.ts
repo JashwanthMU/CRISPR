@@ -4,10 +4,8 @@
 // Every page/component should import from here, never call axios/fetch
 // directly. In demo mode (default — see API_MODE in client.ts) every
 // function resolves fixture data after a small simulated delay. In live
-// mode, it calls the real backend and — consistent with the rest of this
-// app's "never crash the UI on a missing backend" philosophy — falls back
-// to the same fixtures if the request fails or the endpoint isn't
-// implemented yet.
+// mode, it calls the real backend and propagates failures. Fixture substitution
+// is allowed only in explicitly configured demo mode.
 //
 // Components never need to know which mode is active: they always get back
 // the same shape (see src/types).
@@ -33,21 +31,23 @@ import {
 } from '../../utils/mock';
 import { REPOSITORIES, INTEGRATIONS, SCA_FINDINGS } from '../../demo/fixtures';
 import { runAnalysis as runDemoAnalysis } from '../../demo/demoStore';
+import { isDemoOrganization } from '../auth';
 
 async function liveOrFallback<T>(
   path: string,
   fallback: T,
-  method: 'get' | 'post' = 'get',
+  method: 'get' | 'post' | 'patch' = 'get',
   body?: unknown,
   select: (payload: any) => T = (payload) => payload as T,
 ): Promise<T> {
   if (API_MODE === 'demo') return simulateLatency(fallback);
-  try {
-    const res = method === 'get' ? await httpClient.get(path) : await httpClient.post(path, body);
-    return res?.data == null ? fallback : select(res.data);
-  } catch {
-    return fallback;
-  }
+  const res = method === 'get'
+    ? await httpClient.get(path)
+    : method === 'patch'
+      ? await httpClient.patch(path, body)
+      : await httpClient.post(path, body);
+  if (res?.data == null) throw new Error(`Backend returned no data for ${method.toUpperCase()} ${path}`);
+  return select(res.data);
 }
 
 // ----------------------------------------------------------------------------
@@ -62,7 +62,7 @@ export const getEnterprise = getDashboard;
 
 export function getProjects(): Promise<Project[]> {
   return liveOrFallback('/api/projects', [
-    { id: 'proj-novapay', name: 'NovaPay Financial Services', organization: 'NovaPay', environment: 'production' },
+    { id: 'proj-crispr', name: 'CRISPR Demo Organization', organization: 'CRISPR', environment: 'production' },
   ]);
 }
 
@@ -70,9 +70,17 @@ export function getProjects(): Promise<Project[]> {
 // Findings
 // ----------------------------------------------------------------------------
 export function getFindings(): Promise<Finding[]> {
-  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.findings) ? payload.findings : MOCK_FINDINGS,
-  );
+  if (isDemoOrganization()) {
+    return httpClient.get('/api/findings').then(({ data }) => {
+      if (Array.isArray(data?.findings)) return data.findings;
+      throw new Error('Backend returned an invalid findings payload');
+    });
+  }
+  return liveOrFallback('/api/findings', MOCK_FINDINGS as unknown as Finding[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.findings)) return payload.findings;
+    throw new Error('Backend returned an invalid findings payload');
+  });
 }
 
 export function getFinding(id: string): Promise<Finding | undefined> {
@@ -80,18 +88,28 @@ export function getFinding(id: string): Promise<Finding | undefined> {
 }
 
 export function getSources() {
-  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.sources) ? payload.sources : MOCK_SOURCES,
-  );
+  return liveOrFallback('/api/findings/sources', MOCK_SOURCES, 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.sources)) return payload.sources;
+    throw new Error('Backend returned an invalid sources payload');
+  });
 }
 
 // ----------------------------------------------------------------------------
 // Assets
 // ----------------------------------------------------------------------------
 export function getAssets(): Promise<Asset[]> {
-  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.assets) ? payload.assets : MOCK_ASSETS,
-  );
+  if (isDemoOrganization()) {
+    return httpClient.get('/api/assets').then(({ data }) => {
+      if (Array.isArray(data?.assets)) return data.assets;
+      throw new Error('Backend returned an invalid assets payload');
+    });
+  }
+  return liveOrFallback('/api/assets', MOCK_ASSETS as unknown as Asset[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.assets)) return payload.assets;
+    throw new Error('Backend returned an invalid assets payload');
+  });
 }
 
 export function getAsset(id: string): Promise<Asset | undefined> {
@@ -102,37 +120,77 @@ export function getAsset(id: string): Promise<Asset | undefined> {
 // Risk cases
 // ----------------------------------------------------------------------------
 export function getRiskCases(): Promise<RiskCase[]> {
-  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) =>
-    Array.isArray(payload) ? payload : Array.isArray(payload?.risks) ? payload.risks : MOCK_RISKS,
-  );
+  return liveOrFallback('/api/risks', MOCK_RISKS as unknown as RiskCase[], 'get', undefined, (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.risks)) return payload.risks;
+    throw new Error('Backend returned an invalid risks payload');
+  });
 }
 
 export function getRiskCase(id: string): Promise<RiskCase | undefined> {
-  return liveOrFallback(`/api/risks/${id}`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
+  return liveOrFallback(`/api/risks/${id}?explain=true`, (MOCK_RISKS as unknown as RiskCase[]).find((r) => r.asset_id === id));
 }
 
 // ----------------------------------------------------------------------------
 // Repositories / Code Security
 // ----------------------------------------------------------------------------
+function normalizeRepository(row: any): Repository {
+  return {
+    id: String(row.id), name: row.name, provider: row.raw?.provider === 'gitlab' ? 'gitlab' : 'github',
+    defaultBranch: row.defaultBranch ?? 'main', securityScore: Number(row.raw?.securityScore ?? 0),
+    lastScan: row.lastScan ?? new Date(0).toISOString(), criticalIssues: Number(row.raw?.criticalIssues ?? 0),
+    openVulnerabilities: Number(row.raw?.openVulnerabilities ?? 0), secrets: Number(row.raw?.secrets ?? 0),
+    dependencies: Number(row.raw?.dependencies ?? 0), iacIssues: Number(row.raw?.iacIssues ?? 0),
+    owners: Array.isArray(row.raw?.owners) ? row.raw.owners : [],
+    issues: row.raw?.issues ?? { critical: 0, high: 0, medium: 0, low: 0 },
+    language: row.raw?.language, framework: row.raw?.framework,
+  };
+}
+
 export function getRepositories(): Promise<Repository[]> {
-  return liveOrFallback('/api/repositories', REPOSITORIES);
+  return liveOrFallback('/api/repositories', REPOSITORIES, 'get', undefined, (payload) => {
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map(normalizeRepository);
+  });
 }
 
 export function getRepository(id: string): Promise<Repository | undefined> {
-  return liveOrFallback(`/api/repositories/${id}`, REPOSITORIES.find((r) => r.id === id));
+  return liveOrFallback(`/api/repositories/${id}`, REPOSITORIES.find((r) => r.id === id), 'get', undefined, (payload) => payload ? normalizeRepository(payload) : undefined);
 }
 
 export function getScaFindings(repositoryName?: string) {
   const all = SCA_FINDINGS;
   const filtered = repositoryName ? all.filter((f) => f.repository === repositoryName) : all;
-  return liveOrFallback(`/api/sca?repo=${repositoryName ?? ''}`, filtered);
+  return liveOrFallback(`/api/sca?repo=${encodeURIComponent(repositoryName ?? '')}`, filtered, 'get', undefined, (payload) => {
+    const rows = Array.isArray(payload) ? payload : [];
+    return rows.map((row: any) => ({
+      id: String(row.id), cve: row.cve ?? row.external_id ?? 'Unassigned', severity: row.severity ?? 'MEDIUM',
+      component: row.component ?? 'Unknown', version: row.vulnerable_range ?? 'Unknown', fixedVersion: row.fixedVersion,
+      reachable: Boolean(row.reachable ?? row.raw?.reachable), exploitAvailable: Boolean(row.exploitAvailable ?? row.raw?.exploitAvailable),
+      status: row.state === 'dismissed' || row.state === 'fixed' ? 'FIXED' : row.state === 'in_progress' ? 'IN_PROGRESS' : 'OPEN',
+      repository: row.repository,
+    }));
+  });
 }
 
 // ----------------------------------------------------------------------------
 // Integrations
 // ----------------------------------------------------------------------------
 export function getIntegrations(): Promise<Integration[]> {
-  return liveOrFallback('/api/integrations', INTEGRATIONS);
+  return liveOrFallback('/api/integrations', INTEGRATIONS, 'get', undefined, (payload) => {
+    if (!Array.isArray(payload?.integrations)) throw new Error('Backend returned an invalid integrations payload');
+    return payload.integrations.map((item: any) => ({
+      id: item.id,
+      key: item.provider,
+      name: item.name,
+      category: item.provider === 'github' ? 'sca' : 'vulnerability_scanner',
+      status: ['connected', 'error', 'syncing'].includes(item.status) ? item.status : 'disconnected',
+      lastSync: item.last_sync_at,
+      itemsIngested: item.items_ingested ?? 0,
+      errors: item.last_error ? 1 : 0,
+      description: item.config?.organization ? `GitHub organization: ${item.config.organization}` : 'External platform connection',
+    }));
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -143,11 +201,14 @@ export function getReports() {
     { id: 'rep-1', name: 'Q3 2026 Board Risk Report', generated: '2026-08-01', format: 'PDF' },
     { id: 'rep-2', name: 'RBI CSF Compliance Summary', generated: '2026-07-15', format: 'PDF' },
     { id: 'rep-3', name: 'Weekly Findings Digest', generated: '2026-08-22', format: 'CSV' },
-  ]);
+  ], 'get', undefined, (payload) => Array.isArray(payload?.reports) ? payload.reports : []);
 }
 
 export function getCompliance() {
-  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE, 'get', undefined, (payload) => payload.frameworks);
+  return liveOrFallback('/api/compliance', MOCK_COMPLIANCE, 'get', undefined, (payload) => {
+    if (!Array.isArray(payload?.frameworks)) throw new Error('Backend returned an invalid compliance payload');
+    return payload.frameworks;
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -160,11 +221,11 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
       id: finding.finding_id,
       cve: finding.cve!,
       severity: finding.severity,
-      cvss: finding.severity === 'CRITICAL' ? 9.6 : finding.severity === 'HIGH' ? 7.8 : 5.4,
+      cvss: finding.cvss ?? null,
       component: finding.asset_id,
       affectedAssets: [finding.asset_id],
-      exploitAvailable: finding.finding_type === 'ACTIVE_EXPLOITATION' || finding.status === 'VALIDATED',
-      patchAvailable: true,
+      exploitAvailable: finding.exploited_in_wild ?? null,
+      patchAvailable: finding.patch_available ?? null,
       status: finding.status,
     })));
 }
@@ -172,17 +233,126 @@ export function getVulnerabilities(): Promise<Vulnerability[]> {
 // ----------------------------------------------------------------------------
 // Analysis trigger — delegates to the deterministic demo engine in demo mode.
 // ----------------------------------------------------------------------------
-export async function runAnalysis(): Promise<{ started: boolean }> {
+export async function runAnalysis(): Promise<{ started: boolean; id?: string }> {
   if (API_MODE === 'demo') {
     await runDemoAnalysis();
     return { started: true };
   }
-  try {
-    await httpClient.post('/api/analysis/run');
-    return { started: true };
-  } catch {
-    // Even in live mode, still drive the visual demo engine so the UI isn't dead.
-    await runDemoAnalysis();
-    return { started: true };
-  }
+  const response = await httpClient.post('/api/analysis/run');
+  if (response?.data?.started !== true) throw new Error('Backend did not accept the analysis job');
+  return response.data;
+}
+
+// ----------------------------------------------------------------------------
+// Member 5 — Scenarios / Optimizer / Compliance (live endpoints)
+// ----------------------------------------------------------------------------
+export function getScenarioPresets() {
+  return liveOrFallback('/api/scenarios/presets', [], 'get', undefined, (p) =>
+    Array.isArray(p?.presets) ? p.presets : []
+  );
+}
+
+export function runScenario(params: Record<string, any>) {
+  const query = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)])
+  ).toString();
+  return liveOrFallback(`/api/scenarios?${query}`, null);
+}
+
+export function compareScenarios(s1: string, s2: string) {
+  return liveOrFallback(`/api/scenarios/compare?s1=${s1}&s2=${s2}`, null);
+}
+
+export function optimizeBudget(budget_inr: number) {
+  return liveOrFallback('/api/optimize', null, 'post', { budget_inr });
+}
+
+export function getOptimizeControls() {
+  return liveOrFallback('/api/optimize/controls', [], 'get', undefined, (p) =>
+    Array.isArray(p?.controls) ? p.controls : []
+  );
+}
+
+export function getComplianceGaps() {
+  return liveOrFallback('/api/compliance/gaps', [], 'get', undefined, (p) =>
+    Array.isArray(p?.gaps) ? p.gaps : []
+  );
+}
+
+export function getRecommend() {
+  return liveOrFallback('/api/optimize/recommend', []);
+}
+
+export function getForecast() {
+  // No live time-series forecast exists yet. Returning an empty series is an
+  // explicit unavailable state, not fixture substitution.
+  if (API_MODE === 'live') return Promise.resolve([]);
+  return liveOrFallback('/api/assistant/forecast', [], 'get', undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.trend) ? p.trend : []
+  );
+}
+export default httpClient;
+export { httpClient, API_MODE };
+
+// ----------------------------------------------------------------------------
+// Platform Connections — Phase 1 live endpoints
+// ----------------------------------------------------------------------------
+export function getRemediation() {
+  return liveOrFallback("/api/remediation", { items: [], summary: {}, count: 0 }, "get", undefined, (p) => p);
+}
+
+export function updateRemediationStatus(id: string, status: string) {
+  return liveOrFallback(`/api/remediation/${id}`, null, "patch", { status });
+}
+
+export function getRemediationStats() {
+  return liveOrFallback("/api/remediation/stats/summary", {}, "get", undefined, (p) => p);
+}
+
+export function getPolicies() {
+  return liveOrFallback("/api/policies", { policies: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function togglePolicy(id: string) {
+  return liveOrFallback(`/api/policies/${id}/toggle`, null, "patch", {});
+}
+
+export function getLiveIntegrations() {
+  return liveOrFallback("/api/integrations", { integrations: [], count: 0 }, "get", undefined, (p) => p);
+}
+
+export function reconnectIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/reconnect`, null, "post", {});
+}
+
+export function disableIntegration(id: string) {
+  return liveOrFallback(`/api/integrations/${id}/disable`, null, "post", {});
+}
+
+export function getThreatIntel() {
+  return liveOrFallback("/api/threat-intel", { actors: [], campaigns: [] }, "get", undefined, (p) => p);
+}
+
+export function getThreatActors() {
+  return liveOrFallback("/api/threat-intel/actors", [], "get", undefined, (p) =>
+    Array.isArray(p?.actors) ? p.actors : []
+  );
+}
+
+export function getAttackPaths() {
+  return liveOrFallback("/api/attack-paths", [], "get", undefined, (p) =>
+    Array.isArray(p) ? p : Array.isArray(p?.paths) ? p.paths : Array.isArray(p?.attack_paths) ? p.attack_paths : []
+  );
+}
+
+export function getSettings() {
+  return liveOrFallback("/api/settings", {}, "get", undefined, (p) => p);
+}
+
+export function updateSettings(data: Record<string, any>) {
+  return liveOrFallback("/api/settings", null, "patch", data);
+}
+
+export function getReport(id: string) {
+  return liveOrFallback(`/api/reports/${id}`, null);
 }

@@ -1,74 +1,206 @@
-from fastapi import APIRouter, HTTPException
-import json
-from pathlib import Path
+from functools import lru_cache
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from backend.app.auth import AuthUser, require_security
+from backend.data_access import LiveDataUnavailable, demo_mode_enabled, load_assets, load_findings, require_demo_mode, set_active_organization
+from backend.database.connection import get_connection
 
 from backend.risk_engine.likelihood import calculate_likelihood
 from backend.financial_engine.loss_calculator import calculate_loss_magnitude, calculate_eal
 from backend.risk_engine.drivers import identify_risk_drivers
 from backend.asset_intelligence.criticality import enrich_asset
-from backend.controls.effectiveness import calculate_control_effectiveness, DEMO_CONTROLS
+from backend.controls.effectiveness import calculate_control_effectiveness, get_controls_for_asset
+from ml.incident_prediction.model import predict_from_risk_row
 
 router = APIRouter()
 
-ASSETS_PATH = Path(__file__).resolve().parents[3] / "data" / "demo" / "assets.json"
-
-# Hard-coded demo risk inputs (asset + primary finding characteristics).
-# Member 1's connectors + Member 2's correlator will eventually replace this
-# with live-derived findings; this keeps the demo numbers deterministic for now.
-DEMO_RISK_INPUTS = [
-    {"asset_id": "A003", "cvss": 9.8, "exploit_in_wild": True, "patch_age_days": 21, "threat_intel": True, "primary_finding_type": "BUG_BOUNTY", "confidence": 0.94, "sources": ["BUG_BOUNTY", "VULNERABILITY_SCANNER", "XDR", "IAM"], "likelihood": 0.21, "eal_inr": 7_980_000, "risk_score": 87},
-    {"asset_id": "A002", "cvss": 10.0, "exploit_in_wild": True, "patch_age_days": 14, "threat_intel": True, "primary_finding_type": "VULNERABILITY_SCANNER", "confidence": 0.88, "sources": ["VULNERABILITY_SCANNER", "XDR", "THREAT_INTEL"], "likelihood": 0.18, "eal_inr": 6_200_000, "risk_score": 81},
-    {"asset_id": "A004", "cvss": 7.5, "exploit_in_wild": False, "patch_age_days": 30, "threat_intel": False, "primary_finding_type": "BUG_BOUNTY", "confidence": 0.80, "sources": ["BUG_BOUNTY", "IAM"], "likelihood": 0.14, "eal_inr": 3_100_000, "risk_score": 64},
-    {"asset_id": "A005", "cvss": 6.2, "exploit_in_wild": False, "patch_age_days": 50, "threat_intel": False, "primary_finding_type": "VULNERABILITY_SCANNER", "confidence": 0.65, "sources": ["IAM"], "likelihood": 0.10, "eal_inr": 850_000, "risk_score": 42},
-    {"asset_id": "A006", "cvss": 9.8, "exploit_in_wild": True, "patch_age_days": 90, "threat_intel": False, "primary_finding_type": "VULNERABILITY_SCANNER", "confidence": 0.60, "sources": ["VULNERABILITY_SCANNER"], "likelihood": 0.31, "eal_inr": 300_000, "risk_score": 22},
-]
+def _load_assets(organization_id: UUID | None = None) -> list[dict]:
+    return load_assets(organization_id=organization_id)
 
 
-def _calibrate_loss_breakdown(loss_breakdown: dict, target_total: int) -> dict:
-    current_total = loss_breakdown.get("total_inr", 0)
-    if current_total <= 0:
-        return {**loss_breakdown, "total_inr": target_total}
-    keys = [key for key in loss_breakdown if key != "total_inr"]
-    calibrated = {
-        key: round(loss_breakdown[key] * target_total / current_total)
-        for key in keys
-    }
-    difference = target_total - sum(calibrated.values())
-    calibrated["reputation_cost"] = calibrated.get("reputation_cost", 0) + difference
-    calibrated["total_inr"] = target_total
-    return calibrated
+def _load_risk_inputs(organization_id: UUID | None = None) -> list[dict]:
+    if organization_id is not None:
+        set_active_organization(organization_id)
+    """
+    Risk cases are derived from real scanner findings (data/demo/vulnerabilities.json),
+    not hand-typed numbers. One risk case per CVE/vulnerability finding.
+    """
+    findings = load_findings("VULNERABILITY_SCANNER", organization_id=organization_id)
+    frequencies = {}
+    if organization_id is not None and not demo_mode_enabled():
+        with get_connection() as db:
+            rows = db.execute(
+                """SELECT DISTINCT ON (finding_id) finding_id,assessment_id,
+                          annual_incident_probability,methodology,evidence_reference,
+                          source_name,confidence,observed_at,valid_until
+                   FROM incident_frequency_assessments
+                   WHERE organization_id=%s AND observed_at <= NOW() AND valid_until > NOW()
+                   ORDER BY finding_id,observed_at DESC,created_at DESC""",
+                (organization_id,),
+            ).fetchall()
+        frequencies = {row["finding_id"]: row for row in rows}
+    inputs = []
+    for f in findings:
+        # days_since_published is derived from the real NVD published_date
+        # (fetched by tools/enrich_vulnerabilities.py) - None if not yet
+        # enriched, so predict_from_risk_row falls back to its own default
+        # rather than a fabricated day count.
+        days_since_published = None
+        published_date = f.get("published_date")
+        if published_date:
+            try:
+                from datetime import date
+                pub = date.fromisoformat(published_date)
+                days_since_published = (date.today() - pub).days
+            except (ValueError, TypeError):
+                pass
+
+        frequency = frequencies.get(f.get("finding_id"), {})
+        inputs.append({
+            "asset_id": f["asset_id"],
+            "cve_id": f.get("cve"),
+            "cvss": f.get("cvss", 7.0),
+            "exploit_in_wild": f.get("exploited_in_wild", False),
+            "patch_age_days": f.get("patch_age_days", 30),
+            "threat_intel": f.get("exploited_in_wild", False),
+            "primary_finding_type": f.get("source_type", "VULNERABILITY_SCANNER"),
+            "confidence": f.get("confidence", 0.7),
+            "finding_id": f.get("finding_id"),
+            "title": f.get("title"),
+            # Optional NVD/EPSS enrichment - present only after running
+            # tools/enrich_vulnerabilities.py; absent findings fall back
+            # to predict_from_risk_row()'s own defaults, not fabricated values.
+            "epss_score": f.get("epss_score"),
+            "epss_percentile": f.get("epss_percentile"),
+            "attack_vector": f.get("attack_vector"),
+            "attack_complexity": f.get("attack_complexity"),
+            "privileges_required": f.get("privileges_required"),
+            "user_interaction": f.get("user_interaction"),
+            "scope": f.get("scope"),
+            "exploitability_score": f.get("exploitability_score"),
+            "impact_score": f.get("impact_score"),
+            "days_since_published": days_since_published,
+            "flag_rce": f.get("flag_rce"),
+            "flag_sqli": f.get("flag_sqli"),
+            "flag_xss": f.get("flag_xss"),
+            "flag_buffer_overflow": f.get("flag_buffer_overflow"),
+            "flag_priv_escalation": f.get("flag_priv_escalation"),
+            "flag_dos": f.get("flag_dos"),
+            "flag_dir_traversal": f.get("flag_dir_traversal"),
+            "annual_incident_probability": frequency.get("annual_incident_probability"),
+            "frequency_evidence": frequency or None,
+        })
+    return inputs
 
 
-def _load_assets() -> list[dict]:
-    if not ASSETS_PATH.exists():
-        raise HTTPException(status_code=500, detail=f"assets.json not found at {ASSETS_PATH}")
-    return json.load(open(ASSETS_PATH))
-
-
-def compute_risk(inp: dict, assets: list[dict]) -> dict:
+def compute_risk(inp: dict, assets: list[dict], explain: bool = False, organization_id: UUID | None = None) -> dict:
+    if organization_id is not None:
+        set_active_organization(organization_id)
     asset = next((a for a in assets if a["asset_id"] == inp["asset_id"]), None)
     if asset is None:
         raise HTTPException(status_code=404, detail=f"Asset {inp['asset_id']} not found")
 
-    controls = DEMO_CONTROLS.get(inp["asset_id"], {})
+    required_live_model_fields = (
+        "cvss", "epss_score", "epss_percentile", "days_since_published",
+        "attack_vector", "attack_complexity", "privileges_required",
+        "user_interaction", "scope", "exploitability_score", "impact_score",
+    )
+    missing_model_fields = [
+        field for field in required_live_model_fields if inp.get(field) is None
+    ]
+    if missing_model_fields and not demo_mode_enabled():
+        raise LiveDataUnavailable(
+            f"Finding {inp.get('finding_id')} lacks model inputs: {', '.join(missing_model_fields)}"
+        )
+
+    controls = get_controls_for_asset(inp["asset_id"], organization_id=organization_id)
     ce = calculate_control_effectiveness(controls)
 
-    model_likelihood = calculate_likelihood(
-        cvss=inp["cvss"],
-        exploit_in_wild=inp["exploit_in_wild"],
-        patch_age_days=inp["patch_age_days"],
-        internet_facing=asset["internet_facing"],
-        control_effectiveness=ce,
-        threat_intel_active=inp["threat_intel"],
+    # XGBoost ranks CVE exploitation priority only. It never supplies the
+    # annual incident probability used by the financial engine.
+    model_result = predict_from_risk_row({
+        "cvss": inp["cvss"],
+        "exploit_in_wild": inp["exploit_in_wild"],
+        "patch_age_days": inp["patch_age_days"],
+        "internet_facing": asset.get("internet_facing", False),
+        "control_effectiveness_pct": round(ce * 100, 1),
+        "cve_id": inp.get("cve_id"),
+        # Pass real enrichment where available; predict_from_risk_row/
+        # predict_incident already default missing values sensibly, so
+        # None here just means "let the model use its own default", not
+        # a fabricated number.
+        "epss_score": inp.get("epss_score"),
+        "epss_percentile": inp.get("epss_percentile"),
+        "attack_vector": inp.get("attack_vector"),
+        "attack_complexity": inp.get("attack_complexity"),
+        "privileges_required": inp.get("privileges_required"),
+        "user_interaction": inp.get("user_interaction"),
+        "scope": inp.get("scope"),
+        "exploitability_score": inp.get("exploitability_score"),
+        "impact_score": inp.get("impact_score"),
+        "days_since_published": inp.get("days_since_published"),
+        "flag_rce": inp.get("flag_rce"),
+        "flag_sqli": inp.get("flag_sqli"),
+        "flag_xss": inp.get("flag_xss"),
+        "flag_buffer_overflow": inp.get("flag_buffer_overflow"),
+        "flag_priv_escalation": inp.get("flag_priv_escalation"),
+        "flag_dos": inp.get("flag_dos"),
+        "flag_dir_traversal": inp.get("flag_dir_traversal"),
+        "explain": explain,
+    })
+
+    used_model_probability = (
+        model_result is not None
+        and model_result.get("probability") is not None
+        and model_result.get("model") == "xgb_v4_calibrated (Platt)"
     )
-    likelihood = inp["likelihood"]
-    target_loss = round(inp["eal_inr"] / likelihood)
-    loss_magnitude = _calibrate_loss_breakdown(calculate_loss_magnitude(asset), target_loss)
+
+    if not demo_mode_enabled():
+        if not used_model_probability:
+            raise LiveDataUnavailable(
+                f"A calibrated ML ranking is unavailable for finding {inp.get('finding_id')}"
+            )
+        frequency = inp.get("frequency_evidence")
+        if not frequency:
+            raise LiveDataUnavailable(
+                f"Finding {inp.get('finding_id')} lacks a current annual incident-frequency assessment"
+            )
+        likelihood = float(frequency["annual_incident_probability"])
+        lh_dict = {
+            "ranking_score": model_result.get("ranking_score"),
+            "incident_probability": likelihood,
+            "frequency_evidence_available": True,
+            "likelihood_semantics": "organization-supplied annual incident probability",
+            "calculation": {
+                "assessment_id": str(frequency["assessment_id"]),
+                "methodology": frequency["methodology"],
+                "evidence_reference": frequency["evidence_reference"],
+                "source_name": frequency["source_name"],
+                "confidence": frequency["confidence"],
+                "observed_at": frequency["observed_at"],
+                "valid_until": frequency["valid_until"],
+                "kev_probability": model_result.get("probability"),
+                "kev_probability_use": "prioritization only; excluded from EAL",
+            },
+        }
+        model_used = model_result["model"]
+    else:
+        lh_dict = calculate_likelihood(
+            cvss=inp["cvss"],
+            exploit_in_wild=inp["exploit_in_wild"],
+            patch_age_days=inp["patch_age_days"],
+            internet_facing=asset.get("internet_facing", False),
+            control_effectiveness=ce,
+            threat_intel_active=inp["threat_intel"],
+        )
+        likelihood = lh_dict["incident_probability"]
+        model_used = model_result["model"] if used_model_probability else None
+
+    # ── Financial impact: always the real FAIR loss calculator, never
+    # reverse-fitted or overridden by a hardcoded target ──
+    loss_magnitude = calculate_loss_magnitude(asset)
     eal = calculate_eal(likelihood, loss_magnitude)
-    eal["eal_inr"] = inp["eal_inr"]
-    eal["eal_lakh"] = round(inp["eal_inr"] / 100_000, 2)
-    eal["var_95_inr"] = round(inp["eal_inr"] * 3.2)
-    eal["risk_score"] = inp["risk_score"]
 
     finding = {"source_type": inp["primary_finding_type"], "confidence": inp["confidence"]}
     drivers = identify_risk_drivers(asset, finding, controls)
@@ -76,63 +208,213 @@ def compute_risk(inp: dict, assets: list[dict]) -> dict:
     enriched = enrich_asset(asset)
 
     return {
+        "finding_id": inp.get("finding_id"),
         "asset_id": asset["asset_id"],
         "asset_name": asset["name"],
-        "business_service": asset["business_service"],
+        "business_service": asset.get("business_service"),
+        "title": inp.get("title"),
+        "cve_id": inp.get("cve_id"),
         "business_criticality": enriched["business_criticality"],
-        "exposure": "INTERNET" if asset["internet_facing"] else "ISOLATED" if asset.get("criticality", 1) <= 1 else "INTERNAL",
+        "criticality_breakdown": enriched["criticality_breakdown"],
         "control_effectiveness_pct": round(ce * 100, 1),
-        "sources": inp["sources"],
-        "confidence": inp["confidence"],
-        "confidence_pct": round(inp["confidence"] * 100),
-        "model_likelihood": model_likelihood,
+        "control_effectiveness_evidence": {
+            "source": "bundled SIH demo control posture" if demo_mode_enabled(organization_id) else "current organization control posture",
+            "formula": "25% MFA + 20% EDR + 15% WAF + 20% patch compliance + 15% segmentation + 5% logging",
+            "current_posture": controls,
+            "calculated_effectiveness": ce,
+        },
+        "model_used": model_used,
+        "model_purpose": "CVE exploitation prioritization only; excluded from EAL",
+        "ranking_score": model_result.get("ranking_score") if used_model_probability else None,
+        "model_tier": model_result.get("tier") if used_model_probability else None,
+        "model_contributions": model_result.get("contributions") if used_model_probability else None,
+        "exploitation_priority": {
+            "score": model_result.get("probability") if used_model_probability else None,
+            "ranking_score": model_result.get("ranking_score") if used_model_probability else None,
+            "tier": model_result.get("tier") if used_model_probability else None,
+            "model": model_result.get("model") if used_model_probability else None,
+            "model_version": model_result.get("model_version") if used_model_probability else None,
+            "semantics": "CISA KEV-membership prioritization; excluded from EAL",
+        },
+        "annual_frequency": {
+            "probability": likelihood,
+            "semantics": lh_dict.get("likelihood_semantics"),
+            "evidence": lh_dict.get("calculation"),
+        },
+        "likelihood_calculation": lh_dict,
         **eal,
         "loss_breakdown": loss_magnitude,
         "risk_drivers": drivers,
     }
 
 
-def _all_risks() -> list[dict]:
-    assets = _load_assets()
-    risks = [compute_risk(inp, assets) for inp in DEMO_RISK_INPUTS]
+def _compute_all_risks(organization_id: UUID | None = None) -> list[dict]:
+    assets = _load_assets(organization_id)
+    risk_inputs = _load_risk_inputs(organization_id)
+    risks = [compute_risk(inp, assets, organization_id=organization_id) for inp in risk_inputs]
     risks.sort(key=lambda x: x["eal_inr"], reverse=True)
     return risks
 
 
+@lru_cache(maxsize=4)
+def _cached_demo_risks(organization_id: UUID) -> tuple[dict, ...]:
+    return tuple(_compute_all_risks(organization_id))
+
+
+def _all_risks(organization_id: UUID | None = None) -> list[dict]:
+    # Bundled demo evidence is immutable during a running process. Reusing its
+    # calculated rows keeps concurrent dashboard requests below the UI timeout.
+    if organization_id is not None and demo_mode_enabled(organization_id):
+        return list(_cached_demo_risks(organization_id))
+    return _compute_all_risks(organization_id)
+
+
+def _aggregate_asset_risks(risks: list[dict]) -> list[dict]:
+    """Avoid charging the same asset loss once for every vulnerability.
+
+    Finding probabilities are combined as a disclosed independent union. This
+    is still an assumption, but it is materially safer than summing a complete
+    asset loss for each finding and hiding the resulting double count.
+    """
+    grouped: dict[str, list[dict]] = {}
+    for risk in risks:
+        grouped.setdefault(risk["asset_id"], []).append(risk)
+
+    asset_risks = []
+    for asset_id, rows in grouped.items():
+        probability_no_event = 1.0
+        for row in rows:
+            probability_no_event *= 1.0 - row["likelihood"]
+        probability = 1.0 - probability_no_event
+        loss_magnitude = max(row["loss_magnitude_inr"] for row in rows)
+        eal = calculate_eal(probability, {"total_inr": loss_magnitude})
+        asset_risks.append({
+            "asset_id": asset_id,
+            "asset_name": rows[0]["asset_name"],
+            "finding_count": len(rows),
+            **eal,
+            "aggregation": {
+                "probability_formula": "1 - product(1 - finding_probability)",
+                "dependence_assumption": "finding exploit events are independent",
+                "loss_counting": "one asset loss magnitude per simulated asset incident",
+            },
+        })
+    asset_risks.sort(key=lambda row: row["eal_inr"], reverse=True)
+    return asset_risks
+
+
 @router.get("")
-def get_all_risks():
-    risks = _all_risks()
-    total_eal = sum(r["eal_inr"] for r in risks)
+def get_all_risks(user: AuthUser = Depends(require_security)):
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    risks = _all_risks(organization_id)
+    asset_risks = _aggregate_asset_risks(risks)
+    total_eal = sum(r["eal_inr"] for r in asset_risks)
     return {
         "total_eal_inr": total_eal,
         "total_eal_lakh": round(total_eal / 100_000, 2),
         "risks": risks,
+        "asset_risk_aggregation": asset_risks,
+        "financial_methodology": {
+            "formula": "EAL = sourced annual incident probability × loss magnitude",
+            "kev_model_use": "prioritization only; excluded from EAL",
+            "frequency_source": (
+                "bundled, labelled SIH demo scenario assumptions"
+                if demo_mode_enabled(organization_id)
+                else "latest unexpired organization assessment per finding"
+            ),
+        },
     }
 
 
-@router.get("/enterprise")
-def get_enterprise_summary():
-    risks = _all_risks()
-    total_eal = sum(r["eal_inr"] for r in risks)
+def calculate_enterprise_summary(organization_id: UUID | None = None):
+    from backend.financial_engine.monte_carlo import run_monte_carlo
+    
+    risks = _all_risks(organization_id)
+    asset_risks = _aggregate_asset_risks(risks)
+    total_eal = sum(r["eal_inr"] for r in asset_risks)
     avg_score = sum(r["risk_score"] for r in risks) / len(risks) if risks else 0
     top_score = risks[0]["risk_score"] if risks else 0
     enterprise_risk_score = round((2 * top_score + avg_score) / 3)
 
+    mc_data = [
+        {
+            "incident_probability": row["likelihood"],
+            "loss_magnitude_inr": row["loss_magnitude_inr"],
+        }
+        for row in asset_risks
+    ]
+    mc = run_monte_carlo(mc_data)
+
     return {
         "enterprise_risk_score": enterprise_risk_score,
+        "current_spend_inr": 12_000_000 if demo_mode_enabled(organization_id) else None,
         "total_eal_inr": total_eal,
         "total_eal_lakh": round(total_eal / 100_000, 2),
-        "var_95_inr": round(total_eal * 3.2),
-        "var_95_lakh": round(total_eal * 3.2 / 100_000, 2),
-        "current_spend_inr": 2_800_000,
+        "var_95_inr": mc["var_95"],
+        "var_95_lakh": round(mc["var_95"] / 100_000, 2),
+        "var_99_inr": mc["var_99"],
+        "var_99_lakh": round(mc["var_99"] / 100_000, 2),
+        "mean_annual_loss_inr": mc["mean_annual_loss"],
+        "tail_value_at_risk_95_inr": mc["tail_value_at_risk_95"],
+        "monte_carlo_methodology": mc["simulation"],
+        "financial_methodology": {
+            "formula": "EAL = sourced annual incident probability × loss magnitude",
+            "kev_model_use": "prioritization only; excluded from EAL",
+            "frequency_source": (
+                "bundled, labelled SIH demo scenario assumptions"
+                if demo_mode_enabled(organization_id)
+                else "latest unexpired organization assessment per finding"
+            ),
+        },
         "top_risk": risks[0] if risks else None,
+        "asset_risk_aggregation": asset_risks,
     }
 
 
+@router.get("/enterprise")
+def get_enterprise_summary(user: AuthUser = Depends(require_security)):
+    # Direct calls are retained for engine unit tests; HTTP calls always
+    # receive an authenticated AuthUser from FastAPI.
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    return calculate_enterprise_summary(organization_id)
+
+
 @router.get("/{asset_id}")
-def get_risk_by_asset(asset_id: str):
-    inp = next((i for i in DEMO_RISK_INPUTS if i["asset_id"] == asset_id), None)
-    if inp is None:
+def get_risk_by_asset(asset_id: str, explain: bool = False, user: AuthUser = Depends(require_security)):
+    """
+    explain=true computes per-finding SHAP contributions (slower - only
+    used on this single-asset detail view, never on the list endpoint,
+    to avoid slowing down /api/risks for every asset on every request).
+    """
+    organization_id = user.organization_id if isinstance(user, AuthUser) else None
+    risk_inputs = _load_risk_inputs(organization_id)
+    matches = [i for i in risk_inputs if i["asset_id"] == asset_id]
+    if not matches:
         raise HTTPException(status_code=404, detail=f"No risk case modeled for asset {asset_id}")
-    assets = _load_assets()
-    return compute_risk(inp, assets)
+    assets = _load_assets(organization_id)
+    computed = [compute_risk(inp, assets, explain=explain, organization_id=organization_id) for inp in matches]
+    computed.sort(key=lambda x: x["eal_inr"], reverse=True)
+    return computed[0] if len(computed) == 1 else {"asset_id": asset_id, "risk_cases": computed}
+@router.get("/{asset_id}/telemetry-model")
+def get_telemetry_model(asset_id: str, version: str = "v1", user: AuthUser = Depends(require_security)):
+    require_demo_mode("Telemetry risk model")
+    assets = _load_assets(user.organization_id)
+    asset = next((a for a in assets if a["asset_id"] == asset_id), None)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    inputs = _load_risk_inputs(user.organization_id)
+    findings = [inp for inp in inputs if inp["asset_id"] == asset_id]
+    
+    controls = get_controls_for_asset(asset_id, organization_id=user.organization_id)
+    
+    # Mock telemetry for now, since it's a demo
+    telemetry = {
+        "iam": {"risk_score": 0.8},
+        "siem": {"alert_severity": 0.5},
+        "edr": {"alert_severity": 0.6},
+        "cspm": {"misconfig_score": 0.7}
+    }
+    
+    from backend.risk_engine.incident_model import calculate_telemetry_incident_probability
+    return calculate_telemetry_incident_probability(asset, findings, telemetry, controls, version=version)

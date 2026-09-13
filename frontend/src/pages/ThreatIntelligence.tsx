@@ -1,28 +1,26 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { Radar } from 'lucide-react';
 import DataTable, { ColumnDef } from '../components/common/DataTable';
 import FilterBar from '../components/common/FilterBar';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
-import { MOCK_FINDINGS } from '../utils/mock';
-import { getFindings } from '../services/api';
+import { API_MODE, getThreatIntel } from '../lib/api';
 import { TOKENS } from '../utils/format';
 
-const FALLBACK_THREAT_FINDINGS = MOCK_FINDINGS.filter((f) => f.source_type === 'THREAT_INTEL');
-
-const THREAT_ACTORS = [
-  { name: 'APT-Nexus (financially motivated)', targets: 'APAC payment infrastructure', confidence: 'High', lastActivity: '2026-08-20' },
-  { name: 'ShadowLoader ransomware group', targets: 'Financial services databases', confidence: 'Medium', lastActivity: '2026-08-14' },
-  { name: 'CredStuffer collective', targets: 'Authentication endpoints', confidence: 'Medium', lastActivity: '2026-08-05' },
-];
-
 export default function ThreatIntelligence() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
-  const [threatFindings, setThreatFindings] = useState<any[]>(FALLBACK_THREAT_FINDINGS);
+  const [threatFindings, setThreatFindings] = useState<any[]>([]);
+  const [sourceCount, setSourceCount] = useState(0);
 
   useEffect(() => {
-    getFindings().then((response) => {
-      if (response?.data) setThreatFindings(response.data.filter((finding: any) => finding.source_type === 'THREAT_INTEL'));
+    getThreatIntel().then((response: any) => {
+      setThreatFindings(Array.isArray(response?.observations) ? response.observations : []);
+      setSourceCount(Number(response?.source_count ?? 0));
+    }).catch(() => {
+      setThreatFindings([]);
+      setSourceCount(0);
     });
   }, []);
 
@@ -44,7 +42,7 @@ export default function ThreatIntelligence() {
     <div className="page-container page-stack">
       <div className="animate-in">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Radar size={22} color="var(--color-primary-blue)" /> Threat Intelligence
+          <Radar size={22} color="var(--color-primary-blue)" /> {t("Threat Intelligence")}
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           Active threat actor tracking and campaign correlation from MISP feeds
@@ -52,37 +50,16 @@ export default function ThreatIntelligence() {
       </div>
 
       <div className="responsive-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <KPICard title="Tracked Threat Actors" value={String(THREAT_ACTORS.length)} accentColor={TOKENS.critical} icon={<Radar size={16} />} />
-        <KPICard title="Active Campaigns" value="2" accentColor={TOKENS.sevHigh} icon={<Radar size={16} />} />
-        <KPICard title="Actively Exploited CVEs" value="2" accentColor={TOKENS.critical} icon={<Radar size={16} />} />
-        <KPICard title="Intel Feeds Connected" value="1 / 2" accentColor={TOKENS.secondaryBlue} icon={<Radar size={16} />} />
+        <KPICard title="Threat Observations" value={String(threatFindings.length)} accentColor={TOKENS.critical} icon={<Radar size={16} />} />
+        <KPICard title="Critical Observations" value={String(threatFindings.filter((row) => row.severity === 'CRITICAL').length)} accentColor={TOKENS.sevHigh} icon={<Radar size={16} />} />
+        <KPICard title="Actively Exploited CVEs" value={String(threatFindings.filter((row) => row.exploited_in_wild === true).length)} accentColor={TOKENS.critical} icon={<Radar size={16} />} />
+        <KPICard title="Live Intel Sources" value={String(sourceCount)} accentColor={TOKENS.secondaryBlue} icon={<Radar size={16} />} />
       </div>
 
       <div className="card">
-        <div className="card-title">Threat Actors Targeting NovaPay</div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Threat Actor</th>
-              <th>Targets</th>
-              <th>Confidence</th>
-              <th>Last Activity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {THREAT_ACTORS.map((a) => (
-              <tr key={a.name}>
-                <td style={{ fontWeight: 600 }}>{a.name}</td>
-                <td style={{ color: 'var(--text-muted)' }}>{a.targets}</td>
-                <td>{a.confidence}</td>
-                <td style={{ color: 'var(--text-muted)' }}>{a.lastActivity}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
+        {API_MODE === 'live' && threatFindings.length === 0 && (
+          <p style={{ color: 'var(--text-muted)' }}>No live threat-intelligence observations have been ingested.</p>
+        )}
         <FilterBar search={search} onSearchChange={setSearch} searchPlaceholder="Search threat intelligence..." />
         <DataTable columns={columns} rows={filtered} getRowId={(f) => f.finding_id} defaultSortKey="severity" />
       </div>

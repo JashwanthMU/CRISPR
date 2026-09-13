@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import RiskScoreBadge from '../components/common/RiskScoreBadge';
@@ -19,6 +20,7 @@ function bucketOf(score: number): Filter {
 }
 
 export default function Risks() {
+  const { t } = useLanguage();
   const [risks, setRisks] = useState<RiskCase[] | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
@@ -34,7 +36,7 @@ export default function Risks() {
     <div className="page-container page-stack">
       <div className="animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">Risk Case Explorer</h1>
+          <h1 className="page-title">{t("Risk Case Explorer")}</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
             Correlated, business-quantified risk cases sorted by financial exposure
           </p>
@@ -89,7 +91,7 @@ export default function Risks() {
                 {/* Center */}
                 <div>
                   <div style={{ fontSize: '1.875rem', fontWeight: 800, color: riskColor(r.risk_score) }}>{formatLakh(r.eal_lakh)}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 10 }}>Expected Annual Loss</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 10 }}>{t("Expected Annual Loss")}</div>
                   <div style={{ display: 'flex', gap: 20, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     <span>
                       Likelihood: <strong style={{ color: 'var(--text-primary)' }}>{Math.round(r.likelihood * 100)}%</strong>

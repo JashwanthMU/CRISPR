@@ -1,3 +1,4 @@
+import { useLanguage } from '../../lib/i18n';
 import { severityClass, severityColor } from '../../utils/format';
 
 interface Props {
@@ -5,6 +6,7 @@ interface Props {
 }
 
 export default function SeverityBadge({ severity }: Props) {
+  const { t } = useLanguage();
   return (
     <span
       className={severityClass(severity)}
@@ -30,7 +32,7 @@ export default function SeverityBadge({ severity }: Props) {
           display: 'inline-block',
         }}
       />
-      {severity}
+      {t(severity)}
     </span>
   );
 }

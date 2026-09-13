@@ -3,11 +3,17 @@ export interface SessionUser {
   name: string;
   email: string;
   role: 'REPORTER' | 'SECURITY';
+  organization_id: string;
+  organization_name?: string;
+  data_mode?: 'LIVE' | 'DEMO';
+  workspace?: 'executive' | 'technical' | null;
 }
 
 export interface AuthSession {
   access_token: string;
   token_type: 'bearer';
+  refresh_token?: string;
+  expires_in_seconds?: number;
   user: SessionUser;
 }
 
@@ -35,4 +41,9 @@ export function clearSession(): void {
 
 export function getAccessToken(): string | null {
   return getSession()?.access_token ?? null;
+}
+
+/** True only for a session whose active tenant is explicitly a demo tenant. */
+export function isDemoOrganization(): boolean {
+  return getSession()?.user?.data_mode === 'DEMO';
 }

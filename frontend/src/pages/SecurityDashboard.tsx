@@ -1,3 +1,4 @@
+import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, AlertTriangle, Radio, Target, Globe, Boxes, Inbox, IndianRupee } from 'lucide-react';
@@ -14,10 +15,11 @@ import FindingsSummary from '../components/dashboard/FindingsSummary';
 import SecurityPipeline from '../components/dashboard/SecurityPipeline';
 import SecurityInsights from '../components/dashboard/SecurityInsights';
 import RiskCaseDrawer from '../components/riskcases/RiskCaseDrawer';
-import { getEnterprise, getRiskCases, getSources, getFindings } from '../lib/api';
+import { API_MODE, getAssets, getEnterprise, getRemediation, getRiskCases, getSources, getFindings, getForecast } from '../lib/api';
 import { MULTI_SERIES_TREND } from '../demo/fixtures';
 import { useDemoStore } from '../demo/demoStore';
 import { useUiStore, setFilter } from '../lib/uiStore';
+import { isDemoOrganization } from '../lib/auth';
 import { formatLakh, sourceColor, sourceLabel, TOKENS } from '../utils/format';
 import { activateOnEnter } from '../utils/a11y';
 import type { Finding, RiskCase } from '../types';
@@ -38,26 +40,35 @@ const TREND_SERIES = [
 ];
 
 export default function SecurityDashboard() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [enterprise, setEnterprise] = useState<any>(null);
   const [risks, setRisks] = useState<RiskCase[]>([]);
   const [sources, setSources] = useState<any[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
+  const [remediationCount, setRemediationCount] = useState(0);
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
   const demoRiskScore = useDemoStore((s) => s.riskScore);
   const previousRiskScore = useDemoStore((s) => s.previousRiskScore);
   const isRunning = useDemoStore((s) => s.isRunning);
   const filters = useUiStore((s) => s.filters);
-  const riskScore = enterprise?.enterprise_risk_score ?? demoRiskScore;
+  const demoOrganization = isDemoOrganization();
+  const riskScore = enterprise?.enterprise_risk_score ?? (API_MODE === 'demo' ? demoRiskScore : 0);
 
   useEffect(() => {
-    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings()]).then(([e, r, s, f]) => {
+    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings(), getForecast(), getAssets(), getRemediation()]).then(([e, r, s, f, t, a, remediation]) => {
       setEnterprise(e);
       setRisks(r);
       setSources(s);
       setFindings(f);
-    });
+      setAssets(a);
+      setRemediationCount(remediation?.count ?? remediation?.items?.length ?? 0);
+      if (Array.isArray(t) && t.length) setTrendData(t);
+    }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
   }, []);
 
   const sortedRisks = useMemo(() => [...risks].sort((a, b) => b.risk_score - a.risk_score), [risks]);
@@ -68,8 +79,8 @@ export default function SecurityDashboard() {
   const lowCount = findings.filter((f) => f.severity === 'LOW').length;
   const connectedCount = sources.filter((s) => s.status === 'connected').length;
   const topRisk = sortedRisks[0];
-  const internetExposed = risks.filter((r) => (r as any).exposure === 'INTERNET').length || 2;
-  const openRemediations = 5;
+  const internetExposed = assets.filter((asset) => asset.internet_facing).length;
+  const openRemediations = remediationCount;
 
   const findingsSummaryRows = [
     { severity: 'CRITICAL' as const, count: criticalCount, trendPct: 8, remediationRate: 25 },
@@ -77,6 +88,10 @@ export default function SecurityDashboard() {
     { severity: 'MEDIUM' as const, count: mediumCount, trendPct: -2, remediationRate: 60 },
     { severity: 'LOW' as const, count: lowCount, trendPct: -6, remediationRate: 80 },
   ];
+
+  if (error) {
+    return <div className="page-container"><div className="card empty-state">Live dashboard unavailable: {error}</div></div>;
+  }
 
   if (!enterprise) {
     return (
@@ -95,7 +110,7 @@ export default function SecurityDashboard() {
     <div className="page-container page-stack">
       <div className="animate-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="page-title">Security Operations</h1>
+          <h1 className="page-title">{t("Security Operations")}</h1>
           <p className="page-subtitle" style={{ maxWidth: 640 }}>
             Real-time security posture across infrastructure, applications, identities, repositories and cloud resources.
           </p>
@@ -105,7 +120,7 @@ export default function SecurityDashboard() {
       {/* Executive metric grid */}
       <div className="responsive-grid-4 animate-in-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
         <KPICard
-          title="Critical Findings"
+          title={t("Critical Findings")}
           value={criticalCount}
           subtitle={`${highCount} high · ${mediumCount} medium`}
           icon={<AlertTriangle size={16} />}
@@ -115,7 +130,7 @@ export default function SecurityDashboard() {
           sparkline={[4, 5, 6, 7, 8, criticalCount]}
         />
         <KPICard
-          title="Internet Exposed Assets"
+          title={t("Internet Exposed Assets")}
           value={internetExposed}
           subtitle="Directly reachable from the internet"
           icon={<Globe size={16} />}
@@ -124,7 +139,7 @@ export default function SecurityDashboard() {
           tooltip="Assets with a public IP or internet-facing ingress rule."
         />
         <KPICard
-          title="Sources Connected"
+          title={t("Sources Connected")}
           value={`${connectedCount}/${sources.length}`}
           subtitle={`${sources.length - connectedCount} pending integration`}
           icon={<Radio size={16} />}
@@ -132,7 +147,7 @@ export default function SecurityDashboard() {
           navigateTo="/integrations"
         />
         <KPICard
-          title="Estimated Annual Loss"
+          title={t("Estimated Annual Loss")}
           value={formatLakh(enterprise.total_eal_lakh)}
           subtitle="Total quantified cyber exposure"
           icon={<IndianRupee size={16} />}
@@ -140,15 +155,15 @@ export default function SecurityDashboard() {
           navigateTo="/financial"
         />
         <KPICard
-          title="Monitored Assets"
-          value={13}
+          title={t("Monitored Assets")}
+          value={new Set(findings.map((finding) => finding.asset_id)).size}
           subtitle="Across code, cloud, and identity"
           icon={<Boxes size={16} />}
           accentColor={TOKENS.secondaryBlue}
           navigateTo="/assets"
         />
         <KPICard
-          title="Active Risk Cases"
+          title={t("Active Risk Cases")}
           value={risks.length}
           subtitle="Correlated across multiple sources"
           icon={<Target size={16} />}
@@ -156,7 +171,7 @@ export default function SecurityDashboard() {
           navigateTo="/risks"
         />
         <KPICard
-          title="Open Remediations"
+          title={t("Open Remediations")}
           value={openRemediations}
           subtitle="In the remediation queue"
           icon={<Inbox size={16} />}
@@ -177,7 +192,7 @@ export default function SecurityDashboard() {
       <div className="dashboard-grid-2 animate-in-2" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
         <RiskPostureCard
           score={riskScore}
-          previousScore={previousRiskScore}
+          previousScore={API_MODE === 'demo' ? previousRiskScore : riskScore}
           ealLakh={enterprise.total_eal_lakh}
           onOpenDetail={() => topRisk && setActiveCase(topRisk)}
         />
@@ -209,7 +224,7 @@ export default function SecurityDashboard() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="card-title" style={{ margin: 0 }}>
-              Active Risk Cases
+              {t("Active Risk Cases")}
             </div>
             <button className="btn-secondary" style={{ padding: '5px 12px', fontSize: '0.75rem' }} onClick={() => navigate('/risks')}>
               View all
@@ -308,7 +323,7 @@ export default function SecurityDashboard() {
                 </div>
               ))}
             </div>
-            <RiskDonut data={sources} height={180} />
+            <RiskDonut data={sources} height={190} />
           </div>
         </div>
       </div>
@@ -317,7 +332,7 @@ export default function SecurityDashboard() {
       <div className="card animate-in-3">
         <div className="card-title">Risk Trend</div>
         <InteractiveTrendChart
-          data={MULTI_SERIES_TREND}
+          data={demoOrganization ? MULTI_SERIES_TREND : trendData}
           xKey="month"
           series={TREND_SERIES}
           defaultSeries={['enterpriseRisk']}
@@ -341,7 +356,6 @@ export default function SecurityDashboard() {
         </div>
       </div>
 
-      {/* AI Advisor */}
       <AIAdvisorChat theme="security" suggestions={SECURITY_SUGGESTIONS} />
 
       <RiskCaseDrawer riskCase={activeCase} open={!!activeCase} onClose={() => setActiveCase(null)} />
