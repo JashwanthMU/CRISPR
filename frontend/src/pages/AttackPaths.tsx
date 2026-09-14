@@ -1,6 +1,6 @@
 import { useLanguage } from '../lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
-import { DatabaseZap, IndianRupee, Network, ShieldAlert, Waypoints } from 'lucide-react';
+import { IndianRupee, Network, ShieldAlert, Waypoints } from 'lucide-react';
 import AttackPathGraph from '../components/attackpath/AttackPathGraph';
 import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
 import SeverityBadge from '../components/common/SeverityBadge';
@@ -142,7 +142,6 @@ export default function AttackPaths() {
             </h1>
             <p>Trace evidence-backed routes from external entry points to critical assets.</p>
           </div>
-          <div className="attack-path-engine"><DatabaseZap size={16} /><span><strong>Neo4j</strong> graph traversal</span></div>
         </div>
       </div>
 
