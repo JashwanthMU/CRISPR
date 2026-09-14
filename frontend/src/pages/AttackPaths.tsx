@@ -11,7 +11,7 @@ import { getAttackPaths } from '../lib/api';
 import { toast } from '../lib/toastStore';
 import { formatRupees } from '../utils/format';
 
-function mergeAttackTopology(paths: AttackPath[]): AttackPath | null {
+function mergeAttackTopology(paths: AttackPath[], landscape = false): AttackPath | null {
   if (!paths.length) return null;
   const nodeMap = new Map<string, AttackPathNode>();
   const edgeMap = new Map<string, AttackPath['edges'][number]>();
@@ -50,7 +50,14 @@ function mergeAttackTopology(paths: AttackPath[]): AttackPath | null {
     const level = depth.get(node.id) ?? 0;
     const peers = levels.get(level) ?? [node.id];
     const index = peers.indexOf(node.id);
-    return { ...node, x: 75 + level * 180, y: 100 + index * 130 };
+    return {
+      ...node,
+      // The technical view contains many more branches. A wider layer gap
+      // and tighter row gap uses its landscape canvas instead of producing a
+      // tall, tiny topology. Executive overview keeps its established layout.
+      x: 75 + level * (landscape ? 230 : 180),
+      y: (landscape ? 70 : 100) + index * (landscape ? 88 : 130),
+    };
   });
   return { id: 'enterprise-topology', title: 'Enterprise attack topology', severity: paths.some((path) => path.severity === 'CRITICAL') ? 'CRITICAL' : paths[0].severity, nodes, edges };
 }
@@ -68,7 +75,7 @@ export default function AttackPaths() {
   const criticalPaths = paths.filter((path) => path.severity === 'CRITICAL').length;
   const maximumImpact = Math.max(0, ...paths.map((path) => Number(path.financial_impact_inr ?? 0)));
   const maximumConfidence = Math.max(0, ...paths.map((path) => Number(path.confidence ?? 0)));
-  const technicalTopology = useMemo(() => mergeAttackTopology(paths), [paths]);
+  const technicalTopology = useMemo(() => mergeAttackTopology(paths, true), [paths]);
   const executivePaths = useMemo(
     () => [...paths].sort((a, b) => Number(b.financial_impact_inr ?? 0) - Number(a.financial_impact_inr ?? 0)).slice(0, 5),
     [paths],
@@ -230,7 +237,7 @@ export default function AttackPaths() {
                 <div><Network size={16} /><span>Enterprise topology · Focus: {activePath.title}</span></div>
                 <span>{technicalTopology?.nodes.length ?? 0} nodes · {technicalTopology?.edges.length ?? 0} relationships</span>
               </div>
-              {technicalTopology && <AttackPathGraph path={technicalTopology} height={640} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
+              {technicalTopology && <AttackPathGraph path={technicalTopology} height={500} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
               <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
                 Drag to pan · use controls to zoom · click a node to inspect · red edges indicate an exploitable transition
               </div>
