@@ -157,7 +157,7 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
             const ty = target.y ?? 0;
             const midX = (sx + tx) / 2;
             const midY = (sy + ty) / 2;
-            const dim = (hoveredId || selectedNodeId) && !highlightedNodeIds.has(edge.source) && !highlightedNodeIds.has(edge.target);
+            const dim = Boolean(hoveredId) && !highlightedNodeIds.has(edge.source) && !highlightedNodeIds.has(edge.target);
             return (
               <g key={edge.id} opacity={dim ? 0.25 : 1}>
                 <line
@@ -183,7 +183,7 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
             const color = node.severity ? severityColor(node.severity) : TOKENS.textMuted;
             const isSelected = selectedNodeId === node.id;
             const isHovered = hoveredId === node.id;
-            const dim = (hoveredId || selectedNodeId) && !highlightedNodeIds.has(node.id);
+            const dim = Boolean(hoveredId) && !highlightedNodeIds.has(node.id);
             return (
               <g
                 key={node.id}
