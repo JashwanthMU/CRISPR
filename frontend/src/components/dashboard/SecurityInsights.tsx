@@ -34,8 +34,8 @@ const INSIGHTS: Insight[] = [
     title: '3 internet-exposed assets detected',
     description: 'Public API, Authentication API, and Customer Portal are directly reachable from the internet without a WAF.',
     severity: 'HIGH',
-    path: '/resources',
-    actionLabel: 'View Resources',
+    path: '/assets',
+    actionLabel: 'View Assets',
   },
   {
     icon: KeyRound,

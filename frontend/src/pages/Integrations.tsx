@@ -8,6 +8,7 @@ import { TOKENS } from '../utils/format';
 import type { Integration, IntegrationStatus } from '../types';
 import { getIntegrations, httpClient } from '../lib/api';
 import { isDemoOrganization } from '../lib/auth';
+import { SkeletonCard } from '../components/common/Skeleton';
 
 const STATUS_COLOR: Record<IntegrationStatus, string> = {
   connected: TOKENS.success,
@@ -29,15 +30,21 @@ export default function Integrations() {
   const { t } = useLanguage();
   const demoOrganization = isDemoOrganization();
   const [items, setItems] = useState<Integration[]>(demoOrganization ? INTEGRATIONS.map((i) => ({ ...i })) : []);
+  const [loading, setLoading] = useState(!demoOrganization);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (demoOrganization) {
       setItems(INTEGRATIONS.map((item) => ({ ...item })));
+      setLoading(false);
       return;
     }
+    setLoading(true);
+    setLoadError('');
     getIntegrations().then(setItems).catch((error) => {
+      setLoadError(error?.response?.data?.detail ?? error.message ?? 'Integration data could not be loaded.');
       toast.error('Integrations unavailable', error?.response?.data?.detail ?? error.message);
-    });
+    }).finally(() => setLoading(false));
   }, [demoOrganization]);
 
   useEffect(() => {
@@ -125,7 +132,10 @@ export default function Integrations() {
         </p>
       </div>
 
+      {loadError && <div className="card empty-state" role="alert">Integrations could not be loaded: {loadError}</div>}
+
       <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        {loading && Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} lines={2} />)}
         {items.map((integration, i) => (
           <div key={integration.id} className="card animate-in" style={{ animationDelay: `${i * 30}ms` }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>

@@ -26,8 +26,8 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
 
-  const maxX = Math.max(...path.nodes.map((n) => n.x ?? 0)) + 80;
-  const maxY = Math.max(...path.nodes.map((n) => n.y ?? 0)) + 80;
+  const maxX = Math.max(320, ...path.nodes.map((n) => n.x ?? 0)) + 80;
+  const maxY = Math.max(220, ...path.nodes.map((n) => n.y ?? 0)) + 80;
 
   const onMouseDown = (e: React.MouseEvent) => {
     dragRef.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
@@ -149,12 +149,21 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
                 key={node.id}
                 transform={`translate(${node.x} ${node.y})`}
                 style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${node.label}${node.severity ? `, ${node.severity}` : ''}`}
                 opacity={dim ? 0.35 : 1}
                 onMouseEnter={() => setHoveredId(node.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectNode?.(isSelected ? null : node);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectNode?.(isSelected ? null : node);
+                  }
                 }}
               >
                 <circle

@@ -1,5 +1,5 @@
 import { useLanguage } from '../../lib/i18n';
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Rows3, Rows2 } from 'lucide-react';
 
 export interface ColumnDef<T> {
@@ -67,6 +67,10 @@ export default function DataTable<T>({
 
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const pageRows = sortedRows.slice(page * pageSize, page * pageSize + pageSize);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages - 1));
+  }, [totalPages]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) {

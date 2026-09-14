@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Bot, Send, Sparkles, ShieldAlert, Globe, TrendingUp, ScrollText } from 'lucide-react';
 import { useUiStore, closeAIDrawer } from '../../lib/uiStore';
 import { queryAssistant } from '../../services/api';
+import { getEffectiveWorkspace, isWorkspacePathAllowed, safeWorkspacePath } from '../../lib/workspace';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -182,6 +183,7 @@ export default function AIAssistantDrawer() {
   const navigate = useNavigate();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const executiveView = getEffectiveWorkspace() === 'executive';
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
@@ -273,7 +275,7 @@ export default function AIAssistantDrawer() {
               {m.text}
               {!!m.references?.length && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {m.references.map((reference) => (
+                  {m.references.filter((reference) => isWorkspacePathAllowed(reference.path)).map((reference) => (
                     <button key={reference.path} className="btn-secondary" style={{ padding: '3px 7px', fontSize: '0.6875rem' }} onClick={() => { closeAIDrawer(); navigate(reference.path); }}>
                       {reference.label}
                     </button>
@@ -311,9 +313,9 @@ export default function AIAssistantDrawer() {
             <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '5px 10px' }} onClick={() => navigate('/risks')}>
               View Risk Cases
             </button>
-            <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '5px 10px' }} onClick={() => navigate('/findings')}>
+            {!executiveView && <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '5px 10px' }} onClick={() => navigate(safeWorkspacePath('/findings'))}>
               View Findings
-            </button>
+            </button>}
           </div>
         )}
       </div>

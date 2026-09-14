@@ -95,7 +95,7 @@ export default function RepositoryDetail() {
         </div>
 
         {tab === 'Overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div>
               <div className="card-title">Repository Details</div>
               <table className="data-table">

@@ -1,4 +1,5 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopHeader from './TopHeader';
 import AIAssistantDrawer from './AIAssistantDrawer';
@@ -16,6 +17,9 @@ interface Props {
  * the sidebar collapses, expands, or is resized.
  */
 export default function AppShell({ children }: Props) {
+  const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const width = useUiStore((s) => s.sidebarWidth);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
@@ -32,6 +36,21 @@ export default function AppShell({ children }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Route transitions always begin at the page heading. This also prevents a
+  // freshly authenticated user from inheriting the previous page's scroll.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    closeMobileNav();
+  }, [location.pathname]);
+
+  // Refresh and Run Analysis emit this event after backend completion. Remount
+  // the active page so all page-local queries reload from one shared signal.
+  useEffect(() => {
+    const refresh = () => setRefreshVersion((version) => version + 1);
+    window.addEventListener('crispr:data-refresh', refresh);
+    return () => window.removeEventListener('crispr:data-refresh', refresh);
+  }, []);
+
   // Close the mobile drawer automatically on route change via popstate/click
   // is already handled per-nav-item (SidebarItem calls closeMobileNav on
   // click); this covers back/forward browser navigation too.
@@ -46,7 +65,7 @@ export default function AppShell({ children }: Props) {
       <Sidebar />
       <div className={`app-main${mobileNavOpen ? ' mobile-nav-active' : ''}`}>
         <TopHeader />
-        <main>{children}</main>
+        <main ref={mainRef}><div key={refreshVersion}>{children}</div></main>
       </div>
       <AIAssistantDrawer />
     </div>

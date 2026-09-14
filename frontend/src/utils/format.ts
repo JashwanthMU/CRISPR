@@ -8,6 +8,7 @@ export const formatRupees = (amount: number | null | undefined): string => {
 
 export const formatLakh = (v: number | null | undefined): string => {
   if (v === null || v === undefined || Number.isNaN(v)) return '—';
+  if (Math.abs(v) >= 100) return `${v < 0 ? '-' : ''}₹${(Math.abs(v) / 100).toFixed(1)} Cr`;
   return `₹${v.toFixed(1)}L`;
 };
 

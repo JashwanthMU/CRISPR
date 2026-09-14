@@ -60,15 +60,17 @@ export default function SecurityDashboard() {
   const riskScore = enterprise?.enterprise_risk_score ?? (API_MODE === 'demo' ? demoRiskScore : 0);
 
   useEffect(() => {
-    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings(), getForecast(), getAssets(), getRemediation()]).then(([e, r, s, f, t, a, remediation]) => {
+    Promise.all([getEnterprise(), getRiskCases(), getSources(), getFindings(), getAssets(), getRemediation()]).then(([e, r, s, f, a, remediation]) => {
       setEnterprise(e);
       setRisks(r);
       setSources(s);
       setFindings(f);
       setAssets(a);
       setRemediationCount(remediation?.count ?? remediation?.items?.length ?? 0);
-      if (Array.isArray(t) && t.length) setTrendData(t);
     }).catch((requestError) => setError(requestError?.response?.data?.detail ?? requestError.message));
+    getForecast().then((trend) => {
+      if (Array.isArray(trend) && trend.length) setTrendData(trend);
+    }).catch(() => setTrendData([]));
   }, []);
 
   const sortedRisks = useMemo(() => [...risks].sort((a, b) => b.risk_score - a.risk_score), [risks]);
@@ -135,7 +137,7 @@ export default function SecurityDashboard() {
           subtitle="Directly reachable from the internet"
           icon={<Globe size={16} />}
           accentColor={TOKENS.sevHigh}
-          navigateTo="/resources"
+          navigateTo="/assets"
           tooltip="Assets with a public IP or internet-facing ingress rule."
         />
         <KPICard
@@ -152,7 +154,7 @@ export default function SecurityDashboard() {
           subtitle="Total quantified cyber exposure"
           icon={<IndianRupee size={16} />}
           accentColor={TOKENS.critical}
-          navigateTo="/financial"
+          navigateTo="/risks"
         />
         <KPICard
           title={t("Monitored Assets")}

@@ -96,7 +96,7 @@ export default function Assets() {
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {loading && (
           <div className="card" style={{ gridColumn: 'span 3' }}>
             <div className="empty-state">Loading…</div>
@@ -185,7 +185,7 @@ export default function Assets() {
 
               {expanded && (
                 <div style={{ marginTop: 20, borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                     <div>
                       <div className="card-title">Asset Details</div>
                       <table className="data-table">

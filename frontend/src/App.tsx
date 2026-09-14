@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AppShell from './components/shell/AppShell';
@@ -6,37 +6,37 @@ import ToastHost from './components/common/ToastHost';
 import CommandPalette from './components/common/CommandPalette';
 import { openCommandPalette, closeCommandPalette, useUiStore } from './lib/uiStore';
 
-import SecurityDashboard from './pages/SecurityDashboard';
-import FinancialDashboard from './pages/FinancialDashboard';
-import Findings from './pages/Findings';
-import Assets from './pages/Assets';
-import Risks from './pages/Risks';
-import Scenarios from './pages/Scenarios';
-import Investments from './pages/Investments';
-import Compliance from './pages/Compliance';
-
-import AttackPaths from './pages/AttackPaths';
-import Resources from './pages/Resources';
-import Vulnerabilities from './pages/Vulnerabilities';
-import Secrets from './pages/Secrets';
-import ThreatIntelligence from './pages/ThreatIntelligence';
-import CloudSecurity from './pages/CloudSecurity';
-import IdentitySecurity from './pages/IdentitySecurity';
-import CodeSecurity from './pages/CodeSecurity';
-import RepositoryDetail from './pages/RepositoryDetail';
-import ScaSbom from './pages/ScaSbom';
-import Recommendations from './pages/Recommendations';
-import RemediationQueue from './pages/RemediationQueue';
-import Policies from './pages/Policies';
-import Reports from './pages/Reports';
-import Integrations from './pages/Integrations';
-import ApiReference from './pages/ApiReference';
-import SettingsPage from './pages/Settings';
-import VSCodeDemo from './pages/VSCodeDemo';
 import Login from './pages/Login';
 import { getSession } from './lib/auth';
 import { API_MODE } from './lib/api';
-import { getEffectiveWorkspace, SIH_WORKSPACE_ENABLED, type Workspace } from './lib/workspace';
+import { getEffectiveWorkspace, getWorkspaceHome, SIH_WORKSPACE_ENABLED, type Workspace } from './lib/workspace';
+
+const SecurityDashboard = lazy(() => import('./pages/SecurityDashboard'));
+const FinancialDashboard = lazy(() => import('./pages/FinancialDashboard'));
+const Findings = lazy(() => import('./pages/Findings'));
+const Assets = lazy(() => import('./pages/Assets'));
+const Risks = lazy(() => import('./pages/Risks'));
+const Scenarios = lazy(() => import('./pages/Scenarios'));
+const Investments = lazy(() => import('./pages/Investments'));
+const Compliance = lazy(() => import('./pages/Compliance'));
+const AttackPaths = lazy(() => import('./pages/AttackPaths'));
+const Resources = lazy(() => import('./pages/Resources'));
+const Vulnerabilities = lazy(() => import('./pages/Vulnerabilities'));
+const Secrets = lazy(() => import('./pages/Secrets'));
+const ThreatIntelligence = lazy(() => import('./pages/ThreatIntelligence'));
+const CloudSecurity = lazy(() => import('./pages/CloudSecurity'));
+const IdentitySecurity = lazy(() => import('./pages/IdentitySecurity'));
+const CodeSecurity = lazy(() => import('./pages/CodeSecurity'));
+const RepositoryDetail = lazy(() => import('./pages/RepositoryDetail'));
+const ScaSbom = lazy(() => import('./pages/ScaSbom'));
+const Recommendations = lazy(() => import('./pages/Recommendations'));
+const RemediationQueue = lazy(() => import('./pages/RemediationQueue'));
+const Policies = lazy(() => import('./pages/Policies'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Integrations = lazy(() => import('./pages/Integrations'));
+const ApiReference = lazy(() => import('./pages/ApiReference'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const VSCodeDemo = lazy(() => import('./pages/VSCodeDemo'));
 
 function DemoOnly({ children, feature }: { children: ReactNode; feature: string }) {
   if (API_MODE === 'demo') return <>{children}</>;
@@ -68,7 +68,7 @@ function Shell() {
   useGlobalShortcuts();
   // The authenticated workspace claim overrides the browser's login-page selection.
   const workspace = getEffectiveWorkspace();
-  const home = workspace === 'executive' ? '/executive' : '/security';
+  const home = getWorkspaceHome(workspace);
 
   const workspacePage = (allowed: Workspace, page: ReactNode) => (
     !SIH_WORKSPACE_ENABLED || workspace === allowed ? <>{page}</> : <Navigate to={home} replace />
@@ -77,7 +77,8 @@ function Shell() {
   return (
     <>
       <AppShell>
-        <Routes>
+        <Suspense fallback={<div className="page-container"><div className="card empty-state">Loading workspace…</div></div>}>
+          <Routes>
           <Route path="/" element={<Navigate to={home} replace />} />
           <Route path="/executive" element={workspacePage('executive', <FinancialDashboard />)} />
           <Route path="/security" element={workspacePage('technical', <SecurityDashboard />)} />
@@ -114,7 +115,8 @@ function Shell() {
           <Route path="/demo/vscode" element={workspacePage('technical', <DemoOnly feature="VS Code demonstration"><VSCodeDemo /></DemoOnly>)} />
 
           <Route path="*" element={<Navigate to={home} replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </AppShell>
       <ToastHost />
       <CommandPalette />

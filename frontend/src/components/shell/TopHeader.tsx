@@ -25,6 +25,7 @@ export default function TopHeader() {
   const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const [analysisPending, setAnalysisPending] = useState(false);
+  const [exportPending, setExportPending] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -50,11 +51,17 @@ export default function TopHeader() {
   };
 
   const handleExport = async () => {
+    setExportPending(true);
     try {
-      await httpClient.post('/api/reports', { report_type: 'RISK_SUMMARY', name: 'CRISPR Security Report', format: 'JSON' });
-      toast.success('Report requested', 'The generated report will appear in Reports.');
+      const workspace = SIH_WORKSPACE_ENABLED ? getEffectiveWorkspace() : 'technical';
+      const reportName = workspace === 'executive' ? 'CRISPR Executive Cyber Risk Report' : 'CRISPR Technical Security Report';
+      const { downloadDashboardPdf } = await import('../../lib/reportPdf');
+      await downloadDashboardPdf(workspace, reportName);
+      toast.success('PDF downloaded', `${reportName} is ready.`);
     } catch {
-      toast.error('Export failed', 'The backend could not create the report.');
+      toast.error('Export failed', 'Current dashboard evidence could not be compiled into a PDF.');
+    } finally {
+      setExportPending(false);
     }
   };
 
@@ -63,12 +70,14 @@ export default function TopHeader() {
     try {
       const analysis = await runBackendAnalysis();
       if (analysis.id) {
+        let completed = false;
         for (let attempt = 0; attempt < 30; attempt += 1) {
           const job = (await httpClient.get(`/api/analysis/jobs/${analysis.id}`)).data;
-          if (job.status === 'SUCCEEDED') break;
+          if (job.status === 'SUCCEEDED') { completed = true; break; }
           if (job.status === 'FAILED') throw new Error(job.error || 'Risk analysis failed');
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
+        if (!completed) throw new Error('Risk analysis timed out');
       }
       const workspace = SIH_WORKSPACE_ENABLED ? getEffectiveWorkspace() : 'technical';
       window.dispatchEvent(new CustomEvent('crispr:data-refresh'));
@@ -111,8 +120,8 @@ export default function TopHeader() {
         <button className="icon-btn mobile-header-secondary" onClick={handleRefresh} aria-label={t("Refresh dashboard data")} title={t("Refresh")}>
           <RefreshCw size={16} style={refreshing ? { animation: 'spin-refresh 0.8s linear infinite' } : undefined} />
         </button>
-        <button className="icon-btn mobile-header-secondary" onClick={handleExport} aria-label={t("Export report")} title={t("Export")}>
-          <Download size={16} />
+        <button className="icon-btn mobile-header-secondary" onClick={handleExport} disabled={exportPending} aria-label={t("Export report")} title={t("Export")}>
+          {exportPending ? <Loader2 size={16} style={{ animation: 'spin-refresh 0.8s linear infinite' }} /> : <Download size={16} />}
         </button>
         <button
           className="btn-primary run-analysis-btn"

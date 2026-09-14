@@ -5,6 +5,7 @@ import { User, SlidersHorizontal, Building2, KeyRound, HelpCircle, LogOut } from
 import { useUiStore, togglePopover, closePopover } from '../../lib/uiStore';
 import { toast } from '../../lib/toastStore';
 import { clearSession, getSession } from '../../lib/auth';
+import { isWorkspacePathAllowed } from '../../lib/workspace';
 
 const MENU_ITEMS = [
   { label: 'Profile', icon: User, path: '/settings' },
@@ -68,7 +69,7 @@ export default function UserMenu() {
             <div className="user-menu-name">{user?.name || 'Security Team'}</div>
             <div className="user-menu-role">{user?.email}</div>
           </div>
-          {MENU_ITEMS.map((item) => {
+          {MENU_ITEMS.filter((item) => !item.path || isWorkspacePathAllowed(item.path)).map((item) => {
             const Icon = item.icon;
             return (
               <button key={t(item.label)} role="menuitem" className="user-menu-item" onClick={() => go(item.path, item.label)}>

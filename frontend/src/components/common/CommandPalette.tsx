@@ -3,22 +3,20 @@ import { useLanguage, translate } from '../../lib/i18n';
 import { useNavigate } from 'react-router-dom';
 import { Search, FileWarning, Building2, AlertTriangle, GitBranch, ScrollText, LayoutDashboard, Bug, Sparkles } from 'lucide-react';
 import { useUiStore, closeCommandPalette, openAIDrawer } from '../../lib/uiStore';
-import { NAV_GROUPS } from '../shell/navConfig';
+import { EXECUTIVE_NAV_GROUPS, TECHNICAL_NAV_GROUPS } from '../shell/navConfig';
+import { getEffectiveWorkspace } from '../../lib/workspace';
 import { getAssets, getFindings, getRepositories, getRiskCases, runAnalysis } from '../../lib/api';
 import type { CommandResult, CommandResultType } from '../../types';
 
 // "Pages" results are derived from the single shared nav config (see
 // src/components/shell/navConfig.tsx) instead of a second hardcoded list,
 // so the sidebar and command palette can never drift out of sync.
-const PAGE_RESULTS: CommandResult[] = NAV_GROUPS.flatMap((group) =>
-  group.items.map((item) => ({
-    id: `page-${item.to}`,
-    type: 'page' as const,
-    title: item.label,
-    subtitle: group.title,
-    path: item.to,
-  }))
-);
+function pageResultsForWorkspace(): CommandResult[] {
+  const groups = getEffectiveWorkspace() === 'executive' ? EXECUTIVE_NAV_GROUPS : TECHNICAL_NAV_GROUPS;
+  return groups.flatMap((group) => group.items.map((item) => ({
+    id: `page-${item.to}`, type: 'page' as const, title: item.label, subtitle: group.title, path: item.to,
+  })));
+}
 
 // "Actions" — real commands, not just navigation. Selecting one performs
 // the action directly instead of only opening a page.
@@ -81,54 +79,60 @@ export default function CommandPalette() {
       setQuery('');
       setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 10);
-      Promise.all([getAssets(), getFindings(), getRiskCases(), getRepositories()])
-        .then(([assets, findings, risks, repositories]) => setEntities({ assets, findings, risks, repositories }))
-        .catch(() => setEntities({ assets: [], findings: [], risks: [], repositories: [] }));
+      Promise.allSettled([getAssets(), getFindings(), getRiskCases(), getRepositories()])
+        .then(([assets, findings, risks, repositories]) => setEntities({
+          assets: assets.status === 'fulfilled' && Array.isArray(assets.value) ? assets.value : [],
+          findings: findings.status === 'fulfilled' && Array.isArray(findings.value) ? findings.value : [],
+          risks: risks.status === 'fulfilled' && Array.isArray(risks.value) ? risks.value : [],
+          repositories: repositories.status === 'fulfilled' && Array.isArray(repositories.value) ? repositories.value : [],
+        }));
     }
   }, [open]);
 
   type AnyResult = CommandResult | ActionResult;
 
   const results: AnyResult[] = useMemo(() => {
+    const pageResults = pageResultsForWorkspace();
+    const technical = getEffectiveWorkspace() === 'technical';
     const q = query.trim().toLowerCase();
     const matches = (title: string) => title.toLowerCase().includes(q) || translate(language, title).toLowerCase().includes(q);
     const actionMatches = ACTION_RESULTS.filter((a) => !q || matches(a.title));
 
-    if (!q) return [...PAGE_RESULTS, ...actionMatches];
+    if (!q) return [...pageResults, ...actionMatches];
 
-    const assetResults: CommandResult[] = entities.assets.filter((a) => a.name.toLowerCase().includes(q)).map((a) => ({
+    const assetResults: CommandResult[] = entities.assets.filter((a) => String(a.name ?? '').toLowerCase().includes(q)).map((a) => ({
       id: a.asset_id,
       type: 'asset',
       title: a.name,
       subtitle: a.business_service,
       path: `/assets`,
     }));
-    const findingResults: CommandResult[] = entities.findings.filter(
-      (f) => f.title.toLowerCase().includes(q) || f.finding_id.toLowerCase().includes(q) || f.cve?.toLowerCase().includes(q)
+    const findingResults: CommandResult[] = technical ? entities.findings.filter(
+      (f) => String(f.title ?? '').toLowerCase().includes(q) || String(f.finding_id ?? '').toLowerCase().includes(q) || f.cve?.toLowerCase().includes(q)
     ).map((f) => ({
       id: f.finding_id,
       type: 'finding',
       title: f.title,
       subtitle: `${f.finding_id}${f.cve ? ' · ' + f.cve : ''}`,
       path: `/findings`,
-    }));
-    const riskResults: CommandResult[] = entities.risks.filter((r) => r.asset_name.toLowerCase().includes(q)).map((r) => ({
+    })) : [];
+    const riskResults: CommandResult[] = entities.risks.filter((r) => String(r.asset_name ?? '').toLowerCase().includes(q)).map((r) => ({
       id: r.asset_id,
       type: 'risk_case',
       title: r.asset_name,
       subtitle: `Risk score ${r.risk_score}`,
       path: `/risks`,
     }));
-    const repoResults: CommandResult[] = entities.repositories.filter((r) => r.name.toLowerCase().includes(q)).map((r) => ({
+    const repoResults: CommandResult[] = technical ? entities.repositories.filter((r) => String(r.name ?? '').toLowerCase().includes(q)).map((r) => ({
       id: r.id,
       type: 'repository',
       title: r.name,
       subtitle: `Security score ${r.securityScore}`,
       path: `/code-security/repositories/${r.id}`,
-    }));
-    const pageResults = PAGE_RESULTS.filter((p) => matches(p.title));
+    })) : [];
+    const matchingPages = pageResults.filter((p) => matches(p.title));
 
-    return [...pageResults, ...assetResults, ...riskResults, ...findingResults, ...repoResults, ...actionMatches].slice(0, 20);
+    return [...matchingPages, ...assetResults, ...riskResults, ...findingResults, ...repoResults, ...actionMatches].slice(0, 20);
   }, [query, language, entities]);
 
   const grouped = useMemo(() => {

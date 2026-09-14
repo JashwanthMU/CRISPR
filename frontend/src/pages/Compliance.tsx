@@ -74,7 +74,7 @@ export default function Compliance() {
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16 }}>
+      <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16 }}>
         <div className="card">
           <div className="card-title">Framework Score Radar</div>
           <ComplianceRadar data={compliance} />

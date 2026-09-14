@@ -61,16 +61,21 @@ export default function Scenarios() {
   const [lossMagnitudeLakh, setLossMagnitudeLakh] = useState(200);
   const [potentialReductionLakh, setPotentialReductionLakh] = useState(31);
   const [deliveryError, setDeliveryError] = useState('');
+  const [scenarioError, setScenarioError] = useState('');
 
   useEffect(() => {
-    getPresets().then((response) => setPresets(response?.data ?? []));
+    getPresets().then((response) => setPresets(response?.data ?? [])).catch((requestError) => {
+      setScenarioError(requestError?.response?.data?.detail ?? requestError.message ?? 'Scenario presets could not be loaded.');
+    });
   }, []);
 
   const runWithParams = async (params: Record<string, boolean | number>) => {
     setSimulating(true);
-    const response = await getScenarios(params);
-    const data = response?.data;
-    if (data) {
+    setScenarioError('');
+    try {
+      const response = await getScenarios(params);
+      const data = response?.data;
+      if (!data) throw new Error('Scenario engine returned no result.');
       setResult({
         beforeEal: data.before_total_eal_inr,
         afterEal: data.after_total_eal_inr,
@@ -80,8 +85,11 @@ export default function Scenarios() {
           after: row.after_eal_inr,
         })),
       });
+    } catch (requestError: any) {
+      setScenarioError(requestError?.response?.data?.detail ?? requestError.message ?? 'Scenario calculation failed.');
+    } finally {
+      setSimulating(false);
     }
-    setSimulating(false);
   };
 
   const simulate = () => {
@@ -129,7 +137,9 @@ export default function Scenarios() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16 }}>
+      {scenarioError && <div className="card empty-state" role="alert">Scenario service error: {scenarioError}</div>}
+
+      <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16 }}>
         {/* Controls */}
         <div className="card">
           <div className="card-title">Controls</div>
@@ -243,7 +253,7 @@ export default function Scenarios() {
           <div className="card-title">Results</div>
           {result ? (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                 <div style={{ padding: 16, borderRadius: 8, background: 'var(--bg-elevated)', textAlign: 'center' }}>
                   <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
                     Before EAL
@@ -313,7 +323,7 @@ export default function Scenarios() {
       {/* Presets */}
       <div className="card">
         <div className="card-title">Quick Presets</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <div className="responsive-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {presets.map((p) => {
             const negative = p.reduction_inr < 0;
             return (
@@ -350,9 +360,9 @@ export default function Scenarios() {
       <div className="card">
         <div className="card-title" style={{ marginBottom: 4 }}>Remediation Delivery Risk</div>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0 0 18px' }}>Model schedule overrun, staff availability, capability and backup coverage. This records operational capacity—not medical details.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(500px, 1.15fr) minmax(380px, 0.85fr)', gap: 24, alignItems: 'start' }}>
+        <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: 'minmax(500px, 1.15fr) minmax(380px, 0.85fr)', gap: 24, alignItems: 'start' }}>
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+            <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
               {[
                 ['Planned duration', 'days', plannedDays, setPlannedDays, 1, 730],
                 ['Likely duration', 'days', likelyDays, setLikelyDays, 1, 730],
@@ -372,7 +382,7 @@ export default function Scenarios() {
             {deliveryError && <div style={{ color: 'var(--sev-critical)', fontSize: '0.75rem', marginTop: 10 }}>{deliveryError}</div>}
           </div>
           <div style={{ minHeight: 230 }}>
-            {deliveryResult ? <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {deliveryResult ? <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[['Forecast duration', `${deliveryResult.forecast_days} days`], ['Additional exposure', `${deliveryResult.additional_exposure_days} days`], ['Delay-attributable loss', formatRupees(deliveryResult.delay_attributable_loss_inr)], ['Risk reduction at risk', formatRupees(deliveryResult.risk_reduction_at_risk_inr)]].map(([label, value]) => <div key={label} style={{ padding: 16, border: '1px solid var(--bg-border)', borderRadius: 8, background: 'var(--bg-elevated)' }}><div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>{label}</div><strong style={{ fontSize: '1.125rem' }}>{value}</strong></div>)}
               <div style={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Incident probability through forecast completion: {(deliveryResult.forecast_period_probability * 100).toFixed(2)}%</div>
             </div> : <div className="empty-state" style={{ minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Enter delivery conditions and calculate the company’s additional expected loss.</div>}

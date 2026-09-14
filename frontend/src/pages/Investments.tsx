@@ -116,7 +116,7 @@ export default function Investments() {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
+          <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16 }}>
             <div className="card">
               <div className="card-title">Selected Controls</div>
               <table className="data-table">

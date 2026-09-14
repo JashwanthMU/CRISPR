@@ -16,18 +16,30 @@ interface ReportItem {
   status?: string;
 }
 
+function formattedDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleString();
+}
+
 export default function Reports() {
   const { t } = useLanguage();
   const executiveView = SIH_WORKSPACE_ENABLED && getEffectiveWorkspace() === 'executive';
   const [reports, setReports] = useState<ReportItem[] | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (API_MODE === 'demo') {
-      getReports().then((items: any) => setReports(items));
+      getReports().then((items: any) => setReports(items)).catch((requestError: any) => {
+        setError(requestError?.response?.data?.detail ?? requestError.message ?? 'Reports could not be loaded.');
+        setReports([]);
+      });
       return;
     }
     api.get('/api/reports').then((res) => {
       setReports(res.data.reports);
+    }).catch((requestError) => {
+      setError(requestError?.response?.data?.detail ?? requestError.message ?? 'Reports could not be loaded.');
+      setReports([]);
     });
   }, []);
 
@@ -85,6 +97,7 @@ export default function Reports() {
       </div>
 
       <div className="card">
+        {error && <div className="empty-state" role="alert">Reports could not be loaded: {error}</div>}
         {!reports ? (
           <SkeletonTable rows={4} cols={3} />
         ) : (
@@ -104,7 +117,7 @@ export default function Reports() {
                     <div style={{ fontWeight: 600 }}>{r.name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{r.description ?? r.status}</div>
                   </td>
-                  <td style={{ color: 'var(--text-muted)' }}>{new Date(r.generated).toLocaleString()}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{formattedDate(r.generated)}</td>
                   <td>PDF</td>
                   <td>
                     <button
@@ -117,6 +130,7 @@ export default function Reports() {
                   </td>
                 </tr>
               ))}
+              {reports.length === 0 && !error && <tr><td colSpan={4}><div className="empty-state">No reports have been generated yet.</div></td></tr>}
             </tbody>
           </table>
         )}

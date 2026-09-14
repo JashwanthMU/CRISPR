@@ -20,6 +20,7 @@ export default function Findings() {
   const [risks, setRisks] = useState<RiskCase[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeFinding, setActiveFinding] = useState<Finding | null>(null);
+  const [error, setError] = useState('');
 
   const [search, setSearch] = useState('');
   const [sevFilter, setSevFilter] = useState(searchParams.get('severity') ?? 'ALL');
@@ -30,6 +31,9 @@ export default function Findings() {
     Promise.all([getFindings(), getRiskCases()]).then(([f, r]) => {
       setFindings(f);
       setRisks(r);
+    }).catch((requestError) => {
+      setError(requestError?.response?.data?.detail ?? requestError.message ?? 'Findings could not be loaded.');
+      setFindings([]);
     });
   }, []);
 
@@ -62,6 +66,20 @@ export default function Findings() {
   const bulkResolve = (ids: string[]) => {
     toast.success(`${ids.length} finding(s) marked resolved`);
     setSelected(new Set());
+  };
+
+  const exportFindings = () => {
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const header = ['Finding ID', 'Title', 'Severity', 'Asset', 'Source', 'CVE or Rule', 'Status', 'First Seen'];
+    const body = filtered.map((finding) => [finding.finding_id, finding.title, finding.severity, finding.asset_id, finding.source_type, finding.cve, finding.status, finding.first_seen]);
+    const csv = [header, ...body].map((row) => row.map(escape).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `crispr-findings-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV downloaded', `${filtered.length} finding(s) exported.`);
   };
 
   const columns: ColumnDef<Finding>[] = [
@@ -126,10 +144,12 @@ export default function Findings() {
           <h1 className="page-title">{t("Findings Explorer")}</h1>
           <p className="page-subtitle">All raw findings correlated across every connected source</p>
         </div>
-        <button className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => toast.success('Export started', 'findings.csv')}>
+        <button className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={exportFindings} disabled={!filtered.length}>
           <Download size={14} /> {t("Export")}
         </button>
       </div>
+
+      {error && <div className="card empty-state" role="alert">Findings could not be loaded: {error}</div>}
 
       {/* Stats bar */}
       <div className="card" style={{ display: 'flex', gap: 24, alignItems: 'center' }}>

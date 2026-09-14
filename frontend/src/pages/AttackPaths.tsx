@@ -168,7 +168,7 @@ export default function AttackPaths() {
 
       {executiveView ? (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+          <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
             <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <ShieldAlert size={20} color="var(--sev-critical)" />
               <div><div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Critical business routes</div><div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{criticalPaths}</div></div>

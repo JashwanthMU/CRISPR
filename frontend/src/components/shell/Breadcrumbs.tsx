@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { BRAND } from '../../config/branding';
 import { PAGE_LABELS } from './navConfig';
+import { getWorkspaceHome } from '../../lib/workspace';
 
 const EXTRA_LABELS: Record<string, string> = {
   'code-security': 'Code Security',
@@ -46,7 +47,7 @@ export default function Breadcrumbs() {
 
   return (
     <nav className="breadcrumb" aria-label={t("Breadcrumb")}>
-      <button type="button" className="breadcrumb-root" onClick={() => navigate('/security')}>
+      <button type="button" className="breadcrumb-root" onClick={() => navigate(getWorkspaceHome())}>
         {BRAND.name}
       </button>
       {crumbs.map((c, i) => (

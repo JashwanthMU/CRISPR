@@ -58,7 +58,10 @@ export default function KPICard({
       onKeyDown={
         clickable
           ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') navigate(navigateTo!);
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(navigateTo!);
+              }
             }
           : undefined
       }

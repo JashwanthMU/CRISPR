@@ -5,6 +5,7 @@ import { useUiStore, togglePopover, closePopover } from '../../lib/uiStore';
 import { useDemoStore } from '../../demo/demoStore';
 import type { TimelineEvent } from '../../types';
 import { httpClient } from '../../lib/api';
+import { safeWorkspacePath } from '../../lib/workspace';
 
 const KIND_ICON: Record<TimelineEvent['kind'], typeof Circle> = {
   info: GitBranch,
@@ -78,11 +79,11 @@ export default function RecentActivity() {
   const goToRelated = (event: TimelineEvent) => {
     const l = event.label.toLowerCase();
     closePopover();
-    if (l.includes('repository') || l.includes('sync')) navigate('/code-security');
+    if (l.includes('repository') || l.includes('sync')) navigate(safeWorkspacePath('/code-security'));
     else if (l.includes('risk case') || l.includes('risk engine')) navigate('/risks');
-    else if (l.includes('finding') || l.includes('bounty')) navigate('/findings');
+    else if (l.includes('finding') || l.includes('bounty')) navigate(safeWorkspacePath('/findings'));
     else if (l.includes('report')) navigate('/reports');
-    else navigate('/security');
+    else navigate(safeWorkspacePath('/security'));
   };
 
   return (

@@ -24,9 +24,13 @@ export default function Risks() {
   const [risks, setRisks] = useState<RiskCase[] | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [activeCase, setActiveCase] = useState<RiskCase | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    getRiskCases().then(setRisks);
+    getRiskCases().then(setRisks).catch((requestError) => {
+      setError(requestError?.response?.data?.detail ?? requestError.message ?? 'Risk cases could not be loaded.');
+      setRisks([]);
+    });
   }, []);
 
   const sorted = useMemo(() => (risks ? [...risks].sort((a, b) => b.eal_inr - a.eal_inr) : []), [risks]);
@@ -59,6 +63,7 @@ export default function Risks() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {error && <div className="card empty-state" role="alert">Risk cases could not be loaded: {error}</div>}
         {!risks &&
           Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} lines={2} />)}
 
@@ -73,7 +78,7 @@ export default function Risks() {
               onKeyDown={activateOnEnter(() => setActiveCase(r))}
               style={{ cursor: 'pointer' }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 1.5fr', gap: 24, alignItems: 'flex-start' }}>
+              <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 1.5fr', gap: 24, alignItems: 'flex-start' }}>
                 {/* Left */}
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                   <RiskScoreBadge score={r.risk_score} size={56} />
@@ -127,6 +132,7 @@ export default function Risks() {
               </div>
             </div>
           ))}
+        {risks && !error && filtered.length === 0 && <div className="card empty-state">No risk cases match the selected severity.</div>}
 
         {risks && filtered.length === 0 && (
           <div className="card">

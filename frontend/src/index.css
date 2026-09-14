@@ -463,7 +463,7 @@ h3 {
 
 .attack-path-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .attack-path-heading p { margin: 4px 0 0; color: var(--text-muted); font-size: .8125rem; }
-.attack-path-engine { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--color-primary-blue) 30%, var(--color-border)); border-radius: 999px; color: var(--color-primary-blue); background: color-mix(in srgb, var(--color-primary-blue) 7%, var(--color-bg-primary)); font-size: .75rem; white-space: nowrap; }
+.attack-path-engine { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--color-primary-blue) 30%, var(--color-border)); border-radius: 999px; color: var(--color-primary-blue); background: color-mix(in srgb, var(--color-primary-blue) 7%, var(--color-bg)); font-size: .75rem; white-space: nowrap; }
 .attack-graph-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .attack-graph-title > div { display: flex; align-items: center; gap: 8px; font-size: .8125rem; font-weight: 700; }
 .attack-graph-title > span { color: var(--text-muted); font-size: .6875rem; }

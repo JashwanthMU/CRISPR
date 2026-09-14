@@ -331,7 +331,7 @@ export default function FinancialDashboard() {
       {/* Row 4: Budget Optimizer */}
       <div className="card">
         <div className="card-title">Security Budget Optimizer</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 24 }}>
+        <div className="dashboard-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 24 }}>
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
               Annual Budget: {formatRupees(budget)}
