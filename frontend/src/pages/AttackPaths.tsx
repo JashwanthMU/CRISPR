@@ -203,12 +203,17 @@ export default function AttackPaths() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card" ref={graphCard} style={{ scrollMarginTop: 16 }}>
             <div className="attack-graph-title">
               <div><Network size={16} /><span>Enterprise exposure topology</span></div>
-              <span>{executiveTopology?.nodes.length ?? 0} priority stages · {executivePaths.length} highest-impact routes</span>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span>{executiveTopology?.nodes.length ?? 0} priority stages · {executivePaths.length} highest-impact routes</span>
+                <button className="btn-secondary" aria-expanded={graphExpanded} onClick={() => setGraphExpanded((value) => !value)}>
+                  {graphExpanded ? 'Restore view' : 'Enlarge graph'}
+                </button>
+              </div>
             </div>
-            {executiveTopology && <AttackPathGraph path={executiveTopology} height={390} />}
+            {executiveTopology && <AttackPathGraph path={executiveTopology} height={graphExpanded ? 'calc(100dvh - 200px)' : 390} />}
             <div style={{ marginTop: 12, fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
               The overview combines all evidence-backed routes from external entry points to sensitive business assets. Red transitions identify where prioritized controls can interrupt exposure.
             </div>
