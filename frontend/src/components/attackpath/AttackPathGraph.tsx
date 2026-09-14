@@ -51,7 +51,12 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
   }, []);
 
   useEffect(() => {
-    const updateFullscreenState = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    const updateFullscreenState = () => {
+      const active = document.fullscreenElement === containerRef.current;
+      setIsFullscreen(active);
+      setZoom(active ? 1.35 : 1);
+      setPan({ x: 0, y: 0 });
+    };
     document.addEventListener('fullscreenchange', updateFullscreenState);
     return () => document.removeEventListener('fullscreenchange', updateFullscreenState);
   }, []);
@@ -122,7 +127,7 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
       >
-        <g transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}>
+        <g transform={`translate(${pan.x} ${pan.y}) translate(${maxX / 2} ${maxY / 2}) scale(${zoom}) translate(${-maxX / 2} ${-maxY / 2})`}>
           <defs>
             <pattern id="attack-grid" width="28" height="28" patternUnits="userSpaceOnUse">
               <path d="M 28 0 L 0 0 0 28" fill="none" stroke={TOKENS.border} strokeWidth="0.45" opacity="0.5" />
