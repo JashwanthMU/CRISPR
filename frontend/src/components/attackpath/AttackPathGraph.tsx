@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { useRef, useState, useCallback } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import type { AttackPath, AttackPathNode } from '../../types';
 import { ATTACK_NODE_ICON } from '../../config/icons';
 import { severityColor, TOKENS } from '../../utils/format';
@@ -24,9 +24,6 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenError, setFullscreenError] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
 
   const maxX = Math.max(320, ...path.nodes.map((n) => n.x ?? 0)) + 80;
@@ -50,36 +47,6 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
     setPan({ x: 0, y: 0 });
   }, []);
 
-  useEffect(() => {
-    const updateFullscreenState = () => {
-      const active = document.fullscreenElement === containerRef.current;
-      setIsFullscreen(active);
-      // Fullscreen already enlarges the SVG to the viewport. Keep a fitted
-      // transform so outer branches and labels are never clipped.
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-    };
-    document.addEventListener('fullscreenchange', updateFullscreenState);
-    return () => document.removeEventListener('fullscreenchange', updateFullscreenState);
-  }, []);
-
-  const toggleFullscreen = async () => {
-    setFullscreenError('');
-    try {
-      if (document.fullscreenElement === containerRef.current) {
-        await document.exitFullscreen();
-        return;
-      }
-      if (!containerRef.current?.requestFullscreen) {
-        setFullscreenError('Fullscreen is not supported by this browser.');
-        return;
-      }
-      await containerRef.current.requestFullscreen();
-    } catch {
-      setFullscreenError('The browser blocked fullscreen mode.');
-    }
-  };
-
   const highlightedNodeIds = new Set<string>();
   if (hoveredId || selectedNodeId) {
     const activeId = hoveredId ?? selectedNodeId!;
@@ -92,7 +59,6 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
 
   return (
     <div
-      ref={containerRef}
       style={{
         position: 'relative',
         border: '1px solid var(--color-border)',
@@ -101,7 +67,6 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
         background: 'linear-gradient(145deg, color-mix(in srgb, var(--color-primary-blue) 5%, var(--color-bg-secondary)), var(--color-bg-secondary))',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)',
         width: '100%',
-        height: isFullscreen ? '100vh' : undefined,
       }}
     >
       <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, zIndex: 5 }}>
@@ -114,14 +79,10 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
         <button className="icon-btn" onClick={resetView} aria-label="Reset graph view" title="Reset zoom and position">
           <RotateCcw size={13} />
         </button>
-        <button className="icon-btn" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
-          {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-        </button>
       </div>
-      {fullscreenError && <div role="alert" style={{ position: 'absolute', top: 48, right: 8, zIndex: 5, padding: '6px 9px', borderRadius: 6, background: 'var(--color-bg)', color: 'var(--sev-critical)', fontSize: '0.6875rem', boxShadow: 'var(--shadow-sm)' }}>{fullscreenError}</div>}
       <svg
         width="100%"
-        height={isFullscreen ? '100%' : height}
+        height={height}
         viewBox={`0 0 ${maxX} ${maxY}`}
         style={{ cursor: dragRef.current ? 'grabbing' : 'grab', display: 'block' }}
         onMouseDown={onMouseDown}
