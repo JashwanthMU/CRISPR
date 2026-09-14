@@ -230,7 +230,7 @@ export default function AttackPaths() {
                 <div><Network size={16} /><span>Enterprise topology · Focus: {activePath.title}</span></div>
                 <span>{technicalTopology?.nodes.length ?? 0} nodes · {technicalTopology?.edges.length ?? 0} relationships</span>
               </div>
-              {technicalTopology && <AttackPathGraph path={technicalTopology} height={540} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
+              {technicalTopology && <AttackPathGraph path={technicalTopology} height={640} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
               <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
                 Drag to pan · use controls to zoom · click a node to inspect · red edges indicate an exploitable transition
               </div>

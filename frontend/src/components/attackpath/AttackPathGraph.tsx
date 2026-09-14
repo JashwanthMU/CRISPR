@@ -54,7 +54,9 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
     const updateFullscreenState = () => {
       const active = document.fullscreenElement === containerRef.current;
       setIsFullscreen(active);
-      setZoom(active ? 1.35 : 1);
+      // A small centered enlargement keeps dense/tall enterprise topologies
+      // readable without cutting off their entry or target nodes.
+      setZoom(active ? 1.08 : 1);
       setPan({ x: 0, y: 0 });
     };
     document.addEventListener('fullscreenchange', updateFullscreenState);
