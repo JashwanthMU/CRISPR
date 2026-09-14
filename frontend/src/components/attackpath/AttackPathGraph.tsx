@@ -6,7 +6,7 @@ import { severityColor, TOKENS } from '../../utils/format';
 
 interface Props {
   path: AttackPath;
-  height?: number;
+  height?: number | string;
   selectedNodeId?: string | null;
   onSelectNode?: (node: AttackPathNode | null) => void;
 }
@@ -84,7 +84,7 @@ export default function AttackPathGraph({ path, height = 320, selectedNodeId, on
         width="100%"
         height={height}
         viewBox={`0 0 ${maxX} ${maxY}`}
-        style={{ cursor: dragRef.current ? 'grabbing' : 'grab', display: 'block' }}
+        style={{ height, cursor: dragRef.current ? 'grabbing' : 'grab', display: 'block' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}

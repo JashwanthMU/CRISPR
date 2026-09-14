@@ -1,5 +1,5 @@
 import { useLanguage } from '../lib/i18n';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { IndianRupee, Network, ShieldAlert, Waypoints } from 'lucide-react';
 import AttackPathGraph from '../components/attackpath/AttackPathGraph';
 import NodeDetailPanel from '../components/attackpath/NodeDetailPanel';
@@ -77,6 +77,12 @@ export default function AttackPaths() {
   const [selectedNode, setSelectedNode] = useState<AttackPathNode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [graphExpanded, setGraphExpanded] = useState(false);
+  const graphCard = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (graphExpanded) graphCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [graphExpanded]);
 
   const activePath = paths.find((p) => p.id === activePathId) ?? paths[0];
   const executiveView = SIH_WORKSPACE_ENABLED && getEffectiveWorkspace() === 'executive';
@@ -239,13 +245,18 @@ export default function AttackPaths() {
         </>
       ) : (
         <>
-          <div className="attack-path-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 16 }}>
-            <div className="card">
+          <div className="attack-path-layout" style={{ display: 'grid', gridTemplateColumns: graphExpanded ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 320px', gap: 16 }}>
+            <div className="card" ref={graphCard} style={{ scrollMarginTop: 16 }}>
               <div className="attack-graph-title">
                 <div><Network size={16} /><span>Enterprise topology · Focus: {activePath.title}</span></div>
-                <span>{technicalTopology?.nodes.length ?? 0} nodes · {technicalTopology?.edges.length ?? 0} relationships</span>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span>{technicalTopology?.nodes.length ?? 0} nodes · {technicalTopology?.edges.length ?? 0} relationships</span>
+                  <button className="btn-secondary" aria-expanded={graphExpanded} onClick={() => setGraphExpanded((value) => !value)}>
+                    {graphExpanded ? 'Restore view' : 'Enlarge graph'}
+                  </button>
+                </div>
               </div>
-              {technicalTopology && <AttackPathGraph path={technicalTopology} height={500} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
+              {technicalTopology && <AttackPathGraph path={technicalTopology} height={graphExpanded ? 'calc(100dvh - 200px)' : 500} selectedNodeId={selectedNode?.id} onSelectNode={setSelectedNode} />}
               <div style={{ marginTop: 10, fontSize: '0.6875rem', color: 'var(--text-subtle)' }}>
                 Drag to pan · use controls to zoom · click a node to inspect · red edges indicate an exploitable transition
               </div>
