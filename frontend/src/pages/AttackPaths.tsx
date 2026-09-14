@@ -41,13 +41,21 @@ function mergeAttackTopology(paths: AttackPath[], landscape = false): AttackPath
       if (!processed.has(edge.target) && !queue.includes(edge.target)) queue.push(edge.target);
     });
   }
+  const maximumDepth = Math.max(0, ...depth.values());
+  const visualLevel = (id: string) => {
+    const rawLevel = depth.get(id) ?? 0;
+    // Dense technical graphs can contain long merged chains. Bound them to
+    // seven visual columns so the complete topology remains readable in the
+    // available landscape canvas instead of being scaled down excessively.
+    return landscape && maximumDepth > 6 ? Math.round((rawLevel / maximumDepth) * 6) : rawLevel;
+  };
   const levels = new Map<number, string[]>();
   nodeMap.forEach((_, id) => {
-    const level = depth.get(id) ?? 0;
+    const level = visualLevel(id);
     levels.set(level, [...(levels.get(level) ?? []), id]);
   });
   const nodes = [...nodeMap.values()].map((node) => {
-    const level = depth.get(node.id) ?? 0;
+    const level = visualLevel(node.id);
     const peers = levels.get(level) ?? [node.id];
     const index = peers.indexOf(node.id);
     return {
