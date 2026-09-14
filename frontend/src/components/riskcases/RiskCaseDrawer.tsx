@@ -119,7 +119,7 @@ export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
           <div>
             <div className="card-title">Risk Drivers</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {riskCase.risk_drivers.map((d, i) => (
+              {(riskCase.risk_drivers ?? []).map((d, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem' }}>
                   {d.direction === 'up' ? <ArrowUp size={13} color="var(--sev-critical)" /> : <ArrowDown size={13} color="var(--sev-low)" />}
                   <span style={{ fontWeight: 600, color: d.direction === 'up' ? 'var(--sev-critical)' : 'var(--sev-low)', width: 36 }}>
@@ -135,7 +135,7 @@ export default function RiskCaseDrawer({ riskCase, open, onClose }: Props) {
           <div>
             <div className="card-title">Correlated Sources</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {riskCase.sources.map((s) => (
+              {(riskCase.sources ?? []).map((s) => (
                 <SourcePill key={s} source={s} />
               ))}
             </div>

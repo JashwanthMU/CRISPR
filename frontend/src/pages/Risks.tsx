@@ -33,7 +33,7 @@ export default function Risks() {
     });
   }, []);
 
-  const sorted = useMemo(() => (risks ? [...risks].sort((a, b) => b.eal_inr - a.eal_inr) : []), [risks]);
+  const sorted = useMemo(() => (risks ? [...risks].sort((a, b) => Number(b.eal_inr ?? 0) - Number(a.eal_inr ?? 0)) : []), [risks]);
   const filtered = filter === 'ALL' ? sorted : sorted.filter((r) => bucketOf(r.risk_score) === filter);
 
   return (
@@ -113,7 +113,7 @@ export default function Risks() {
                     Top Risk Drivers
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {r.risk_drivers.slice(0, 3).map((d, i) => (
+                    {(r.risk_drivers ?? []).slice(0, 3).map((d, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem' }}>
                         {d.direction === 'up' ? (
                           <ArrowUp size={12} color="var(--sev-critical)" />
