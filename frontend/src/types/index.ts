@@ -318,7 +318,7 @@ export interface AttackPath {
 // ----------------------------------------------------------------------------
 // Remediation scenarios (new, camelCase — separate from legacy "Scenarios" what-if sim)
 // ----------------------------------------------------------------------------
-export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'BLOCKED' | 'AT_RISK' | 'RESOLVED' | 'VERIFIED';
+export type ScenarioStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PR_OPENED' | 'BLOCKED' | 'AT_RISK' | 'REOPENED' | 'RESOLVED' | 'VERIFIED';
 
 export interface RemediationScenario {
   id: string;

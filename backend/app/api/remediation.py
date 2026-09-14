@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
 from backend.app.auth import AuthUser, require_security
@@ -13,7 +14,7 @@ from backend.services.audit import record_audit_event
 from backend.services.delivery_risk import calculate_delivery_risk
 
 router = APIRouter()
-VALID_STATUSES = {"NOT_STARTED", "IN_PROGRESS", "PR_OPENED", "BLOCKED", "AT_RISK", "RESOLVED", "VERIFIED"}
+VALID_STATUSES = {"NOT_STARTED", "IN_PROGRESS", "PR_OPENED", "BLOCKED", "AT_RISK", "REOPENED", "RESOLVED"}
 
 
 class RemediationCreate(BaseModel):
@@ -68,6 +69,16 @@ class DeliveryRiskRequest(BaseModel):
     backup_available: bool = False
 
 
+class VerificationCreate(BaseModel):
+    result: str = Field(pattern="^(PASSED|FAILED)$")
+    method: str = Field(pattern="^(RESCAN|CONTROL_TEST|CONFIGURATION_REVIEW|MANUAL_EVIDENCE)$")
+    evidence_reference: str = Field(min_length=3, max_length=500)
+    evidence_summary: str = Field(min_length=10, max_length=2000)
+    observed_at: datetime
+    expected_version: int = Field(ge=1)
+    model_version: str | None = Field(default=None, max_length=120)
+
+
 def _summary(items: list[dict]) -> dict:
     open_items = [item for item in items if item["status"] not in {"RESOLVED", "VERIFIED"}]
     pending = sum(float(item.get("riskReductionInr") or 0) for item in open_items)
@@ -113,7 +124,8 @@ def _apply_update(item_id: UUID, expected: int, user: AuthUser, *, status: str |
         db.execute(
             """INSERT INTO remediation_events(event_id,remediation_id,organization_id,event_type,actor_id,previous,current)
                VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-            (uuid4(), item_id, user.organization_id, event_type, user.user_id, Jsonb(previous), Jsonb(current)),
+            (uuid4(), item_id, user.organization_id, event_type, user.user_id,
+             Jsonb(jsonable_encoder(previous)), Jsonb(jsonable_encoder(current))),
         )
     record_audit_event(user.organization_id, user.user_id, f"remediation.{event_type.lower()}", "remediation", str(item_id))
     return current
@@ -123,7 +135,90 @@ def _apply_update(item_id: UUID, expected: int, user: AuthUser, *, status: str |
 def update_status(item_id: UUID, body: StatusUpdate, user: AuthUser = Depends(require_security)) -> dict:
     if body.status not in VALID_STATUSES:
         raise HTTPException(status_code=422, detail=f"Invalid status; expected one of {sorted(VALID_STATUSES)}")
+    with get_connection() as db:
+        current = db.execute(
+            "SELECT status FROM remediation_items WHERE remediation_id=%s AND organization_id=%s",
+            (item_id, user.organization_id),
+        ).fetchone()
+    if current and current["status"] == "VERIFIED":
+        raise HTTPException(status_code=409, detail="Verified remediation is immutable; create a new remediation if risk recurs")
     return _apply_update(item_id, body.expected_version, user, status=body.status)
+
+
+@router.get("/{item_id}/verifications")
+def list_verifications(item_id: UUID, user: AuthUser = Depends(require_security)) -> dict:
+    with get_connection() as db:
+        exists = db.execute(
+            "SELECT 1 FROM remediation_items WHERE remediation_id=%s AND organization_id=%s",
+            (item_id, user.organization_id),
+        ).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Remediation item not found")
+        rows = db.execute(
+            """SELECT v.verification_id AS id,v.result,v.method,v.evidence_reference,
+                      v.evidence_summary,v.observed_at,v.model_version,v.created_at,
+                      u.name AS verifier_name,u.email AS verifier_email
+               FROM remediation_verifications v JOIN users u ON u.user_id=v.verifier_id
+               WHERE v.remediation_id=%s AND v.organization_id=%s
+               ORDER BY v.created_at DESC""",
+            (item_id, user.organization_id),
+        ).fetchall()
+    return {"items": rows, "count": len(rows)}
+
+
+@router.post("/{item_id}/verify", status_code=201)
+def verify_remediation(item_id: UUID, body: VerificationCreate, user: AuthUser = Depends(require_security)) -> dict:
+    if user.workspace == "executive":
+        raise HTTPException(status_code=403, detail="Technical security reviewer access is required")
+    with get_connection() as db:
+        item = db.execute(
+            """SELECT status,version,risk_reduction_inr FROM remediation_items
+               WHERE remediation_id=%s AND organization_id=%s FOR UPDATE""",
+            (item_id, user.organization_id),
+        ).fetchone()
+        if not item:
+            raise HTTPException(status_code=404, detail="Remediation item not found")
+        if item["version"] != body.expected_version:
+            raise HTTPException(status_code=409, detail={"error": "Version conflict", "current_version": item["version"]})
+        if item["status"] != "RESOLVED":
+            raise HTTPException(status_code=409, detail="Mark the remediation resolved before submitting verification evidence")
+
+        verification_id = uuid4()
+        row = db.execute(
+            """INSERT INTO remediation_verifications(
+                      verification_id,organization_id,remediation_id,result,method,evidence_reference,
+                      evidence_summary,observed_at,verifier_id,model_version)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               RETURNING verification_id AS id,result,method,evidence_reference,evidence_summary,
+                         observed_at,model_version,created_at""",
+            (verification_id, user.organization_id, item_id, body.result, body.method,
+             body.evidence_reference, body.evidence_summary, body.observed_at, user.user_id, body.model_version),
+        ).fetchone()
+        next_status = "VERIFIED" if body.result == "PASSED" else "REOPENED"
+        realized = item["risk_reduction_inr"] if body.result == "PASSED" else 0
+        current = db.execute(
+            """UPDATE remediation_items SET status=%s,realized_risk_reduction_inr=COALESCE(%s,0),
+                      version=version+1,updated_at=NOW()
+               WHERE remediation_id=%s AND organization_id=%s
+               RETURNING remediation_id AS id,ticket_key,title,finding_id,asset_id,priority,status,owner,backup_owner,
+                         recommended_fix AS "recommendedFix",risk_reduction_inr AS "riskReductionInr",
+                         realized_risk_reduction_inr AS "realizedRiskReductionInr",planned_due_at,forecast_due_at,
+                         estimated_effort_hours,remaining_effort_hours,capability_status,metadata,version,created_at,updated_at""",
+            (next_status, realized, item_id, user.organization_id),
+        ).fetchone()
+        from psycopg.types.json import Jsonb
+        db.execute(
+            """INSERT INTO remediation_events(event_id,remediation_id,organization_id,event_type,actor_id,previous,current)
+               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+            (uuid4(), item_id, user.organization_id, f"VERIFICATION_{body.result}", user.user_id,
+             Jsonb(jsonable_encoder(item)), Jsonb(jsonable_encoder(current))),
+        )
+    record_audit_event(
+        user.organization_id, user.user_id, f"remediation.verification_{body.result.lower()}",
+        "remediation", str(item_id),
+        {"verification_id": str(verification_id), "method": body.method, "evidence_reference": body.evidence_reference},
+    )
+    return {"verification": {**row, "verifier_name": user.name, "verifier_email": user.email}, "item": current}
 
 
 @router.post("/{item_id}/assign")

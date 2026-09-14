@@ -1,6 +1,6 @@
 import { useLanguage } from '../lib/i18n';
 import { useState, useEffect } from 'react';
-import { Inbox, GitPullRequest, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Inbox, GitPullRequest, UserPlus, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import SeverityBadge from '../components/common/SeverityBadge';
 import KPICard from '../components/common/KPICard';
 import OpenPrModal from '../components/codesecurity/OpenPrModal';
@@ -11,13 +11,15 @@ import api from '../lib/api';
 import { API_MODE } from '../lib/api';
 import { REMEDIATION_SCENARIOS } from '../demo/fixtures';
 import DeliveryIssueModal, { DeliveryIssueInput } from '../components/remediation/DeliveryIssueModal';
+import VerificationModal, { VerificationInput, VerificationRecord } from '../components/remediation/VerificationModal';
+import { getSession } from '../lib/auth';
 
 const STATUS_LABEL: Record<ScenarioStatus, string> = {
   NOT_STARTED: 'Not Started',
   IN_PROGRESS: 'In Progress',
   PR_OPENED: 'PR Opened',
   RESOLVED: 'Resolved',
-  BLOCKED: 'Blocked', AT_RISK: 'At Risk', VERIFIED: 'Verified',
+  BLOCKED: 'Blocked', AT_RISK: 'At Risk', REOPENED: 'Reopened', VERIFIED: 'Verified',
 };
 
 const STATUS_COLOR: Record<ScenarioStatus, string> = {
@@ -25,7 +27,7 @@ const STATUS_COLOR: Record<ScenarioStatus, string> = {
   IN_PROGRESS: TOKENS.secondaryBlue,
   PR_OPENED: TOKENS.primaryBlue,
   RESOLVED: TOKENS.success,
-  BLOCKED: TOKENS.critical, AT_RISK: TOKENS.sevHigh, VERIFIED: TOKENS.success,
+  BLOCKED: TOKENS.critical, AT_RISK: TOKENS.sevHigh, REOPENED: TOKENS.critical, VERIFIED: TOKENS.success,
 };
 
 const normalizeItem = (item: any): RemediationScenario => ({
@@ -51,6 +53,9 @@ export default function RemediationQueue() {
   const [scenarios, setScenarios] = useState<RemediationScenario[]>(API_MODE === 'demo' ? REMEDIATION_SCENARIOS : []);
   const [prTarget, setPrTarget] = useState<RemediationScenario | null>(null);
   const [issueTarget, setIssueTarget] = useState<RemediationScenario | null>(null);
+  const [verificationTarget, setVerificationTarget] = useState<RemediationScenario | null>(null);
+  const [verificationHistory, setVerificationHistory] = useState<VerificationRecord[]>([]);
+  const isExecutive = getSession()?.user?.workspace === 'executive';
 
   useEffect(() => {
     if (API_MODE === 'demo') return;
@@ -105,6 +110,36 @@ export default function RemediationQueue() {
     if (API_MODE !== 'demo') await api.post(`/api/remediation/${issueTarget.id}/issues`, issue);
     setScenarios((prev) => prev.map((s) => s.id === issueTarget.id ? { ...s, status: 'AT_RISK', openDeliveryIssues: (s.openDeliveryIssues ?? 0) + 1 } : s));
     toast.warning('Delivery issue reported', 'The ticket forecast and risk reduction are now at risk.');
+  };
+
+  const openVerification = async (item: RemediationScenario) => {
+    setVerificationTarget(item);
+    if (API_MODE === 'demo') {
+      setVerificationHistory([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/api/remediation/${item.id}/verifications`);
+      setVerificationHistory(response.data.items ?? []);
+    } catch {
+      setVerificationHistory([]);
+      toast.error('History unavailable', 'Existing verification records could not be loaded.');
+    }
+  };
+
+  const verify = async (input: VerificationInput) => {
+    if (!verificationTarget) return;
+    if (API_MODE === 'demo') {
+      const status: ScenarioStatus = input.result === 'PASSED' ? 'VERIFIED' : 'REOPENED';
+      setScenarios((previous) => previous.map((item) => item.id === verificationTarget.id ? {
+        ...item, status, realizedRiskReductionInr: input.result === 'PASSED' ? item.riskReductionInr : 0,
+      } : item));
+    } else {
+      const response = await api.post(`/api/remediation/${verificationTarget.id}/verify`, input);
+      setScenarios((previous) => previous.map((item) => item.id === verificationTarget.id ? normalizeItem(response.data.item) : item));
+    }
+    toast.success(input.result === 'PASSED' ? 'Remediation verified' : 'Verification failed',
+      input.result === 'PASSED' ? 'Risk reduction is now realized.' : 'The item was reopened for corrective work.');
   };
 
   return (
@@ -179,9 +214,14 @@ export default function RemediationQueue() {
                         <GitPullRequest size={13} />
                       </button>
                     )}
-                    {s.status !== 'RESOLVED' && (
+                    {!['RESOLVED', 'VERIFIED'].includes(s.status) && (
                       <button className="icon-btn" title="Mark Resolved" onClick={() => markResolved(s)}>
                         <CheckCircle2 size={13} />
+                      </button>
+                    )}
+                    {['RESOLVED', 'VERIFIED'].includes(s.status) && (
+                      <button className="icon-btn" title={s.status === 'RESOLVED' && !isExecutive ? 'Verify Remediation' : 'Verification history'} onClick={() => openVerification(s)}>
+                        <ShieldCheck size={13} />
                       </button>
                     )}
                   </div>
@@ -207,6 +247,10 @@ export default function RemediationQueue() {
         />
       )}
       {issueTarget && <DeliveryIssueModal open={!!issueTarget} ticketTitle={issueTarget.title} onClose={() => setIssueTarget(null)} onSubmit={reportIssue} />}
+      {verificationTarget && <VerificationModal open={!!verificationTarget} ticketTitle={verificationTarget.title}
+        version={verificationTarget.version ?? 1} history={verificationHistory}
+        canVerify={verificationTarget.status === 'RESOLVED' && !isExecutive}
+        onClose={() => setVerificationTarget(null)} onSubmit={verify} />}
     </div>
   );
 }

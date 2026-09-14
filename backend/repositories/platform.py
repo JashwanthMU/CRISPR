@@ -114,8 +114,7 @@ def update_remediation(
             return previous, None
         current = db.execute(
             """UPDATE remediation_items SET status=COALESCE(%s,status),owner=COALESCE(%s,owner),
-                      realized_risk_reduction_inr=CASE WHEN %s='VERIFIED' THEN COALESCE(risk_reduction_inr,0)
-                                                       WHEN %s IN ('BLOCKED','AT_RISK') THEN 0
+                      realized_risk_reduction_inr=CASE WHEN %s IN ('BLOCKED','AT_RISK','REOPENED') THEN 0
                                                        ELSE realized_risk_reduction_inr END,
                       version=version+1,updated_at=NOW()
                WHERE organization_id=%s AND remediation_id=%s AND version=%s
@@ -123,7 +122,7 @@ def update_remediation(
                          recommended_fix AS "recommendedFix",risk_reduction_inr AS "riskReductionInr",
                          realized_risk_reduction_inr AS "realizedRiskReductionInr",planned_due_at,forecast_due_at,
                          estimated_effort_hours,remaining_effort_hours,capability_status,metadata,version,created_at,updated_at""",
-            (status, Jsonb(owner) if owner else None, status, status, org_id, item_id, expected_version),
+            (status, Jsonb(owner) if owner else None, status, org_id, item_id, expected_version),
         ).fetchone()
         return previous, current
 
