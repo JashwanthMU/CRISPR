@@ -1,691 +1,533 @@
+<div align="center">
+
 # CRISPR
 
-**Cyber-risk quantification and security investment decision support for Indian enterprises**
+### Cyber Risk Intelligence System for Prioritized Remediation
 
-CRISPR is a Smart India Hackathon prototype for **Problem Statement ID 26105**. It brings findings from security tools into one asset-aware risk picture, estimates financial exposure in Indian rupees, explains the drivers behind each risk, simulates control changes, and recommends a security portfolio for a given budget.
+**Not another risk score - a ₹-quantified, source-verified investment decision.**
 
-## SIH 2026 Presentation - Team: P0werh0usE
+CRISPR turns tens of thousands of raw security findings into **financial risk a board can act on** - Expected Annual Loss (EAL) and Value at Risk (VaR) in rupees - then recommends the exact set of controls that cuts the most risk under a fixed budget.
 
-Our Smart India Hackathon 2026 presentation covers the CRISPR solution, technical architecture, FAIR-based financial risk engine, AI investment optimization, feasibility, impact, and references.
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-3.4-EB5E28)](https://xgboost.readthedocs.io/)
+[![FAIR](https://img.shields.io/badge/Model-Open%20FAIR-1F6FEB)](https://www.opengroup.org/open-fair)
+[![Tests](https://img.shields.io/badge/tests-119-success)](#-testing)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[📄 View SIH 2026 Presentation](docs/presentation/SMART%20INDIA%20HACKATHON%202026.pdf)
+[**🚀 Live Prototype**](https://crispr-hosting.vercel.app/login) · [**🎥 Demo Video**](https://youtu.be/lDz5yODLh9I) · [**💻 Source**](https://github.com/JashwanthMU/CRISPR) · [**📚 Docs**](docs/)
 
-## Live Prototype
+</div>
 
-> **CRISPR Financial Risk Quantification Prototype**
+---
 
-Experience the live CRISPR prototype running on AWS:
+## 📌 TL;DR
 
-[🔗 Open Live Prototype](https://crispr-hosting.vercel.app/login)
+Enterprises spend heavily on cybersecurity, yet risk is still reported as vague **"Low / Medium / High"** ratings that never answer the only question leadership asks: *how much money are we exposed to, and where should the next rupee go?*
 
-The prototype demonstrates how CRISPR converts technical cybersecurity findings into **₹-denominated financial risk** and helps security teams prioritize and optimize remediation decisions.
+CRISPR fuses security telemetry with **asset criticality** and **control effectiveness** into a single FAIR-based engine, uses a **calibrated XGBoost model** (trained on **~320,000 CVE records**) to score exploitation likelihood, and a **budget-constrained optimizer** to recommend the highest-impact controls. A **deterministic, evidence-gated financial engine** guarantees that every ₹ figure is traceable to source — the AI narrates numbers, it never invents them.
 
-### What You Can Explore
+> **Built for:** Smart India Hackathon 2026 · Problem Statement **SIH26105** (AICTE) · Theme: *Blockchain & Cybersecurity*
 
-- **Financial Risk Quantification** - Convert vulnerability and asset data into Expected Annual Loss (EAL)
-- **Asset-Weighted Risk Scoring** - Prioritize risks using business and asset criticality rather than CVSS alone
-- **Risk Prioritization** - Identify which vulnerabilities create the greatest financial exposure
-- **AI Investment Optimization** - Determine the most effective security controls within a defined ₹ budget
-- **What-If Scenario Analysis** - Evaluate how security decisions affect financial exposure
-- **Natural Language Risk Queries** - Ask questions about organizational cyber risk in business language
-- **Compliance Mapping** - Connect findings with relevant cybersecurity and regulatory frameworks
-- **Executive Financial View** - Present cyber risk in a format suitable for management and decision-makers
+---
 
-> **Prototype:** The live environment is intended for demonstration and evaluation of the CRISPR financial-risk workflow.
+## 📖 Table of Contents
 
-The included fictional organization is **NovaPay Financial Services**, an Indian fintech used only for demonstration.
+- [The Problem](#-the-problem)
+- [What CRISPR Does](#-what-crispr-does)
+- [System Architecture](#-system-architecture)
+- [How It Works](#-how-it-works)
+- [The ML Model](#-the-ml-model)
+- [The Evidence-Gated Financial Engine](#-the-evidence-gated-financial-engine)
+- [Investment Optimizer](#-investment-optimizer)
+- [Compliance Mapping](#-compliance-mapping)
+- [Tech Stack](#-tech-stack)
+- [Repository Structure](#-repository-structure)
+- [Getting Started](#-getting-started)
+- [Usage](#-usage)
+- [Testing](#-testing)
+- [Security](#-security)
+- [Roadmap](#-roadmap)
+- [Research & References](#-research--references)
+- [Team & License](#-team--license)
 
-## Why CRISPR
+---
 
-Security teams often receive isolated alerts from scanners, bug-bounty programs, EDR/XDR, SIEM, IAM, threat intelligence, cloud tools, and asset inventories. Technical severity alone does not show which issue creates the greatest business loss.
+## 🎯 The Problem
 
-CRISPR turns that fragmented evidence into a decision workflow:
+Security findings arrive by the tens of thousands - from scanners, SIEM, EDR, CSPM and threat intel - but they are ranked by **technical severity (CVSS)**, not **business impact**.
 
-```text
-Security findings
-      ↓
-Normalize and correlate by asset
-      ↓
-Add business criticality and control posture
-      ↓
-Estimate likelihood and loss magnitude
-      ↓
-Expected Annual Loss (EAL) in ₹
-      ↓
-Explain drivers, forecast risk, test scenarios
-      ↓
-Optimize security investment
+> **CVSS ≠ business risk.** A "critical" CVE on an isolated test box matters less than a "medium" on a payment database.
+
+Boards are handed heatmaps that cannot tell them:
+
+- 💰 **How much money** are we exposed to, in rupees?
+- 🎯 **Which fixes first** reduce that exposure the most?
+- 📊 Is our security spend going to **real business risk** or to noise?
+- 📝 Can we **prove to an auditor** why each risk was prioritized?
+
+Manual, periodic assessments go stale - by the time a report is written, assets and threats have changed. The result is alert fatigue, mis-allocated spend, SLA breaches, and cyber risk that never enters board-level financial decisions.
+
+**Why it matters in India (2026):** average data-breach cost hit a record **₹25.5 Cr** (IBM, +15.9% YoY; BFSI highest at ₹40.9 Cr) · Indian BFSI faces attacks at **1.6× the global average** · mean time to contain a breach is **263 days and rising** (DSCI–BCG).
+
+---
+
+## ✨ What CRISPR Does
+
+| | Capability | Description |
+|---|---|---|
+| 📊 | **Quantify** | Converts technical findings into ₹-denominated **Expected Annual Loss (EAL)** and **Value at Risk (VaR)** using the FAIR model. |
+| 🧠 | **Predict** | A calibrated **XGBoost** model scores per-CVE exploitation likelihood from KEV / NVD / EPSS / CERT-In signals, explained with **SHAP**. |
+| 🔮 | **Simulate** | Instant **what-if scenarios** - MFA rollout, patch delay, before-vs-after remediation, alternative budget allocations. |
+| 🎛️ | **Optimize** | A budget-constrained optimizer selects the control portfolio that **maximizes risk reduction** under a fixed ₹ budget, with **ROSI**. |
+| 🛡️ | **Guardrail** | A **deterministic financial engine** cross-checks every ₹ figure against source evidence and refuses anything it cannot trace — preventing hallucinated numbers. |
+| 📋 | **Comply** | Maps controls to **ISO/IEC 27001, NIST CSF, CIS, RBI CSF & SEBI CSCRF**. |
+| 👥 | **Communicate** | Split **executive** (risk score, financial exposure) and **technical** (control-level drill-down) dashboards + a natural-language advisor: *"Ask CRISPR."* |
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph SRC["🔌 Data Sources"]
+        S1["Vulnerability Scanners"]
+        S2["SIEM / SOC"]
+        S3["IAM · EDR/XDR · CSPM"]
+        S4["Threat Intel · Bug Bounty"]
+        S5["NVD · CISA KEV · EPSS v4"]
+        S6["CERT-In Advisories"]
+    end
+
+    subgraph INT["⚙️ Integration & Normalization"]
+        I1["Ingest · Cleanse · Deduplicate · Correlate"]
+        I2["Asset Criticality Scoring & Entity Resolution"]
+    end
+
+    subgraph AI["🧠 Intelligence & Quantification"]
+        A1["XGBoost Incident-Likelihood Model<br/>(Platt-calibrated · SHAP)"]
+        A2["FAIR Risk Quantification<br/>EAL = Σ Pᵢ × Lᵢ · VaR"]
+        A3["Neo4j Context Graph"]
+    end
+
+    subgraph OPT["🎛️ Optimization"]
+        O1["Budget-Constrained Optimizer (ROSI)"]
+        O2["Monte Carlo VaR - 10,000 seeded runs"]
+        O3["What-if Scenario Engine"]
+    end
+
+    subgraph OUT["📊 Decision Layer"]
+        D1["Executive Dashboard"]
+        D2["Technical Dashboard"]
+        D3["Compliance Mapping"]
+        D4["Natural-Language Advisor"]
+        D5["REST API (FastAPI)"]
+    end
+
+    SRC --> INT --> AI --> OPT --> OUT
+
+    style SRC fill:#e3f2fd,stroke:#1565c0
+    style INT fill:#f3e5f5,stroke:#6a1b9a
+    style AI fill:#e8f5e9,stroke:#2e7d32
+    style OPT fill:#fff3e0,stroke:#e65100
+    style OUT fill:#e0f7fa,stroke:#00838f
 ```
 
-## Demo Story
+---
 
-The strongest demonstration is the **Authentication API (`A003`)**:
+## 🔄 How It Works
 
-- Corroborated by Bug Bounty, Vulnerability Scanner, XDR, and IAM evidence.
-- Evidence confidence is capped at **94%**.
-- Business criticality is **96/100**.
-- Control posture includes only **58% MFA coverage**.
-- Annual incident frequency comes from explicit evidence (or a clearly labelled SIH demo assumption); the CVE model is used only for exploitation prioritization.
-- Loss magnitude is **₹3.80 crore**.
-- Expected Annual Loss is **₹79.8 lakh**.
-- Risk score is **87/100**.
-
-The contrasting **Test Server (`A006`)** has CVSS 9.8 but low business criticality and only **₹3 lakh EAL**, demonstrating that technical severity is not the same as business risk.
-
-Demo figures are calculated from bundled fixtures and are labeled as demo data.
-Live figures are calculated only from persisted, organization-scoped evidence;
-missing evidence produces an explicit error instead of fixture substitution.
-
-## Implemented Capabilities
-
-### Data ingestion and connectors
-
-- PostgreSQL-backed, idempotent ingestion for assets and findings.
-- Explicit demo-fixture mode; live mode fails closed when PostgreSQL or evidence is unavailable.
-- Connectors for Bug Bounty, Vulnerability Scanner, EDR, XDR, SIEM, IAM, Threat Intelligence, CSPM, and CMDB.
-- Source status, per-asset findings, and cross-source grouping APIs.
-- Accepted live bug-bounty reports become normalized findings automatically.
-
-### Correlation and asset intelligence
-
-- Pydantic-based unified finding schema.
-- Severity normalization and finding deduplication helpers.
-- Asset-based correlation and source-diversity confidence scoring.
-- Business criticality scoring from operational and regulatory context.
-- Weighted control-effectiveness scoring for MFA, EDR, WAF, patching, segmentation, and logging.
-
-### Risk and financial quantification
-
-- Deterministic likelihood calculation.
-- India-specific downtime and regulatory cost inputs.
-- Loss breakdown across downtime, incident response, recovery, data breach, regulatory, and reputation costs.
-- Evidence-backed Expected Annual Loss and seeded Monte Carlo P95/P99 VaR.
-- Explainable positive and negative risk drivers.
-
-### AI and ML
-
-- Natural-language intent routing for risk, scenario, optimization, forecast, and anomaly questions.
-- General cybersecurity question answering with bounded model fallbacks.
-- Financial-number guardrail: LLM-generated rupee claims must exist in deterministic engine data.
-- Checksum-verified XGBoost CVE prioritization with governed runtime validation.
-- Isolation Forest detection of unusual failed-login rates.
-- Deterministic 90-day linear EAL forecast.
-- Real TreeSHAP explanations computed against the deployed XGBoost model.
-
-### Decision support
-
-- MFA, emergency patching, segmentation, EDR expansion, and patch-delay simulations.
-- Dynamic marginal-benefit optimizer that recomputes overlapping control effects.
-- Compliance mapping for ISO 27001, NIST CSF, CIS Controls, RBI CSF, and SEBI CSCRF.
-- Control costs, risk reduction, remaining budget, and ROSI output.
-
-### User applications
-
-- Executive security and financial-risk dashboard.
-- Risk, asset, finding, scenario, investment, compliance, identity, threat-intelligence, and integration views.
-- AI Risk Advisor available from the application shell and dashboards.
-- Separate authenticated bug-bounty portal for reporters and security reviewers.
-- Separate animated product-tour prototype under `crispr_products/`.
-
-## Architecture
+CRISPR runs a four-stage pipeline: **Collect → Quantify → Optimize → Decide** - with AI supporting every stage.
 
 ```mermaid
 flowchart LR
-    BB[Bug Bounty] --> ING[Ingestion]
-    VS[Vulnerability Scanner] --> ING
-    EDR[EDR / XDR] --> ING
-    SIEM[SIEM] --> ING
-    IAM[IAM] --> ING
-    TI[Threat Intelligence] --> ING
-    CSPM[CSPM] --> ING
-    CMDB[CMDB / Assets] --> ING
+    C["1️⃣ COLLECT<br/>Continuously integrate<br/>enterprise security data"]
+    Q["2️⃣ QUANTIFY<br/>Model exploitation +<br/>compute ₹ EAL / VaR"]
+    O["3️⃣ OPTIMIZE<br/>Maximize risk reduction<br/>under ₹ budget"]
+    D["4️⃣ DECIDE<br/>Board-ready dashboards<br/>+ framework evidence"]
 
-    ING --> DB[(PostgreSQL)]
-    ING --> NORM[Normalization]
-    NORM --> CORR[Correlation]
-    CORR --> ENRICH[Asset and Control Enrichment]
-    ENRICH --> RISK[Risk Engine]
-    RISK --> FIN[Financial Engine]
-    FIN --> SCEN[Scenario Engine]
-    FIN --> FORECAST[Forecast and Anomaly Models]
-    FIN --> AI[AI Risk Advisor]
-    SCEN --> OPT[Budget Optimizer]
+    C --> Q --> O --> D
+    D -.feedback / re-scan.-> C
 
-    RISK --> API[FastAPI]
-    FIN --> API
-    SCEN --> API
-    FORECAST --> API
-    AI --> API
-    OPT --> API
-    DB --> API
-
-    API --> UI[React Dashboard]
-    API --> PORTAL[Bug Bounty Portal]
+    style C fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style Q fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style O fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style D fill:#e0f7fa,stroke:#00838f,stroke-width:2px
 ```
 
-### Docker services
+**1 · Collect** - Live connectors (NVD, CISA KEV, GitHub, generic HTTP) plus a normalization layer ingest, cleanse, deduplicate and correlate findings; an asset-criticality engine performs threat-likelihood weighting and entity resolution across sources.
 
-The repository has one `docker-compose.yml` that starts the complete stack. Services intentionally use separate containers rather than placing PostgreSQL and web processes in one container.
+**2 · Quantify** - The XGBoost model scores exploitation likelihood per CVE. The FAIR engine combines Asset Criticality, Control Effectiveness and evidence-backed Loss Magnitude to produce `EAL = Σ (Pᵢ × Lᵢ)` and `VaR = VaRα(L)`.
 
-| Service | Image/build | Host port | Purpose |
-|---|---|---:|---|
-| `frontend` | Multi-stage React + Nginx build | 5173 | Main CRISPR dashboard |
-| `bug-bounty` | Multi-stage React + Nginx build | 3000 | Researcher and triage portal |
-| `backend` | Python 3.11 + FastAPI | 8000 | APIs, engines, AI and ML runtime |
-| `db` | PostgreSQL 15 | Internal only | Users, reports, assets and findings |
+**3 · Optimize** - A greedy marginal-ROSI optimizer selects the control portfolio maximizing risk reduction under budget; 10,000 seeded Monte Carlo runs produce reproducible 95% / 99% VaR.
 
-Both Nginx containers proxy `/api/*` to the backend, so browser deployments can use same-origin API requests.
+**4 · Decide** - Executive and technical dashboards, compliance mapping, and a natural-language advisor turn technical findings into defensible financial decisions.
 
-## Quick Start with Docker
+---
 
-For a guided, idempotent installation that prompts for required and optional
-credentials, run:
+## 🧠 The ML Model
 
-```bash
-chmod +x install.sh
-./install.sh
+**Incident-Likelihood Model** - an XGBoost classifier that predicts per-CVE exploitation likelihood.
+
+```mermaid
+flowchart LR
+    subgraph DATA["📥 Data (~320K CVE records)"]
+        N["NVD<br/>(vulnerability data)"]
+        E["EPSS v4<br/>(FIRST.org)"]
+        K["CISA KEV<br/>(ground-truth labels)"]
+        CI["CERT-In<br/>(India signal)"]
+    end
+
+    F["🔧 20 Features<br/>CVSS · EPSS · exploitability<br/>attack vector · CWE flags<br/>recency · CERT-In"]
+    X["🌳 XGBoost<br/>235 trees · depth 8"]
+    P["📐 Platt Scaling<br/>(calibrated probabilities)"]
+    SH["🔍 SHAP<br/>(explainability)"]
+    R["🎯 Exploitation Priority<br/>+ per-finding drivers"]
+
+    N & E & K & CI --> F --> X --> P --> SH --> R
+
+    style DATA fill:#e3f2fd,stroke:#1565c0
+    style X fill:#e8f5e9,stroke:#2e7d32
+    style R fill:#fff3e0,stroke:#e65100
 ```
 
-See [the complete installation walkthrough](docs/deployment/setup.md) for
-live-data prerequisites, backup behavior, verification, and troubleshooting.
+### Model at a glance
 
-### Prerequisites
+| Property | Value |
+|---|---|
+| **Algorithm** | XGBoost 3.4 · 235 estimators · max depth 8 |
+| **Dataset** | ~320,000 CVE records (256K train / 64K test) |
+| **Label** | `exploited = is_kev` - CISA KEV catalog only (no synthetic labels, no EPSS in the label) |
+| **Positives** | 1,592 KEV CVEs · **imbalance ≈ 200:1 (~0.5% base rate)** |
+| **Features** | 20 real features - EPSS score/percentile, CVSS, exploitability & impact sub-scores, attack vector, and CWE-type flags (RCE, SQLi, XSS, buffer overflow, priv-esc, DoS, dir-traversal) |
+| **Calibration** | Platt scaling |
+| **Explainability** | SHAP (top drivers: EPSS percentile, EPSS score, exploitability score) |
 
-- Docker Engine or Docker Desktop
-- Docker Compose v2 (`docker compose`)
-- Ports `3000`, `5173`, and `8000` available
+### Evaluation
 
-### 1. Configure environment variables
+| Split | ROC-AUC | PR-AUC | Notes |
+|---|:---:|:---:|---|
+| **Stratified random** | **0.982** | **0.479** | F1 0.524 · Precision 0.575 · Recall 0.481 |
+| **5-fold stratified CV** | 0.985 | 0.503 | ±0.002 / ±0.037 |
+| **Temporal (forward)** | 0.981 | 0.491 | trains on past, tests on future |
+| **Ablation — no EPSS** | 0.853 | 0.124 | isolates EPSS contribution |
+| **Calibrated (production)** | 0.982 | 0.481 | deployed model |
 
-```bash
-cp .env.example .env
+> On a **~0.5% base-rate** problem, a random classifier scores PR-AUC ≈ 0.005 - so **PR-AUC 0.479 is ~96× over random**. The ablation shows the full model (0.479) meaningfully outperforms EPSS-derived signal alone: EPSS is our strongest input, not our whole model.
+
+---
+
+## 🛡️ The Evidence-Gated Financial Engine
+
+This is the heart of CRISPR's trust story. The financial engine is **deterministic and evidence-gated**: a loss event **cannot be created** without citing frequency and loss evidence. The AI never derives ₹ figures from a classifier - it narrates numbers the engine computed and traces every one to source.
+
+```mermaid
+sequenceDiagram
+    participant U as Analyst / API
+    participant E as Financial Engine
+    participant V as Evidence Validator
+    participant M as Monte Carlo (10K seeded)
+
+    U->>E: Submit RiskEvent(s)<br/>(probability, loss, evidence)
+    E->>V: Validate frequency_evidence<br/>+ loss_evidence present?
+    alt ❌ Evidence missing / untraceable
+        V-->>U: Reject (redacted — cannot verify)
+    else ✅ Evidence present
+        V->>M: Run 10,000 seeded iterations<br/>(+ correlated shock groups)
+        M-->>E: Loss distribution
+        E-->>U: EAL (mean) · VaR (P95/P99)<br/>every figure traceable to evidence
+    end
 ```
 
-Edit `.env` and replace all placeholders. The AI Advisor can run deterministic templates without an LLM, but general AI answers and polished explanations require an OpenAI-compatible endpoint.
+**How the guardrail is enforced:** each `RiskEvent` requires non-empty `frequency_evidence` and `loss_evidence`; any non-zero control effect requires `control_evidence`; duplicate events are rejected to prevent double-counting; and correlated incidents are modelled explicitly via **shock groups**. Reproducibility is guaranteed by a fixed seed - the same inputs always produce the same VaR.
 
-```dotenv
-AUTH_SECRET=replace-with-a-long-random-secret
-SECURITY_ADMIN_EMAIL=security@example.com
-SECURITY_ADMIN_PASSWORD=replace-with-a-long-random-password
+> **Demo vs Live modes** (`CRISPR_DATA_MODE`): *demo* runs on a seeded reference environment for reproducibility; *live* mode requires organization-approved, persisted, evidence-backed values before any figure is shown.
 
-LLM_ENABLED=true
-LLM_BASE_URL=https://your-compatible-endpoint.example.com/v1
-LLM_API_KEY=replace-with-your-api-key
+---
+
+## 🎛️ Investment Optimizer
+
+CRISPR selects the control portfolio that maximizes risk reduction under a fixed budget using a **greedy marginal-ROSI** strategy. Greedy selection is deliberate: it correctly handles **overlapping control benefits** (where two controls reduce the same risk), which a naïve 0/1 knapsack over-counts.
+
+```mermaid
+flowchart TD
+    B["💰 Budget (₹)"] --> L{"Marginal ROSI<br/>of each remaining control?"}
+    L -->|"pick highest ROSI<br/>≥ threshold"| SEL["Add control<br/>recompute EAL"]
+    SEL --> L
+    L -->|"budget exhausted<br/>or ROSI below threshold"| OUT["✅ Optimal control set<br/>+ ROSI + residual risk"]
+
+    style B fill:#fff3e0,stroke:#e65100
+    style OUT fill:#e8f5e9,stroke:#2e7d32
 ```
 
-The repository-root `.env` is ignored by Git. Never put real credentials in `.env.example`, source files, Dockerfiles, or commits.
+Each candidate control carries a cost, complexity, implementation time, and its effect on the simulated enterprise EAL - so the recommendation is always an **investment decision with a return**, not a checklist.
 
-### 2. Start the complete application
+---
 
-```bash
-docker compose up --build -d
-```
+## 📋 Compliance Mapping
 
-Docker waits for PostgreSQL and the backend health check before starting both frontends.
+Controls are mapped to five frameworks, giving auditors a traceable line from a fix to a control reference.
 
-### 3. Open the applications
+| Control | ISO/IEC 27001 | NIST CSF 2.0 | CIS v8.1 | RBI CSF | SEBI CSCRF |
+|---|:---:|:---:|:---:|:---:|:---:|
+| MFA | A.9.4 | PR.AC-7 | CIS-6 | IAM-3 | AC-2 |
+| Patching | A.12.6 | PR.IP-12 | CIS-7 | VM-2 | CM-3 |
+| Segmentation | A.13.1 | PR.AC-5 | CIS-12 | NS-4 | SC-7 |
+| EDR | A.12.2 | DE.CM-4 | CIS-10 | EP-1 | SI-3 |
+| Backup | A.12.3 | PR.IP-4 | CIS-11 | BC-2 | CP-9 |
 
-- Main dashboard: <http://localhost:5173>
-- Bug-bounty portal: <http://localhost:3000>
-- FastAPI documentation: <http://localhost:8000/docs>
-- OpenAPI schema: <http://localhost:8000/openapi.json>
-- Health check: <http://localhost:8000/api/health>
+---
 
-### 4. Inspect or stop the stack
+## 🧰 Tech Stack
 
-```bash
-docker compose ps
-docker compose logs -f backend
-docker compose down
-```
+| Layer | Technologies |
+|---|---|
+| **Backend** | Python 3.12 · FastAPI · Uvicorn · Pydantic v2 · SQLAlchemy 2 · Alembic |
+| **ML** | XGBoost · scikit-learn (Platt scaling) · SHAP · NumPy · pandas · SciPy |
+| **Data** | PostgreSQL (psycopg 3) · Neo4j (context graph) |
+| **Frontend** | React · TypeScript · Vite · Tailwind CSS |
+| **Security** | Cryptography · JWT auth · role-based access (executive / technical / reporter) |
+| **Infra** | Docker · Docker Compose · GitHub Actions CI · Vercel / AWS EC2 |
 
-PostgreSQL data is retained in the `crispr_postgres_data` volume. To remove all local database state:
+---
 
-```bash
-docker compose down -v
-```
-
-## Local Demo Authentication
-
-The Docker configuration creates a local security-team account if it does not already exist:
-
-```text
-Email:    security@novapay.com
-Password: NovaPay-Security-2026
-```
-
-These credentials are for local demonstration only. Override them in `.env` before any shared or public deployment.
-
-Researchers register their own `REPORTER` accounts in the bug-bounty portal. Security users can view all reports, review submissions, and trigger ingestion refreshes. Reporter users can only view their own reports.
-
-## Data Pipeline
-
-At backend startup:
-
-1. PostgreSQL tables and indexes are created if required.
-2. The default security user is created if absent.
-3. `data/demo/assets.json` is upserted by `asset_id`.
-4. Source findings are upserted by `finding_id`.
-5. Connectors read PostgreSQL first and use JSON fallback on database failure.
-
-Seed datasets:
-
-| File | Source | Records |
-|---|---|---:|
-| `assets.json` | CMDB asset inventory | 20 |
-| `bug_bounty.json` | Bug Bounty | 11 |
-| `vulnerabilities.json` | Vulnerability Scanner | 11 |
-| `edr_events.json` | EDR | 10 |
-| `xdr_events.json` | XDR | 10 |
-| `siem_events.json` | SIEM | 10 |
-| `iam.json` | IAM | 10 |
-| `threat_intel.json` | Threat Intelligence | 10 |
-
-The CSPM connector supports an optional `data/demo/cspm.json`. It reports `disconnected` when that file is absent. CMDB reports asset-inventory status rather than producing security findings.
-
-Manual refresh:
-
-```bash
-docker compose exec backend python backend/ingestion/seed.py
-```
-
-## Risk Methodology
-
-### Business criticality
-
-Business criticality is a 0–100 weighted score:
-
-```text
-30% asset criticality
-20% data sensitivity
-20% revenue dependency
-15% regulatory scope
-15% internet exposure
-```
-
-### Control effectiveness
-
-```text
-25% MFA coverage
-20% EDR coverage
-20% patch compliance
-15% WAF
-15% segmentation
- 5% logging coverage
-```
-
-The prototype caps control effectiveness at 95%.
-
-### Likelihood
-
-```text
-25% normalized CVSS
-20% exploit availability
-15% patch age
-15% internet exposure
-15% control weakness
-10% active threat intelligence
-```
-
-### Financial loss
-
-```text
-Loss magnitude = downtime
-               + incident response
-               + recovery
-               + data breach
-               + regulatory
-               + reputation
-
-EAL = organization-supplied annual incident probability × loss magnitude
-Monte Carlo VaR = percentile of simulated annual portfolio loss
-```
-
-Live loss components and annual frequency must be supplied from approved
-organization evidence. The ML artifact predicts calibrated KEV membership and
-is used for prioritization only; it is excluded from EAL.
-
-## Scenario and Investment Models
-
-Scenario values are recomputed from ingested findings, asset loss inputs, and
-control posture; there are no calibrated target reductions. Missing findings are
-excluded and counted in `calculation_scope`. Patch-delay exposure is compounded
-with the formula returned in each response.
-
-The optimizer dynamically recomputes marginal loss-exposure reduction after
-each selected control and enforces a configurable minimum marginal ROSI. Control
-costs remain planning assumptions until replaced with approved internal/vendor
-estimates, and the response says so explicitly.
-
-Production defaults to `CRISPR_DATA_MODE=live`, which reads only rows marked
-`data_origin=LIVE` and returns HTTP 503 when required data is missing. Set
-`CRISPR_DATA_MODE=demo` only for tests or a clearly labelled presentation.
-
-## AI Risk Advisor
-
-The advisor follows a grounded pipeline:
-
-```text
-Question
-  ↓
-Deterministic keyword intent
-  ↓
-In-process tool call to risk/scenario/optimizer engine
-  ↓
-Template answer containing engine facts
-  ↓
-Optional LLM explanation
-  ↓
-Financial-number guardrail
-```
-
-The LLM is an explanation layer, not the source of financial truth. Every rupee amount in a model-generated risk answer must match a value contained in the deterministic tool data; otherwise the response falls back to the deterministic template.
-
-Supported demo questions include:
-
-- “What is our highest financial cyber risk?”
-- “Why is the Auth API high risk?”
-- “What happens if we implement MFA?”
-- “What if we delay patching by 30 days?”
-- “What should we do with ₹1 crore?”
-- “Show the 90-day risk forecast.”
-- “Are there suspicious failed logins?”
-- General cybersecurity questions such as “What is IDOR?”
-
-When `LLM_ENABLED=false` or the model service is unavailable, deterministic risk answers continue to work.
-
-## ML Prototype Modules
-
-| Module | Current implementation | Training status |
-|---|---|---|
-| CVE exploitation prioritization | Calibrated XGBoost KEV-membership classifier | Trained artifact; runtime validation required |
-| Anomaly detection | Isolation Forest over synthetic failed-login-rate features derived from SIEM demo signals | Runtime unsupervised fit |
-| Forecasting | Linear EAL drift at 0.77% per day, default 90-day horizon | Not trained |
-| Explainability | Contribution ranking in a SHAP-compatible display shape | Rule-based V1 |
-
-Runtime dependencies are in `requirements.txt`. Future XGBoost, pandas, and SHAP experimentation uses:
-
-```bash
-pip install -r requirements-ml-v2.txt
-```
-
-## API Reference
-
-Interactive request and response schemas are available at `/docs`.
-
-### Health and authentication
-
-| Method | Endpoint | Purpose | Auth |
-|---|---|---|---|
-| GET | `/api/health` | Backend and database state | No |
-| POST | `/api/auth/register` | Create reporter account | No |
-| POST | `/api/auth/login` | Issue 12-hour bearer token | No |
-| GET | `/api/auth/me` | Return current user | Bearer |
-
-### Findings, ingestion and assets
-
-| Method | Endpoint | Purpose | Auth |
-|---|---|---|---|
-| GET | `/api/findings` | All connector findings | No |
-| GET | `/api/findings/sources` | Connection state and counts | No |
-| GET | `/api/findings/correlate` | Findings grouped by asset | No |
-| GET | `/api/findings/asset/{asset_id}` | Findings for an asset | No |
-| GET | `/api/ingestion/status` | Stored source counts and timestamps | Security |
-| POST | `/api/ingestion/refresh` | Re-upsert demo sources | Security |
-| GET | `/api/assets` | Enriched asset inventory | No |
-| GET | `/api/assets/{asset_id}` | Enriched asset details | No |
-| GET | `/api/assets/{asset_id}/controls` | Asset control posture | No |
-| GET | `/api/assets/{asset_id}/risk-cases` | Correlated cases for an asset | No |
-
-### Risk, scenarios, optimization and compliance
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/api/risks` | Five modeled risks sorted by EAL |
-| GET | `/api/risks/enterprise` | Enterprise score, EAL, VaR and top risk |
-| GET | `/api/risks/{asset_id}` | Risk, loss breakdown and drivers |
-| GET | `/api/scenarios` | Run control overrides via query parameters |
-| GET | `/api/scenarios/presets` | Four enriched scenario presets |
-| GET | `/api/scenarios/{scenario_id}` | Run one preset |
-| POST | `/api/optimize` | Optimize a JSON `budget_inr` |
-| GET | `/api/optimize?budget=10000000` | Optimize through a query parameter |
-| GET | `/api/optimize/controls` | Control catalogue |
-| GET | `/api/compliance` | Framework summary |
-| GET | `/api/compliance/gaps` | Control gaps with financial impact |
-| GET | `/api/compliance/scores` | Raw demo framework scores |
-
-### AI and ML
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/assistant/query` | Ask the AI Risk Advisor |
-| GET | `/api/assistant/forecast` | Forecast EAL; supports horizon, step and patch-delay parameters |
-| GET | `/api/assistant/anomalies` | Failed-login anomaly scan |
-
-Example:
-
-```bash
-curl -X POST http://localhost:8000/api/assistant/query \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What is our highest financial cyber risk?"}'
-```
-
-### Bug bounty
-
-| Method | Endpoint | Purpose | Auth |
-|---|---|---|---|
-| POST | `/api/bug-bounty/reports` | Submit a vulnerability report | Bearer |
-| GET | `/api/bug-bounty/reports` | Reporter-owned or security-wide queue | Bearer |
-| GET | `/api/bug-bounty/reports/{report_id}` | View an authorized report | Bearer |
-| PATCH | `/api/bug-bounty/reports/{report_id}/review` | Accept or reject a report | Security |
-
-## Frontend Coverage
-
-The main React dashboard defaults to live API mode. Its API abstraction returns demo fixtures if an optional endpoint is unavailable so the hackathon interface remains navigable.
-
-### Live or substantially connected
-
-- Security and financial dashboards
-- Findings and source status
-- Assets, controls and risk cases
-- Risks and risk drivers
-- Scenarios and presets
-- Investments and control catalogue
-- Compliance and gaps
-- AI Advisor, forecast and anomaly APIs
-- Identity MFA summaries
-- Threat-intelligence finding list
-- Integration connection-status display
-
-### Prototype or fixture-backed areas
-
-- Attack-path graph generation
-- Code repositories, SAST, SCA/SBOM, secrets and IaC scanning
-- Cloud/CSPM findings while `cspm.json` is absent
-- Privileged-identity inventory beyond asset-level MFA data
-- Threat actors and campaigns
-- Remediation workflow and assignments
-- Policies and policy evaluation
-- Report generation/export
-- Persistent settings, organizations and API keys
-- Integration connect/reconnect/disable operations
-- Historical dashboard trend series
-
-The API Reference screen also shows planned `/api/repositories`, `/api/integrations`, and `/api/analysis/run` routes that are not implemented by the current backend.
-
-## Local Development without Full Compose
-
-### Backend
-
-For the complete database-backed backend during frontend development:
-
-```bash
-docker compose up -d db backend
-```
-
-For a native Python run using the JSON fallback:
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-LLM_ENABLED=false uvicorn backend.app.main:app --reload --port 8000
-```
-
-The native fallback supports public connector and risk APIs. Authentication, live ingestion control, and bug-bounty workflows require a reachable PostgreSQL instance; use the Docker backend unless you have configured a local `DATABASE_URL`.
-
-### Main dashboard
-
-```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-For a Vite development server, set `VITE_API_URL=http://localhost:8000` because the production Nginx reverse proxy is not present.
-
-### Bug-bounty portal
-
-```bash
-cd bug-bounty
-npm install
-VITE_API_URL=http://localhost:8000 npm run dev -- --port 3000
-```
-
-### Animated product tour
-
-`crispr_products/` is a separate TanStack Start/React 19 presentation prototype. It is fixture-driven and is **not** part of the root Docker Compose stack or the source of live platform figures.
-
-```bash
-cd crispr_products
-npm install
-npm run dev
-```
-
-## Testing and Validation
-
-Run the backend suite inside the integrated environment:
-
-```bash
-docker compose exec backend pytest backend/tests -q
-```
-
-Current suite coverage focuses on the scenario engine, optimizer, compliance mapper, and their API routes.
-
-Build both frontend applications:
-
-```bash
-cd frontend && npm ci && npm run build
-cd ../bug-bounty && npm install && npm run build
-```
-
-Useful smoke tests:
-
-```bash
-curl http://localhost:8000/api/health
-curl http://localhost:8000/api/risks/enterprise
-curl http://localhost:8000/api/scenarios/presets
-curl http://localhost:8000/api/compliance
-```
-
-## PostgreSQL
-
-The database contains:
-
-- `users`: PBKDF2-SHA256 password hashes and `REPORTER`/`SECURITY` roles.
-- `bug_bounty_reports`: report content, ownership, status, and review metadata.
-- `assets`: JSONB asset payloads keyed by `asset_id`.
-- `findings`: JSONB source payloads with indexed source and asset columns.
-
-Open a PostgreSQL shell without exposing port 5432 to the host:
-
-```bash
-docker compose exec db psql -U crispr -d crispr
-```
-
-## Repository Structure
+## 📂 Repository Structure
 
 ```text
 CRISPR/
-├── ai/                         # Advisor routing, tools, model client and guardrail
-├── backend/
-│   ├── app/api/                # FastAPI routers
-│   ├── app/models/             # HTTP request and response schemas
-│   ├── asset_intelligence/     # Business criticality
-│   ├── compliance/             # Framework mappings and gaps
-│   ├── connectors/             # Security-source adapters
-│   ├── controls/               # Control effectiveness
-│   ├── correlation/            # Finding correlation
-│   ├── database/               # PostgreSQL connection and Alembic migrations
-│   ├── financial_engine/       # Loss magnitude and EAL
-│   ├── ingestion/              # JSON loading and database upserts
-│   ├── normalization/          # Unified finding conversion
-│   ├── optimizer/              # Dynamic marginal-benefit investment optimizer
-│   ├── risk_engine/            # Likelihood and drivers
-│   ├── scenario_engine/        # What-if simulations
-│   ├── repositories/           # PostgreSQL persistence operations
-│   ├── services/               # Business workflows and orchestration
-│   ├── security/               # Credential encryption helpers
-│   ├── workers/                # Persistent background job worker
-│   └── tests/                  # Backend tests
-├── bug-bounty/                 # Reporter and security-review React portal
-├── crispr_products/            # Separate animated product-tour prototype
-├── data/demo/                  # NovaPay assets and source findings
-├── docs/                       # Indexed architecture, API, deployment and methodology docs
-├── frontend/                   # Main React 18 dashboard
-├── ml/                         # Prediction, anomaly, forecast and explanation models
-├── tools/                      # Audits and operator utilities
-├── docker-compose.yml          # Complete application stack
-├── requirements.txt            # Runtime Python dependencies
-└── requirements-ml-v2.txt      # Optional future training dependencies
+├── backend/                    # FastAPI application
+│   ├── app/                    # API, auth, models, entry point (main.py)
+│   ├── ingestion/              # source ingestion pipeline
+│   ├── connectors/             # NVD · CISA KEV · GitHub · generic HTTP
+│   ├── normalization/          # unified schema & cleansing
+│   ├── correlation/            # multi-source entity resolution
+│   ├── asset_intelligence/     # asset criticality scoring
+│   ├── risk_engine/            # threat likelihood
+│   ├── financial_engine/       # ⭐ evidence-gated EAL/VaR + Monte Carlo
+│   ├── scenario_engine/        # what-if simulations
+│   ├── optimizer/              # greedy marginal-ROSI control selection
+│   ├── compliance/             # framework mapping (ISO/NIST/CIS/RBI/SEBI)
+│   ├── controls/               # control catalogue
+│   ├── security/               # crypto & secrets
+│   ├── services/               # attack paths & orchestration
+│   ├── workers/                # background jobs
+│   └── tests/                  # backend test suite
+├── ml/
+│   └── incident_prediction/    # ⭐ XGBoost model, artifacts & training
+│       ├── model_config.json   # full metrics, dataset & hyperparameters
+│       ├── portable/           # 5-fold boosters + Platt params
+│       └── training/           # train & evaluate scripts
+├── ai/
+│   ├── assistant/              # natural-language advisor ("Ask CRISPR")
+│   ├── tools/                  # advisor tools
+│   └── knowledge/              # grounding knowledge
+├── crispr_products/            # React + TypeScript frontend (Vite)
+├── frontend/                   # dashboard frontend
+├── data/demo/                  # seeded reference environment
+├── docs/                       # architecture, methodology, ML, deployment…
+├── docker-compose.yml          # backend · frontend · worker · db
+├── install.sh                  # one-command Docker setup
+├── Makefile                    # dev / up / down / test / migrate …
+└── requirements.txt
 ```
 
-See the [documentation index](docs/README.md) and the detailed
-[project structure guide](docs/development/project-structure.md) before adding
-new modules.
+```mermaid
+flowchart LR
+    subgraph BE["backend/"]
+        direction TB
+        b1[connectors] --> b2[normalization] --> b3[correlation]
+        b3 --> b4[risk_engine] --> b5[financial_engine]
+        b5 --> b6[optimizer] --> b7[compliance]
+    end
+    subgraph ML["ml/"]
+        m1[incident_prediction]
+    end
+    subgraph AIx["ai/"]
+        a1[assistant]
+    end
+    subgraph FE["frontend/"]
+        f1[dashboards]
+    end
 
-## Security Notes
+    m1 -.exploitation scores.-> b4
+    BE --> a1
+    BE --> f1
 
-Before any non-local deployment:
+    style BE fill:#e8f5e9,stroke:#2e7d32
+    style ML fill:#e3f2fd,stroke:#1565c0
+    style AIx fill:#f3e5f5,stroke:#6a1b9a
+    style FE fill:#e0f7fa,stroke:#00838f
+```
 
-- Replace every default secret and password.
-- Restrict CORS instead of allowing all origins.
-- Terminate TLS at a trusted reverse proxy or load balancer.
-- Use a managed identity provider and managed secret storage.
-- Add rate limiting, audit logging, account lockout, and CSRF protections where applicable.
-- Keep PostgreSQL private and back it up.
-- Validate and sanitize uploaded or externally sourced connector data.
-- Review model endpoint data-handling requirements before sending security context externally.
+---
 
-See [`docs/deployment/aws.md`](docs/deployment/aws.md) for the current AWS deployment walkthrough.
+## 🚀 Getting Started
 
-## Current Limitations
+### Prerequisites
 
-- Exact historical ML holdout rows and a training-distribution reference profile
-  are not shipped, so historical metric reproduction and statistical drift remain
-  `NOT_ASSESSABLE`.
-- The XGBoost target is CISA KEV membership; it is approved for prioritization,
-  not direct annual-frequency prediction.
-- Live EAL requires organization-approved frequency and loss evidence for every
-  calculated finding and asset.
-- Scenario control-effect formulas are disclosed planning assumptions and require
-  organization-specific validation before investment decisions.
-- Only the GitHub platform connector currently implements a complete external
-  credential verification and background synchronization workflow.
-- Forecasting remains a deterministic planning projection rather than a trained
-  forecasting model.
+- **Docker** & **Docker Compose v2**
+- `curl` and `python3` (used for secure key generation)
 
-## Team
+### Option A — One-command setup (recommended)
 
-| Area | Contributor |
+```bash
+git clone https://github.com/JashwanthMU/CRISPR.git
+cd CRISPR
+./install.sh
+```
+
+`install.sh` verifies your Docker environment, generates a `.env` with secure secrets, builds the images, and starts the full stack.
+
+### Option B — Manual (Make)
+
+```bash
+cp .env.example .env          # then fill in the values (see below)
+make up                       # build & start all services
+make migrate                  # apply database migrations
+make logs                     # tail logs
+make down                     # stop everything
+```
+
+**Handy Make targets:** `dev` · `up` · `down` · `logs` · `migrate` · `test` · `test-backend` · `test-frontend` · `audit`
+
+### Services
+
+| Service | Description |
 |---|---|
-| Connectors, ingestion and demo datasets | Harish Kumar N |
-| Normalization, correlation, assets and controls | Ishwarya S |
-| Risk and financial quantification | Jashwanth MU |
-| AI/ML, forecasting and AI Advisor | Michael S |
-| Scenarios, optimization and compliance | Kadhiravan EG |
-| Dashboard and frontend integration | Karan RJ |
+| `backend` | FastAPI API (Swagger at `/docs` when `API_DOCS_ENABLED=true`) |
+| `sih-frontend` | React + Vite dashboard |
+| `worker` | Background ingestion / jobs |
+| `db` | PostgreSQL |
 
-## License
+> Once running, open the frontend (default **http://localhost:5173**) and the API (default **http://localhost:8000**). Confirm exact ports in `docker-compose.yml`.
 
-This project is licensed under the [MIT License](LICENSE).
+### Key environment variables (`.env`)
+
+```ini
+# Database
+POSTGRES_DB= / POSTGRES_USER= / POSTGRES_PASSWORD=
+
+# Auth & demo accounts
+AUTH_SECRET=
+SIH_EXECUTIVE_EMAIL= / SIH_EXECUTIVE_PASSWORD=
+SIH_TECHNICAL_EMAIL=  / SIH_TECHNICAL_PASSWORD=
+
+# Modes & features
+CRISPR_DATA_MODE=demo         # demo (seeded) | live (evidence-required)
+DEMO_AUTO_SEED=true
+NEO4J_ENABLED=false           # enable for the context graph
+API_DOCS_ENABLED=true
+
+# External data
+NVD_API_KEY=                  # optional — raises NVD rate limits
+
+# LLM advisor (optional)
+LLM_ENABLED=false
+LLM_BASE_URL= / LLM_API_KEY=
+```
+
+---
+
+## 🖱️ Usage
+
+CRISPR ships with two role-based workspaces, reachable from the login screen:
+
+- **👔 Executive** — enterprise risk score, ₹ financial exposure, what-if scenarios, board briefing.
+- **🔧 Technical** — control-level drill-down, per-finding SHAP drivers, framework mapping.
+
+Ask the built-in advisor questions like *"What is our highest financial cyber risk today?"* and CRISPR answers in plain English — with every ₹ figure traceable to its evidence.
+
+---
+
+## 🧪 Testing
+
+```bash
+make test            # full suite
+make test-backend    # backend only
+make test-frontend   # frontend only
+```
+
+The backend ships **119 test functions across 24 files**, including determinism/reproducibility tests for the financial engine and Monte Carlo, connector tests (CISA KEV, NVD), and AI-assistant fallback tests. CI runs on GitHub Actions (Python 3.12).
+
+---
+
+## 🔐 Security
+
+- **Role-based access control** — executive / technical / reporter roles.
+- **JWT authentication** with configurable token lifetime.
+- **Encrypted connector credentials** (`INTEGRATION_ENCRYPTION_KEY`); HTTPS-only connectors by default.
+- **Evidence-gated financial engine** — untraceable figures are rejected, not displayed.
+- **Deterministic, reproducible outputs** — fixed seeds for auditability.
+
+---
+
+## 🗺️ Roadmap
+
+```mermaid
+gantt
+    title CRISPR Roadmap
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b
+    section Reporting
+    Audit-ready PDF export           :active, 2026-09-15, 14d
+    section Optimization
+    Exact PuLP/ILP optimizer path    :2026-09-20, 14d
+    section Integrations
+    Expand live connectors (SIEM/CSPM/scanners) :2026-09-25, 21d
+    section Compliance
+    Derive scores from live control state :2026-10-05, 14d
+    section ML
+    Continuous retraining + drift monitoring :2026-10-10, 21d
+```
+
+- [ ] **Audit-ready PDF report** export from dashboard + evidence trail
+- [ ] **Exact ILP** optimizer path (PuLP) alongside the greedy heuristic
+- [ ] **More live connectors** — scanner, SIEM, CSPM adapters beyond the current NVD / KEV / GitHub
+- [ ] **Dynamically derived compliance scores** from live control state
+- [ ] **Monitored retraining pipeline** with temporal drift detection
+
+---
+
+## 📚 Research & References
+
+CRISPR is built on established, peer-reviewed cyber-risk economics:
+
+1. **Open FAIR** - The Open Group (O-RA): quantitative risk analysis and taxonomy; the foundation for monetizing cyber risk.
+2. **Orlando, A. (2021).** *Cyber Risk Quantification: Investigating the Role of Cyber Value at Risk.* Risks, 9(10):184. [DOI: 10.3390/risks9100184](https://doi.org/10.3390/risks9100184)
+3. **Gordon, L.A., Loeb, M.P. & Zhou, L. (2020).** *Integrating cost–benefit analysis into the NIST Cybersecurity Framework via the Gordon–Loeb Model.* Journal of Cybersecurity, 6(1):tyaa005. [DOI: 10.1093/cybsec/tyaa005](https://doi.org/10.1093/cybsec/tyaa005)
+
+**Data sources:** NVD · [EPSS v4 — FIRST.org](https://www.first.org/epss/) · [CISA KEV Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) · CERT-In advisories.
+
+> **What makes CRISPR different:** it combines real CVE/EPSS-driven likelihood, a deterministic ₹ guardrail, a budget-constrained optimizer, and India-specific regulatory mapping (RBI / SEBI) in one deployable platform.
+
+<details>
+<summary><strong>Why "CRISPR"?</strong></summary>
+
+Like the gene-editing tool that makes precise, targeted edits, **C**yber **R**isk **I**ntelligence **S**ystem for **P**rioritized **R**emediation makes precise, high-impact edits to your security posture - fixing the risks that actually move financial exposure, not the loudest alerts.
+
+</details>
+
+---
+
+## 👥 Team & License
+
+Built by **Team P0WERH0USE** for **Smart India Hackathon 2026** - Problem Statement **SIH26105**.
+
+Licensed under the **MIT License** - see [LICENSE](LICENSE).
+
+## © Copyright & Usage
+
+© 2026 CRISPR Team. All Rights Reserved.
+
+This project, including its source code, architecture, documentation, designs, workflows, and related materials, is the intellectual property of the CRISPR Team. **No part of this project may be copied, reproduced, modified, distributed, published, or reused in any form without prior written permission from the project owners.**
+
+Unauthorized use, reproduction, or redistribution of this project or substantial portions of its implementation is strictly prohibited.
+
+<div align="center">
+
+**⭐ If CRISPR helped you think about cyber risk in rupees, star the repo.**
+
+*Turning cyber findings into defensible financial decisions.*
+
+</div>
