@@ -56,7 +56,7 @@ CRISPR fuses security telemetry with **asset criticality** and **control effecti
 
 ## 🎯 The Problem
 
-Security findings arrive by the tens of thousands — from scanners, SIEM, EDR, CSPM and threat intel — but they are ranked by **technical severity (CVSS)**, not **business impact**.
+Security findings arrive by the tens of thousands - from scanners, SIEM, EDR, CSPM and threat intel - but they are ranked by **technical severity (CVSS)**, not **business impact**.
 
 > **CVSS ≠ business risk.** A "critical" CVE on an isolated test box matters less than a "medium" on a payment database.
 
@@ -67,7 +67,7 @@ Boards are handed heatmaps that cannot tell them:
 - 📊 Is our security spend going to **real business risk** or to noise?
 - 📝 Can we **prove to an auditor** why each risk was prioritized?
 
-Manual, periodic assessments go stale — by the time a report is written, assets and threats have changed. The result is alert fatigue, mis-allocated spend, SLA breaches, and cyber risk that never enters board-level financial decisions.
+Manual, periodic assessments go stale - by the time a report is written, assets and threats have changed. The result is alert fatigue, mis-allocated spend, SLA breaches, and cyber risk that never enters board-level financial decisions.
 
 **Why it matters in India (2026):** average data-breach cost hit a record **₹25.5 Cr** (IBM, +15.9% YoY; BFSI highest at ₹40.9 Cr) · Indian BFSI faces attacks at **1.6× the global average** · mean time to contain a breach is **263 days and rising** (DSCI–BCG).
 
@@ -79,7 +79,7 @@ Manual, periodic assessments go stale — by the time a report is written, asset
 |---|---|---|
 | 📊 | **Quantify** | Converts technical findings into ₹-denominated **Expected Annual Loss (EAL)** and **Value at Risk (VaR)** using the FAIR model. |
 | 🧠 | **Predict** | A calibrated **XGBoost** model scores per-CVE exploitation likelihood from KEV / NVD / EPSS / CERT-In signals, explained with **SHAP**. |
-| 🔮 | **Simulate** | Instant **what-if scenarios** — MFA rollout, patch delay, before-vs-after remediation, alternative budget allocations. |
+| 🔮 | **Simulate** | Instant **what-if scenarios** - MFA rollout, patch delay, before-vs-after remediation, alternative budget allocations. |
 | 🎛️ | **Optimize** | A budget-constrained optimizer selects the control portfolio that **maximizes risk reduction** under a fixed ₹ budget, with **ROSI**. |
 | 🛡️ | **Guardrail** | A **deterministic financial engine** cross-checks every ₹ figure against source evidence and refuses anything it cannot trace — preventing hallucinated numbers. |
 | 📋 | **Comply** | Maps controls to **ISO/IEC 27001, NIST CSF, CIS, RBI CSF & SEBI CSCRF**. |
@@ -113,7 +113,7 @@ flowchart TD
 
     subgraph OPT["🎛️ Optimization"]
         O1["Budget-Constrained Optimizer (ROSI)"]
-        O2["Monte Carlo VaR — 10,000 seeded runs"]
+        O2["Monte Carlo VaR - 10,000 seeded runs"]
         O3["What-if Scenario Engine"]
     end
 
@@ -138,7 +138,7 @@ flowchart TD
 
 ## 🔄 How It Works
 
-CRISPR runs a four-stage pipeline: **Collect → Quantify → Optimize → Decide** — with AI supporting every stage.
+CRISPR runs a four-stage pipeline: **Collect → Quantify → Optimize → Decide** - with AI supporting every stage.
 
 ```mermaid
 flowchart LR
@@ -156,19 +156,19 @@ flowchart LR
     style D fill:#e0f7fa,stroke:#00838f,stroke-width:2px
 ```
 
-**1 · Collect** — Live connectors (NVD, CISA KEV, GitHub, generic HTTP) plus a normalization layer ingest, cleanse, deduplicate and correlate findings; an asset-criticality engine performs threat-likelihood weighting and entity resolution across sources.
+**1 · Collect** - Live connectors (NVD, CISA KEV, GitHub, generic HTTP) plus a normalization layer ingest, cleanse, deduplicate and correlate findings; an asset-criticality engine performs threat-likelihood weighting and entity resolution across sources.
 
-**2 · Quantify** — The XGBoost model scores exploitation likelihood per CVE. The FAIR engine combines Asset Criticality, Control Effectiveness and evidence-backed Loss Magnitude to produce `EAL = Σ (Pᵢ × Lᵢ)` and `VaR = VaRα(L)`.
+**2 · Quantify** - The XGBoost model scores exploitation likelihood per CVE. The FAIR engine combines Asset Criticality, Control Effectiveness and evidence-backed Loss Magnitude to produce `EAL = Σ (Pᵢ × Lᵢ)` and `VaR = VaRα(L)`.
 
-**3 · Optimize** — A greedy marginal-ROSI optimizer selects the control portfolio maximizing risk reduction under budget; 10,000 seeded Monte Carlo runs produce reproducible 95% / 99% VaR.
+**3 · Optimize** - A greedy marginal-ROSI optimizer selects the control portfolio maximizing risk reduction under budget; 10,000 seeded Monte Carlo runs produce reproducible 95% / 99% VaR.
 
-**4 · Decide** — Executive and technical dashboards, compliance mapping, and a natural-language advisor turn technical findings into defensible financial decisions.
+**4 · Decide** - Executive and technical dashboards, compliance mapping, and a natural-language advisor turn technical findings into defensible financial decisions.
 
 ---
 
 ## 🧠 The ML Model
 
-**Incident-Likelihood Model** — an XGBoost classifier that predicts per-CVE exploitation likelihood.
+**Incident-Likelihood Model** - an XGBoost classifier that predicts per-CVE exploitation likelihood.
 
 ```mermaid
 flowchart LR
@@ -198,9 +198,9 @@ flowchart LR
 |---|---|
 | **Algorithm** | XGBoost 3.4 · 235 estimators · max depth 8 |
 | **Dataset** | ~320,000 CVE records (256K train / 64K test) |
-| **Label** | `exploited = is_kev` — CISA KEV catalog only (no synthetic labels, no EPSS in the label) |
+| **Label** | `exploited = is_kev` - CISA KEV catalog only (no synthetic labels, no EPSS in the label) |
 | **Positives** | 1,592 KEV CVEs · **imbalance ≈ 200:1 (~0.5% base rate)** |
-| **Features** | 20 real features — EPSS score/percentile, CVSS, exploitability & impact sub-scores, attack vector, and CWE-type flags (RCE, SQLi, XSS, buffer overflow, priv-esc, DoS, dir-traversal) |
+| **Features** | 20 real features - EPSS score/percentile, CVSS, exploitability & impact sub-scores, attack vector, and CWE-type flags (RCE, SQLi, XSS, buffer overflow, priv-esc, DoS, dir-traversal) |
 | **Calibration** | Platt scaling |
 | **Explainability** | SHAP (top drivers: EPSS percentile, EPSS score, exploitability score) |
 
@@ -214,13 +214,13 @@ flowchart LR
 | **Ablation — no EPSS** | 0.853 | 0.124 | isolates EPSS contribution |
 | **Calibrated (production)** | 0.982 | 0.481 | deployed model |
 
-> On a **~0.5% base-rate** problem, a random classifier scores PR-AUC ≈ 0.005 — so **PR-AUC 0.479 is ~96× over random**. The ablation shows the full model (0.479) meaningfully outperforms EPSS-derived signal alone: EPSS is our strongest input, not our whole model.
+> On a **~0.5% base-rate** problem, a random classifier scores PR-AUC ≈ 0.005 - so **PR-AUC 0.479 is ~96× over random**. The ablation shows the full model (0.479) meaningfully outperforms EPSS-derived signal alone: EPSS is our strongest input, not our whole model.
 
 ---
 
 ## 🛡️ The Evidence-Gated Financial Engine
 
-This is the heart of CRISPR's trust story. The financial engine is **deterministic and evidence-gated**: a loss event **cannot be created** without citing frequency and loss evidence. The AI never derives ₹ figures from a classifier — it narrates numbers the engine computed and traces every one to source.
+This is the heart of CRISPR's trust story. The financial engine is **deterministic and evidence-gated**: a loss event **cannot be created** without citing frequency and loss evidence. The AI never derives ₹ figures from a classifier - it narrates numbers the engine computed and traces every one to source.
 
 ```mermaid
 sequenceDiagram
@@ -240,7 +240,7 @@ sequenceDiagram
     end
 ```
 
-**How the guardrail is enforced:** each `RiskEvent` requires non-empty `frequency_evidence` and `loss_evidence`; any non-zero control effect requires `control_evidence`; duplicate events are rejected to prevent double-counting; and correlated incidents are modelled explicitly via **shock groups**. Reproducibility is guaranteed by a fixed seed — the same inputs always produce the same VaR.
+**How the guardrail is enforced:** each `RiskEvent` requires non-empty `frequency_evidence` and `loss_evidence`; any non-zero control effect requires `control_evidence`; duplicate events are rejected to prevent double-counting; and correlated incidents are modelled explicitly via **shock groups**. Reproducibility is guaranteed by a fixed seed - the same inputs always produce the same VaR.
 
 > **Demo vs Live modes** (`CRISPR_DATA_MODE`): *demo* runs on a seeded reference environment for reproducibility; *live* mode requires organization-approved, persisted, evidence-backed values before any figure is shown.
 
@@ -261,7 +261,7 @@ flowchart TD
     style OUT fill:#e8f5e9,stroke:#2e7d32
 ```
 
-Each candidate control carries a cost, complexity, implementation time, and its effect on the simulated enterprise EAL — so the recommendation is always an **investment decision with a return**, not a checklist.
+Each candidate control carries a cost, complexity, implementation time, and its effect on the simulated enterprise EAL - so the recommendation is always an **investment decision with a return**, not a checklist.
 
 ---
 
@@ -493,7 +493,7 @@ gantt
 
 CRISPR is built on established, peer-reviewed cyber-risk economics:
 
-1. **Open FAIR** — The Open Group (O-RA): quantitative risk analysis and taxonomy; the foundation for monetizing cyber risk.
+1. **Open FAIR** - The Open Group (O-RA): quantitative risk analysis and taxonomy; the foundation for monetizing cyber risk.
 2. **Orlando, A. (2021).** *Cyber Risk Quantification: Investigating the Role of Cyber Value at Risk.* Risks, 9(10):184. [DOI: 10.3390/risks9100184](https://doi.org/10.3390/risks9100184)
 3. **Gordon, L.A., Loeb, M.P. & Zhou, L. (2020).** *Integrating cost–benefit analysis into the NIST Cybersecurity Framework via the Gordon–Loeb Model.* Journal of Cybersecurity, 6(1):tyaa005. [DOI: 10.1093/cybsec/tyaa005](https://doi.org/10.1093/cybsec/tyaa005)
 
@@ -504,7 +504,7 @@ CRISPR is built on established, peer-reviewed cyber-risk economics:
 <details>
 <summary><strong>Why "CRISPR"?</strong></summary>
 
-Like the gene-editing tool that makes precise, targeted edits, **C**yber **R**isk **I**ntelligence **S**ystem for **P**rioritized **R**emediation makes precise, high-impact edits to your security posture — fixing the risks that actually move financial exposure, not the loudest alerts.
+Like the gene-editing tool that makes precise, targeted edits, **C**yber **R**isk **I**ntelligence **S**ystem for **P**rioritized **R**emediation makes precise, high-impact edits to your security posture - fixing the risks that actually move financial exposure, not the loudest alerts.
 
 </details>
 
@@ -512,9 +512,17 @@ Like the gene-editing tool that makes precise, targeted edits, **C**yber **R**is
 
 ## 👥 Team & License
 
-Built by **Team POWERHOUSE** for **Smart India Hackathon 2026** — Problem Statement **SIH26105**.
+Built by **Team P0WERH0USE** for **Smart India Hackathon 2026** - Problem Statement **SIH26105**.
 
-Licensed under the **MIT License** — see [LICENSE](LICENSE).
+Licensed under the **MIT License** - see [LICENSE](LICENSE).
+
+## © Copyright & Usage
+
+© 2026 CRISPR Team. All Rights Reserved.
+
+This project, including its source code, architecture, documentation, designs, workflows, and related materials, is the intellectual property of the CRISPR Team. **No part of this project may be copied, reproduced, modified, distributed, published, or reused in any form without prior written permission from the project owners.**
+
+Unauthorized use, reproduction, or redistribution of this project or substantial portions of its implementation is strictly prohibited.
 
 <div align="center">
 
